@@ -2,111 +2,152 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <title>Advanced Framework with Virtual DOM</title>
+    <title>Framework</title>
   </head>
   <body>
     <div id="root"></div>
 
     <script>
       const MyFramework = {
-        _renderFunction: null,
         _rootElement: null,
         _oldVNode: null,
-
+        _effects: [],
+        _effectIndex: 0,
+        _effectRunners: [],
         h(tag, props, ...children) {
-          return { tag, props: props || {}, children };
+          return { tag, props: props || {}, children: children.flat() };
         },
-
+        registerEffects(effectRunner) {
+          this._effectRunners.push(effectRunner);
+        },
+        useEffect(callback, deps) {
+          const oldDeps = this._effects[this._effectIndex];
+          let hasDepsChanged =
+            !oldDeps ||
+            !deps ||
+            deps.length !== oldDeps.length ||
+            deps.some((dep, i) => dep !== oldDeps[i]);
+          if (hasDepsChanged) {
+            callback();
+            this._effects[this._effectIndex] = deps;
+          }
+          this._effectIndex++;
+        },
         createDOMElement(vnode) {
-          if (typeof vnode === "string" || typeof vnode === "number") {
+          if (vnode.tag === undefined) {
             return document.createTextNode(String(vnode));
           }
-
-          const element = document.createElement(vnode.tag);
-
-          Object.entries(vnode.props).forEach(([name, value]) => {
+          const el = document.createElement(vnode.tag);
+          Object.entries(vnode.props || {}).forEach(([name, value]) => {
             if (name.startsWith("on")) {
-              const eventName = name.toLowerCase().substring(2);
-              element.addEventListener(eventName, value);
+              const eventName = name.slice(2).toLowerCase();
+              el.addEventListener(eventName, value);
             } else {
-              element.setAttribute(name, value);
+              el.setAttribute(name, value);
             }
           });
-
-          vnode.children.forEach((childVNode) => {
-            element.appendChild(this.createDOMElement(childVNode));
-          });
-
-          return element;
+          vnode.children.forEach((child) =>
+            el.appendChild(this.createDOMElement(child))
+          );
+          return el;
         },
 
-        updateElement(parentElement, newVNode, oldVNode, index = 0) {
-          const realDOMElement = parentElement.childNodes[index];
-
-          if (oldVNode == null) {
-            parentElement.appendChild(this.createDOMElement(newVNode));
-            return;
-          }
+        updateElement(parent, newVNode, oldVNode, index = 0) {
+          const el = parent.childNodes[index];
 
           if (newVNode == null) {
-            parentElement.removeChild(realDOMElement);
+            parent.removeChild(el);
+            return;
+          }
+          if (oldVNode == null) {
+            parent.appendChild(this.createDOMElement(newVNode));
             return;
           }
 
-          const typeChanged = typeof newVNode !== typeof oldVNode;
-          const tagChanged = !typeChanged && newVNode.tag !== oldVNode.tag;
-          if (typeChanged || tagChanged) {
-            parentElement.replaceChild(
-              this.createDOMElement(newVNode),
-              realDOMElement
-            );
+          // 교체 조건: VNode의 핵심 속성(.tag) 유무가 다르거나, 태그 이름이 다를 때
+          const hasTagNew = newVNode.tag !== undefined;
+          const hasTagOld = oldVNode.tag !== undefined;
+          if (
+            hasTagNew !== hasTagOld ||
+            (hasTagNew && newVNode.tag !== oldVNode.tag)
+          ) {
+            parent.replaceChild(this.createDOMElement(newVNode), el);
             return;
           }
 
-          if (newVNode.tag) {
-            const newLength = newVNode.children.length;
-            const oldLength = oldVNode.children.length;
-            for (let i = 0; i < newLength || i < oldLength; i++) {
+          // VNode가 태그를 가진 Element일 경우
+          if (hasTagNew) {
+            const newLen = newVNode.children.length;
+            const oldLen = oldVNode.children.length;
+            for (let i = 0; i < newLen || i < oldLen; i++) {
               this.updateElement(
-                realDOMElement,
+                el,
                 newVNode.children[i],
                 oldVNode.children[i],
                 i
               );
             }
-          } else if (newVNode !== oldVNode) {
-            realDOMElement.nodeValue = newVNode;
+          }
+          // VNode가 태그가 없는 원시 값(Text)일 경우
+          else {
+            if (newVNode !== oldVNode) {
+              el.nodeValue = String(newVNode);
+            }
           }
         },
 
         render(AppComponent, rootElement) {
           this._rootElement = rootElement;
-          this._renderFunction = AppComponent();
-
-          const updater = this.update.bind(this);
+          const renderFunction = AppComponent();
+          const updater = this.update.bind(this, renderFunction);
           updater();
           setInterval(updater, 1000);
         },
-
-        update() {
-          const newVNode = this._renderFunction();
+        update(renderFunction) {
+          this._effectIndex = 0;
+          this._effectRunners.forEach((runner) => runner());
+          const newVNode = renderFunction();
           this.updateElement(this._rootElement, newVNode, this._oldVNode);
           this._oldVNode = newVNode;
         },
       };
 
       const h = MyFramework.h;
+      const useEffect = MyFramework.useEffect.bind(MyFramework);
+      const registerEffects = MyFramework.registerEffects.bind(MyFramework);
 
       const App = () => {
         let count = 0;
+        let text = "Hello";
         const increment = () => count++;
+        const handleInput = (e) => (text = e.target.value);
+
+        registerEffects(() => {
+          useEffect(() => {
+            console.log("🚀 앱이 처음 렌더링되었습니다.");
+          }, []);
+        });
+        registerEffects(() => {
+          useEffect(() => {
+            console.log(`카운트가 변경되었습니다: ${count}`);
+            document.title = `카운트: ${count}`;
+          }, [count]);
+        });
+        registerEffects(() => {
+          useEffect(() => {
+            console.log(`매번 렌더링됩니다. 현재 텍스트: ${text}`);
+          });
+        });
 
         return () => {
           return h(
             "div",
             { class: "container" },
             h("h1", null, "카운트: ", count),
-            h("button", { onClick: increment }, "count 증가")
+            h("button", { onClick: increment }, "count 증가"),
+            h("hr"),
+            h("input", { value: text, onInput: handleInput }),
+            h("p", null, "입력된 텍스트: ", text)
           );
         };
       };
