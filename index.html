@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Advanced Framework with Virtual DOM</title>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script>
+      const MyFramework = {
+        _renderFunction: null,
+        _rootElement: null,
+        _oldVNode: null,
+
+        h(tag, props, ...children) {
+          return { tag, props: props || {}, children };
+        },
+
+        createDOMElement(vnode) {
+          if (typeof vnode === "string" || typeof vnode === "number") {
+            return document.createTextNode(String(vnode));
+          }
+
+          const element = document.createElement(vnode.tag);
+
+          Object.entries(vnode.props).forEach(([name, value]) => {
+            if (name.startsWith("on")) {
+              const eventName = name.toLowerCase().substring(2);
+              element.addEventListener(eventName, value);
+            } else {
+              element.setAttribute(name, value);
+            }
+          });
+
+          vnode.children.forEach((childVNode) => {
+            element.appendChild(this.createDOMElement(childVNode));
+          });
+
+          return element;
+        },
+
+        updateElement(parentElement, newVNode, oldVNode, index = 0) {
+          const realDOMElement = parentElement.childNodes[index];
+
+          if (oldVNode == null) {
+            parentElement.appendChild(this.createDOMElement(newVNode));
+            return;
+          }
+
+          if (newVNode == null) {
+            parentElement.removeChild(realDOMElement);
+            return;
+          }
+
+          const typeChanged = typeof newVNode !== typeof oldVNode;
+          const tagChanged = !typeChanged && newVNode.tag !== oldVNode.tag;
+          if (typeChanged || tagChanged) {
+            parentElement.replaceChild(
+              this.createDOMElement(newVNode),
+              realDOMElement
+            );
+            return;
+          }
+
+          if (newVNode.tag) {
+            const newLength = newVNode.children.length;
+            const oldLength = oldVNode.children.length;
+            for (let i = 0; i < newLength || i < oldLength; i++) {
+              this.updateElement(
+                realDOMElement,
+                newVNode.children[i],
+                oldVNode.children[i],
+                i
+              );
+            }
+          } else if (newVNode !== oldVNode) {
+            realDOMElement.nodeValue = newVNode;
+          }
+        },
+
+        render(AppComponent, rootElement) {
+          this._rootElement = rootElement;
+          this._renderFunction = AppComponent();
+
+          const updater = this.update.bind(this);
+          updater();
+          setInterval(updater, 1000);
+        },
+
+        update() {
+          const newVNode = this._renderFunction();
+          this.updateElement(this._rootElement, newVNode, this._oldVNode);
+          this._oldVNode = newVNode;
+        },
+      };
+
+      const h = MyFramework.h;
+
+      const App = () => {
+        let count = 0;
+        const increment = () => count++;
+
+        return () => {
+          return h(
+            "div",
+            { class: "container" },
+            h("h1", null, "카운트: ", count),
+            h("button", { onClick: increment }, "count 증가")
+          );
+        };
+      };
+
+      const root = document.getElementById("root");
+      MyFramework.render(App, root);
+    </script>
+  </body>
+</html>
