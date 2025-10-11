@@ -2,158 +2,282 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <title>Framework</title>
+    <title>My Framework</title>
   </head>
   <body>
     <div id="root"></div>
 
-    <script>
-      const MyFramework = {
-        _rootElement: null,
-        _oldVNode: null,
-        _effects: [],
-        _effectIndex: 0,
-        _effectRunners: [],
-        h(tag, props, ...children) {
+    <script type="module">
+      const CoolFramework = {
+        // --- 🖼️ 프레임워크 내부 상태 ---
+        _containerElement: null,
+        _RootComponent: null,
+        _previousVNode: null,
+        _componentInstanceMap: new Map(),
+
+        createVNode(tag, props, ...children) {
           return { tag, props: props || {}, children: children.flat() };
         },
-        registerEffects(effectRunner) {
-          this._effectRunners.push(effectRunner);
+
+        // --- ⚙️ 컴포넌트 인스턴스 및 훅(Hooks) 관리 ---
+
+        _getCurrentInstance() {
+          const currentInstanceKey = this._componentInstanceMap.get(
+            "$$currentInstanceKey"
+          );
+          return this._componentInstanceMap.get(currentInstanceKey);
         },
-        useEffect(callback, deps) {
-          const oldDeps = this._effects[this._effectIndex];
-          let hasDepsChanged =
-            !oldDeps ||
-            !deps ||
-            deps.length !== oldDeps.length ||
-            deps.some((dep, i) => dep !== oldDeps[i]);
-          if (hasDepsChanged) {
+
+        /**
+         * ✨ 1. `watch` 함수 추가
+         * 매번 업데이트 시 실행되어야 할 로직(주로 useEffect)을 등록합니다.
+         * @param {Function} runner - 매번 실행될 함수
+         */
+        watch(runner) {
+          const instance = this._getCurrentInstance();
+          if (!instance) return;
+          instance._effectRunners.push(runner);
+        },
+
+        /**
+         * ✨ 2. `useEffect` 로직 수정
+         * 이제 이 함수는 `watch`에 의해 매번 다시 호출되므로,
+         * 호출될 때마다 최신 의존성 배열을 받아 정상적으로 비교를 수행할 수 있습니다.
+         */
+        useEffect(callback, dependencies) {
+          const instance = this._getCurrentInstance();
+          if (!instance) return;
+
+          const oldDependencies = instance.hooks[instance.hookIndex];
+          const hasChanged =
+            !oldDependencies ||
+            !dependencies ||
+            dependencies.some((dep, i) => dep !== oldDependencies[i]);
+
+          if (hasChanged) {
             callback();
-            this._effects[this._effectIndex] = deps;
+            instance.hooks[instance.hookIndex] = dependencies;
           }
-          this._effectIndex++;
+          instance.hookIndex++;
         },
-        createDOMElement(vnode) {
+
+        // --- DOM 렌더링 및 업데이트 (재조정) ---
+
+        _createDomNode(vnode) {
           if (vnode.tag === undefined) {
             return document.createTextNode(String(vnode));
           }
-          const el = document.createElement(vnode.tag);
-          Object.entries(vnode.props || {}).forEach(([name, value]) => {
+          if (typeof vnode.tag === "function") {
+            return document.createComment("Component Placeholder");
+          }
+          const domNode = document.createElement(vnode.tag);
+          Object.entries(vnode.props).forEach(([name, value]) => {
             if (name.startsWith("on")) {
               const eventName = name.slice(2).toLowerCase();
-              el.addEventListener(eventName, value);
+              domNode.addEventListener(eventName, value);
             } else {
-              el.setAttribute(name, value);
+              domNode.setAttribute(name, value);
             }
           });
-          vnode.children.forEach((child) =>
-            el.appendChild(this.createDOMElement(child))
-          );
-          return el;
+          return domNode;
         },
 
-        updateElement(parent, newVNode, oldVNode, index = 0) {
-          const el = parent.childNodes[index];
-
+        _reconcile(
+          parentElement,
+          newVNode,
+          prevVNode,
+          index = 0,
+          instanceKey = "root"
+        ) {
           if (newVNode == null) {
-            parent.removeChild(el);
-            return;
-          }
-          if (oldVNode == null) {
-            parent.appendChild(this.createDOMElement(newVNode));
-            return;
-          }
-
-          // 교체 조건: VNode의 핵심 속성(.tag) 유무가 다르거나, 태그 이름이 다를 때
-          const hasTagNew = newVNode.tag !== undefined;
-          const hasTagOld = oldVNode.tag !== undefined;
-          if (
-            hasTagNew !== hasTagOld ||
-            (hasTagNew && newVNode.tag !== oldVNode.tag)
-          ) {
-            parent.replaceChild(this.createDOMElement(newVNode), el);
+            if (prevVNode?.tag && typeof prevVNode.tag === "function") {
+              this._componentInstanceMap.delete(instanceKey);
+            }
+            if (parentElement.childNodes[index]) {
+              parentElement.removeChild(parentElement.childNodes[index]);
+            }
             return;
           }
 
-          // VNode가 태그를 가진 Element일 경우
-          if (hasTagNew) {
-            const newLen = newVNode.children.length;
-            const oldLen = oldVNode.children.length;
-            for (let i = 0; i < newLen || i < oldLen; i++) {
-              this.updateElement(
-                el,
-                newVNode.children[i],
-                oldVNode.children[i],
-                i
+          if (typeof newVNode.tag === "function") {
+            let instance = this._componentInstanceMap.get(instanceKey);
+
+            if (!instance || prevVNode?.tag !== newVNode.tag) {
+              instance = {
+                prevRenderedVNode: null,
+                hooks: [],
+                hookIndex: 0,
+                _effectRunners: [], // ✨ effect 실행기(runner)를 저장할 배열
+              };
+              this._componentInstanceMap.set(instanceKey, instance);
+              this._componentInstanceMap.set(
+                "$$currentInstanceKey",
+                instanceKey
               );
+              // setup 실행 시, 내부의 watch 함수가 runner들을 등록합니다.
+              instance.render = newVNode.tag(newVNode.props);
             }
+
+            this._componentInstanceMap.set("$$currentInstanceKey", instanceKey);
+            const componentRenderedVNode = instance.render();
+
+            this._reconcile(
+              parentElement,
+              componentRenderedVNode,
+              instance.prevRenderedVNode,
+              index,
+              instanceKey
+            );
+
+            instance.prevRenderedVNode = componentRenderedVNode;
+            return;
           }
-          // VNode가 태그가 없는 원시 값(Text)일 경우
-          else {
-            if (newVNode !== oldVNode) {
-              el.nodeValue = String(newVNode);
+
+          const prevRenderedVNode =
+            prevVNode && typeof prevVNode.tag === "function"
+              ? this._componentInstanceMap.get(instanceKey)?.prevRenderedVNode
+              : prevVNode;
+
+          if (prevRenderedVNode == null) {
+            const newDomNode = this._createDomNode(newVNode);
+            if (typeof newVNode === "object" && newVNode !== null) {
+              newVNode.children.forEach((childVNode, i) => {
+                this._reconcile(
+                  newDomNode,
+                  childVNode,
+                  null,
+                  i,
+                  `${instanceKey}.${i}`
+                );
+              });
             }
+            parentElement.appendChild(newDomNode);
+            return;
+          }
+
+          const domNode = parentElement.childNodes[index];
+
+          if (newVNode.tag !== prevRenderedVNode.tag) {
+            const newDomNode = this._createDomNode(newVNode);
+            if (typeof newVNode === "object" && newVNode !== null) {
+              newVNode.children.forEach((childVNode, i) => {
+                this._reconcile(
+                  newDomNode,
+                  childVNode,
+                  null,
+                  i,
+                  `${instanceKey}.${i}`
+                );
+              });
+            }
+            parentElement.replaceChild(newDomNode, domNode);
+            return;
+          }
+
+          if (newVNode.tag === undefined) {
+            if (domNode.nodeValue !== String(newVNode)) {
+              domNode.nodeValue = String(newVNode);
+            }
+            return;
+          }
+
+          const newChildrenCount = newVNode.children.length;
+          const oldChildrenCount = prevRenderedVNode.children.length;
+          for (let i = 0; i < newChildrenCount || i < oldChildrenCount; i++) {
+            this._reconcile(
+              domNode,
+              newVNode.children[i],
+              prevRenderedVNode.children[i],
+              i,
+              `${instanceKey}.${i}`
+            );
           }
         },
 
-        render(AppComponent, rootElement) {
-          this._rootElement = rootElement;
-          const renderFunction = AppComponent();
-          const updater = this.update.bind(this, renderFunction);
-          updater();
-          setInterval(updater, 1000);
+        // --- 🚀 프레임워크 초기화 및 실행 루프 ---
+
+        mount(RootComponent, containerElement) {
+          this._containerElement = containerElement;
+          this._RootComponent = RootComponent;
+
+          this._tick();
+          setInterval(() => this._tick(), 1000);
         },
-        update(renderFunction) {
-          this._effectIndex = 0;
-          this._effectRunners.forEach((runner) => runner());
-          const newVNode = renderFunction();
-          this.updateElement(this._rootElement, newVNode, this._oldVNode);
-          this._oldVNode = newVNode;
+
+        _tick() {
+          // ✨ 3. 렌더링 전, 등록된 effect runner들을 먼저 실행
+          for (const [key, instance] of this._componentInstanceMap.entries()) {
+            if (key === "$$currentInstanceKey") continue;
+            instance.hookIndex = 0;
+            // 등록된 runner를 실행하면, 내부의 useEffect가 최신 상태값으로 다시 호출됩니다.
+            instance._effectRunners.forEach((runner) => runner());
+          }
+
+          const newVNode = this.createVNode(this._RootComponent);
+          this._reconcile(
+            this._containerElement,
+            newVNode,
+            this._previousVNode
+          );
+          this._previousVNode = newVNode;
         },
       };
 
-      const h = MyFramework.h;
-      const useEffect = MyFramework.useEffect.bind(MyFramework);
-      const registerEffects = MyFramework.registerEffects.bind(MyFramework);
+      // --- ✨ 사용자가 작성할 코드 ---
+      const createVNode = CoolFramework.createVNode.bind(CoolFramework);
+      const useEffect = CoolFramework.useEffect.bind(CoolFramework);
+      // ✨ watch 함수를 사용자가 쓸 수 있도록 별칭을 만듭니다.
+      const watch = CoolFramework.watch.bind(CoolFramework);
+
+      const Counter = () => {
+        let count = 0;
+        const increment = () => count++;
+
+        // ✨ watch로 감싸서 이 effect가 매번 실행되어야 함을 알려줍니다.
+        watch(() => {
+          useEffect(() => {
+            console.log(`[Counter] 카운트가 변경되었습니다: ${count}`);
+          }, [count]);
+        });
+
+        return () => {
+          return createVNode(
+            "div",
+            {
+              style: "border: 1px solid blue; padding: 10px; margin-top: 10px;",
+            },
+            createVNode("h2", null, "자식 카운트: ", count),
+            createVNode("button", { onClick: increment }, "자식 count 증가")
+          );
+        };
+      };
 
       const App = () => {
-        let count = 0;
         let text = "Hello";
-        const increment = () => count++;
         const handleInput = (e) => (text = e.target.value);
 
-        registerEffects(() => {
+        // ✨ 마운트 시 한 번만 실행되는 effect
+        watch(() => {
           useEffect(() => {
             console.log("🚀 앱이 처음 렌더링되었습니다.");
           }, []);
         });
-        registerEffects(() => {
-          useEffect(() => {
-            console.log(`카운트가 변경되었습니다: ${count}`);
-            document.title = `카운트: ${count}`;
-          }, [count]);
-        });
-        registerEffects(() => {
-          useEffect(() => {
-            console.log(`매번 렌더링됩니다. 현재 텍스트: ${text}`);
-          });
-        });
 
         return () => {
-          return h(
+          return createVNode(
             "div",
             { class: "container" },
-            h("h1", null, "카운트: ", count),
-            h("button", { onClick: increment }, "count 증가"),
-            h("hr"),
-            h("input", { value: text, onInput: handleInput }),
-            h("p", null, "입력된 텍스트: ", text)
+            createVNode("h1", null, "부모 컴포넌트"),
+            createVNode("input", { value: text, onInput: handleInput }),
+            createVNode("p", null, "입력된 텍스트: ", text),
+            createVNode(Counter),
+            createVNode(Counter)
           );
         };
       };
 
       const root = document.getElementById("root");
-      MyFramework.render(App, root);
+      CoolFramework.mount(App, root);
     </script>
   </body>
 </html>
