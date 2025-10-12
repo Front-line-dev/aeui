@@ -53,11 +53,20 @@ function App() {
 - `function` 혹은 `Arrow function`으로 JSX를 return 한다.
 - React와는 다르게 내부 코드는 1번만 실행된다.
 - 컴포넌트 내부에 `watch` 사용시 특정 코드를 여러번 실행시킬 수 있다. 아래 참조.
+- 컴포넌트 내부에 `clean` 사용시 unmount시에 특정 코드를 실행시킬 수 있다. 아래 참조.
 
 ## watch
 
-- `watch`는 유일한 hook으로, React의 `useEffect`와 비슷하게 작동해서 `watch`로 컴포넌트 내의 코드를 여러번 실행시킬 수 있다.
-  - `useEffect`와 다른 점은 `useEffect`는 값이 변경될 때(렌더)마다 트리거되지만, `AEUI`에서는 렌더를 `tick`마다 실행하기 때문에 모든 값 변경마다 실행되지 않을 수 있다.
+`watch`는 hook으로, React의 `useEffect`와 비슷하게 작동해서 `watch`로 컴포넌트 내의 코드를 여러번 실행시킬 수 있다.
+
+- `useEffect`는 컴포넌트 mount시 실행되지만 `watch`는 mount시 실행되지 않는다.
+- `useEffect`는 렌더 -> DOM 수정완료 후에 실행되지만 `watch`는 기본적으로 렌더 전에 실행되고 옵션을 통해 DOM 수정완료 후에 실행할 수 있다.
+- `useEffect`는 cleanup 기능이 있으나 `watch`는 없고 해당 기능은 별도 hook인 `clean`으로 사용한다.
+- `useEffect`와 다른 점은 `useEffect`는 값이 변경될 때(렌더)마다 트리거되지만, `AEUI`에서는 렌더를 `tick`마다 실행하기 때문에 모든 값 변경마다 실행되지 않을 수 있다.
+
+## clean (TODO)
+
+`clean`은 hook으로, 컴포넌트가 unmount될 때 실행된다.
 
 # 배포
 
@@ -78,6 +87,13 @@ SSR, Static Build 2개의 방법을 제공한다.
 # 기타
 
 - TODO
+  - InstanceMap을 트리 구조로 변경
+  - Diffing Algorithm 개선
+    - 순서 중간에 다른 컴포넌트가 추가되어도 상태 유지
+    - key 사용 가능
   - 다른 프레임워크처럼 create 명령어 제공
   - babel, SWC 2개의 트랜스파일러 옵션 제공
     - 웹 환경을 위해 babel 옵션을 남겨두고, 실제 사용시 SWC로 속도를 빠르게
+  - `_currentInstance`을 내부 구조가 stack인 클래스로 변경해서 더 유연하게 작동?
+    - 필요한 부분에서 자체적으로 사용?
+  - TypeScript 지원

@@ -9,39 +9,52 @@
 
     <script type="module">
       const CoolFramework = {
-        // --- 🖼️ 프레임워크 내부 상태 ---
         _containerElement: null,
         _RootComponent: null,
         _previousVNode: null,
         _componentInstanceMap: new Map(),
+        _componentInstanceTree: [],
         _currentInstance: null,
 
+        createInstance(instanceKey, newVNode) {
+          const instance = {
+            prevRenderedVNode: null,
+            watchIndex: 0,
+            watchRunners: [],
+            watchStates: [],
+          };
+          this._componentInstanceMap.set(instanceKey, instance);
+          // TODO: 필요한지 확인
+          this._currentInstance = instance;
+          // 컴포넌트 실행
+          instance.render = newVNode.tag(newVNode.props);
+
+          return instance;
+        },
+
+        // tag: HTML tagName OR Component(function)
         createVNode(tag, props, ...children) {
           return { tag, props: props || {}, children: children.flat() };
         },
 
-        /**
-         * ✨ 1. `watch` 함수 추가
-         * 매번 업데이트 시 실행되어야 할 로직(주로 useEffect)을 등록합니다.
-         * @param {Function} runner - 매번 실행될 함수
-         */
-        watch(runner) {
+        registerWatch(runner) {
           const instance = this._currentInstance;
-          if (!instance) return;
 
-          instance._effectRunners.push(runner);
+          instance.watchRunners.push(runner);
+          instance.watchStates.push(runner());
+          instance.watchIndex++;
         },
 
-        /**
-         * ✨ 2. `useEffect` 로직 수정
-         * 이제 이 함수는 `watch`에 의해 매번 다시 호출되므로,
-         * 호출될 때마다 최신 의존성 배열을 받아 정상적으로 비교를 수행할 수 있습니다.
-         */
-        useEffect(callback, dependencies) {
+        watch(callback, dependencies) {
           const instance = this._currentInstance;
-          if (!instance) return;
+          const oldDependencies = instance.watchStates[instance.watchIndex];
 
-          const oldDependencies = instance.hooks[instance.hookIndex];
+          // 처음 생성될 때 callback을 실행하지 않고 초기 dependencies 등록
+          if (!oldDependencies) {
+            return dependencies;
+          }
+
+          // TODO: 공통 함수로 변경
           const hasChanged =
             !oldDependencies ||
             !dependencies ||
@@ -49,9 +62,11 @@
 
           if (hasChanged) {
             callback();
-            instance.hooks[instance.hookIndex] = dependencies;
+            instance.watchStates[instance.watchIndex] = dependencies;
           }
-          instance.hookIndex++;
+
+          // TODO: dependencies가 변하지 않았으면 변하지 않았다고 추가로 알려줘서 효율적이게 작동
+          return dependencies;
         },
 
         // --- DOM 렌더링 및 업데이트 (재조정) ---
@@ -96,17 +111,9 @@
             let instance = this._componentInstanceMap.get(instanceKey);
 
             if (!instance || prevVNode?.tag !== newVNode.tag) {
-              instance = {
-                prevRenderedVNode: null,
-                hooks: [],
-                hookIndex: 0,
-                _effectRunners: [], // ✨ effect 실행기(runner)를 저장할 배열
-              };
-              this._componentInstanceMap.set(instanceKey, instance);
-              this._currentInstance = instance;
-              // setup 실행 시, 내부의 watch 함수가 runner들을 등록합니다.
-              instance.render = newVNode.tag(newVNode.props);
+              instance = this.createInstance(instanceKey, newVNode);
             }
+            // TODO: unmount 코드 작성
 
             this._currentInstance = instance;
             const componentRenderedVNode = instance.render();
@@ -186,7 +193,7 @@
 
         // --- 🚀 프레임워크 초기화 및 실행 루프 ---
 
-        mount(RootComponent, containerElement) {
+        init(RootComponent, containerElement) {
           this._containerElement = containerElement;
           this._RootComponent = RootComponent;
 
@@ -195,12 +202,16 @@
         },
 
         _tick() {
-          // ✨ 3. 렌더링 전, 등록된 effect runner들을 먼저 실행
+          // ✨ 3. 렌더링 전, 등록된 watchRunner들을 먼저 실행
+          // TODO: 트리로 변경
           for (const [key, instance] of this._componentInstanceMap.entries()) {
-            if (instance === this._currentInstance) continue;
-            instance.hookIndex = 0;
-            // 등록된 runner를 실행하면, 내부의 useEffect가 최신 상태값으로 다시 호출됩니다.
-            instance._effectRunners.forEach((runner) => runner());
+            // 필요한지 체크
+            // if (instance === this._currentInstance) continue;
+            instance.watchIndex = 0;
+            instance.watchRunners.forEach((runner) => {
+              instance.watchStates[instance.watchIndex] = runner();
+              instance.watchIndex++;
+            });
           }
 
           const newVNode = this.createVNode(this._RootComponent);
@@ -215,17 +226,16 @@
 
       // --- ✨ 사용자가 작성할 코드 ---
       const createVNode = CoolFramework.createVNode.bind(CoolFramework);
-      const useEffect = CoolFramework.useEffect.bind(CoolFramework);
-      // ✨ watch 함수를 사용자가 쓸 수 있도록 별칭을 만듭니다.
       const watch = CoolFramework.watch.bind(CoolFramework);
+      const registerWatch = CoolFramework.registerWatch.bind(CoolFramework);
 
       const Counter = () => {
         let count = 0;
         const increment = () => count++;
 
         // ✨ watch로 감싸서 이 effect가 매번 실행되어야 함을 알려줍니다.
-        watch(() => {
-          useEffect(() => {
+        registerWatch(() => {
+          return watch(() => {
             console.log(`[Counter] 카운트가 변경되었습니다: ${count}`);
           }, [count]);
         });
@@ -247,8 +257,8 @@
         const handleInput = (e) => (text = e.target.value);
 
         // ✨ 마운트 시 한 번만 실행되는 effect
-        watch(() => {
-          useEffect(() => {
+        registerWatch(() => {
+          return watch(() => {
             console.log("🚀 앱이 처음 렌더링되었습니다.");
           }, []);
         });
@@ -267,7 +277,7 @@
       };
 
       const root = document.getElementById("root");
-      CoolFramework.mount(App, root);
+      CoolFramework.init(App, root);
     </script>
   </body>
 </html>
