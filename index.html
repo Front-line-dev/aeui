@@ -14,18 +14,10 @@
         _RootComponent: null,
         _previousVNode: null,
         _componentInstanceMap: new Map(),
+        _currentInstance: null,
 
         createVNode(tag, props, ...children) {
           return { tag, props: props || {}, children: children.flat() };
-        },
-
-        // --- ⚙️ 컴포넌트 인스턴스 및 훅(Hooks) 관리 ---
-
-        _getCurrentInstance() {
-          const currentInstanceKey = this._componentInstanceMap.get(
-            "$$currentInstanceKey"
-          );
-          return this._componentInstanceMap.get(currentInstanceKey);
         },
 
         /**
@@ -34,8 +26,9 @@
          * @param {Function} runner - 매번 실행될 함수
          */
         watch(runner) {
-          const instance = this._getCurrentInstance();
+          const instance = this._currentInstance;
           if (!instance) return;
+
           instance._effectRunners.push(runner);
         },
 
@@ -45,7 +38,7 @@
          * 호출될 때마다 최신 의존성 배열을 받아 정상적으로 비교를 수행할 수 있습니다.
          */
         useEffect(callback, dependencies) {
-          const instance = this._getCurrentInstance();
+          const instance = this._currentInstance;
           if (!instance) return;
 
           const oldDependencies = instance.hooks[instance.hookIndex];
@@ -110,15 +103,12 @@
                 _effectRunners: [], // ✨ effect 실행기(runner)를 저장할 배열
               };
               this._componentInstanceMap.set(instanceKey, instance);
-              this._componentInstanceMap.set(
-                "$$currentInstanceKey",
-                instanceKey
-              );
+              this._currentInstance = instance;
               // setup 실행 시, 내부의 watch 함수가 runner들을 등록합니다.
               instance.render = newVNode.tag(newVNode.props);
             }
 
-            this._componentInstanceMap.set("$$currentInstanceKey", instanceKey);
+            this._currentInstance = instance;
             const componentRenderedVNode = instance.render();
 
             this._reconcile(
@@ -207,7 +197,7 @@
         _tick() {
           // ✨ 3. 렌더링 전, 등록된 effect runner들을 먼저 실행
           for (const [key, instance] of this._componentInstanceMap.entries()) {
-            if (key === "$$currentInstanceKey") continue;
+            if (instance === this._currentInstance) continue;
             instance.hookIndex = 0;
             // 등록된 runner를 실행하면, 내부의 useEffect가 최신 상태값으로 다시 호출됩니다.
             instance._effectRunners.forEach((runner) => runner());
