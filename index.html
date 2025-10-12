@@ -256,7 +256,7 @@
         let text = "Hello";
         const handleInput = (e) => (text = e.target.value);
 
-        // ✨ 마운트 시 한 번만 실행되는 effect
+        // 실행되지 않아야 함
         registerWatch(() => {
           return watch(() => {
             console.log("🚀 앱이 처음 렌더링되었습니다.");

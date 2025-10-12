@@ -60,9 +60,11 @@ function App() {
 `watch`는 hook으로, React의 `useEffect`와 비슷하게 작동해서 `watch`로 컴포넌트 내의 코드를 여러번 실행시킬 수 있다.
 
 - `useEffect`는 컴포넌트 mount시 실행되지만 `watch`는 mount시 실행되지 않는다.
-- `useEffect`는 렌더 -> DOM 수정완료 후에 실행되지만 `watch`는 기본적으로 렌더 전에 실행되고 옵션을 통해 DOM 수정완료 후에 실행할 수 있다.
+- `useEffect`는 렌더 -> DOM 수정완료 후에 실행되지만 `watch`는 기본적으로 렌더 전에 실행되고 TODO: 옵션을 통해 DOM 수정완료 후에 실행할 수 있다.
 - `useEffect`는 cleanup 기능이 있으나 `watch`는 없고 해당 기능은 별도 hook인 `clean`으로 사용한다.
 - `useEffect`와 다른 점은 `useEffect`는 값이 변경될 때(렌더)마다 트리거되지만, `AEUI`에서는 렌더를 `tick`마다 실행하기 때문에 모든 값 변경마다 실행되지 않을 수 있다.
+- TODO
+  - dependency가 Array 뿐만 아니라 AEUI 상태값도 핸들링 할 수 있게 변경
 
 ## clean (TODO)
 
