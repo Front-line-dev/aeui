@@ -88,6 +88,9 @@ SSR, Static Build 2개의 방법을 제공한다.
 
 # 기타
 
+- 1.0 버전 이전에는 중요한 작업에 사용을 권장하지 않음
+  - 1.0 이전 버전과 달리 내부 작동 방식이 변경될 수 있음
+  - 1.0 이전 버전에서 보안 이슈가 발생해도 마이너 버전으로 패치하지 않음
 - TODO
   - InstanceMap을 트리 구조로 변경
   - Diffing Algorithm 개선
@@ -96,6 +99,25 @@ SSR, Static Build 2개의 방법을 제공한다.
   - 다른 프레임워크처럼 create 명령어 제공
   - babel, SWC 2개의 트랜스파일러 옵션 제공
     - 웹 환경을 위해 babel 옵션을 남겨두고, 실제 사용시 SWC로 속도를 빠르게
+    - https://ko.react.dev/reference/react/createElement 같은 웹 플레이그라운드를 위해 babel 사용
   - `_currentInstance`을 내부 구조가 stack인 클래스로 변경해서 더 유연하게 작동?
     - 필요한 부분에서 자체적으로 사용?
   - TypeScript 지원
+  - `<meta>` 지원
+  - `SCSS` 지원
+  - `CSS Modules` 지원
+
+## `aeui.init`
+
+- containerElement에 AEUI가 들어갈 DOM 지정
+- \_componentInstanceTree에 루트 컴포넌트 지정
+- 렌더
+- 1초마다 렌더 이벤트를 생성하는 코드 실행
+
+## `aeui.createVNode`
+
+- React의 `createElement`와 비슷하게 동작해야한다.(JSX 호환을 위해)
+- `createVNode(tag, props, ...children)`
+- https://github.com/facebook/react/blob/main/packages/react/src/jsx/ReactJSXElement.js 참고
+
+## `aeui._reconcile`
