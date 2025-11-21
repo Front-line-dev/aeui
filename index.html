@@ -2,184 +2,199 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <title>My Framework</title>
+    <title>AEUI Framework</title>
+    <!-- Babel Standalone -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   </head>
   <body>
     <div id="root"></div>
 
+    <!-- Framework & Plugin Definition (Normal JS) -->
     <script>
-      console.log("AEUI Script Started");
+      console.log("AEUI Framework Loading...");
+
+      /**
+       * AEUI Framework Core
+       */
       const AEUI = {
+        _componentInstanceMap: new Map(),
         _containerElement: null,
         _RootComponent: null,
-        _previousVNode: null,
-        _componentInstanceMap: new Map(),
         _currentInstance: null,
         _isRendering: false,
+        _previousVNode: null,
 
         createInstance(instanceKey, newVNode) {
           const instance = {
-            key: instanceKey,
             vnode: newVNode,
-            render: null, // The render function returned by the component
+            render: null,
             prevRenderedVNode: null,
-            watchIndex: 0,
-            watchStates: [], // Stores dependencies for each watch
-            cleanups: [], // Stores cleanup functions
+            watchStates: [],
+            cleanups: [],
+            props: newVNode.props || {}, 
           };
-          this._componentInstanceMap.set(instanceKey, instance);
-          
-          // Set current instance for hooks to work during initial render
+
           this._currentInstance = instance;
-          
-          // Execute component function once to get the render function
-          const renderFn = newVNode.tag(newVNode.props);
-          
-          if (typeof renderFn !== 'function') {
-             throw new Error("Component must return a render function");
-          }
-          
-          instance.render = renderFn;
+          // Setup runs once
+          // Pass initial props to Setup
+          instance.render = newVNode.tag(newVNode.props);
           this._currentInstance = null;
 
           return instance;
         },
 
         createVNode(tag, props, ...children) {
+          // console.log("createVNode", tag, typeof tag);
           return { tag, props: props || {}, children: children.flat().filter(c => c != null) };
         },
 
-        // --- Hooks ---
+        init(RootComponent, containerElement) {
+          this._RootComponent = RootComponent;
+          this._containerElement = containerElement;
 
-        watch(callback, dependencies) {
-          const instance = this._currentInstance;
-          if (!instance) return;
+          // Initial Render
+          this._tick();
 
-          const index = instance.watchIndex++;
-          const oldDependencies = instance.watchStates[index];
-
-          let hasChanged = true;
-          if (oldDependencies) {
-            hasChanged = dependencies.some((dep, i) => dep !== oldDependencies[i]);
-          }
-
-          if (hasChanged) {
-            instance.watchStates[index] = dependencies;
-            callback();
-          }
+          // Start Loop (1s)
+          setInterval(() => {
+            this._tick();
+          }, 1000);
         },
 
-        clean(callback) {
-          const instance = this._currentInstance;
-          if (!instance) return;
-          instance.cleanups.push(callback);
-        },
+        _tick() {
+          if (this._isRendering) return;
+          this._isRendering = true;
 
-        // --- Reconciliation ---
+          // 1. Run Watchers
+          this._componentInstanceMap.forEach((instance) => {
+            instance.watchStates.forEach((watcher) => {
+              const newDeps = watcher.getDeps();
+              const hasChanged =
+                !watcher.oldDeps ||
+                newDeps.some((d, i) => d !== watcher.oldDeps[i]);
+
+              if (hasChanged) {
+                watcher.callback();
+                watcher.oldDeps = newDeps;
+              }
+            });
+          });
+
+          // 2. Reconcile
+          const newVNode = this.createVNode(this._RootComponent);
+          this._reconcile(
+            this._containerElement,
+            newVNode,
+            this._previousVNode
+          );
+          this._previousVNode = newVNode;
+
+          this._isRendering = false;
+        },
 
         _createDomNode(vnode) {
-          if (vnode.tag === undefined) {
+          if (typeof vnode !== "object") {
             return document.createTextNode(String(vnode));
           }
+
+          if (typeof vnode.tag !== "string") {
+             console.error("_createDomNode: Invalid Tag", vnode.tag, typeof vnode.tag);
+          }
+
           const domNode = document.createElement(vnode.tag);
           this._updateDomProps(domNode, vnode.props);
+
+          // FIXED: Do not recursively create children here.
+          // Let _reconcile handle them to support Components.
+
           return domNode;
         },
 
         _updateDomProps(domNode, props, oldProps = {}) {
-          // Remove old props
-          Object.keys(oldProps).forEach(name => {
-            if (!(name in props)) {
-              if (name.startsWith("on")) {
-                const eventName = name.slice(2).toLowerCase();
-                domNode.removeEventListener(eventName, oldProps[name]);
-              } else {
-                domNode.removeAttribute(name);
-              }
-            }
-          });
+          const allProps = { ...oldProps, ...props };
 
-          // Set new props
-          Object.entries(props).forEach(([name, value]) => {
-            if (oldProps[name] === value) return;
+          for (const key in allProps) {
+            const newValue = props ? props[key] : undefined;
+            const oldValue = oldProps ? oldProps[key] : undefined;
 
-            if (name.startsWith("on")) {
-              const eventName = name.slice(2).toLowerCase();
-              if (oldProps[name]) {
-                domNode.removeEventListener(eventName, oldProps[name]);
-              }
-              domNode.addEventListener(eventName, value);
-            } else if (name === "style") {
-               domNode.style.cssText = value;
-            } else if (name === "value" && ["INPUT", "TEXTAREA", "SELECT"].includes(domNode.tagName)) {
-               domNode.value = value;
+            if (newValue === oldValue) continue;
+
+            if (key.startsWith("on") && typeof newValue === "function") {
+              const eventName = key.substring(2).toLowerCase();
+              if (oldValue) domNode.removeEventListener(eventName, oldValue);
+              if (newValue) domNode.addEventListener(eventName, newValue);
+            } else if (key === "style" && typeof newValue === "string") {
+              domNode.style.cssText = newValue;
+            } else if (newValue === undefined) {
+              domNode.removeAttribute(key);
             } else {
-              domNode.setAttribute(name, value);
+              domNode.setAttribute(key, newValue);
             }
-          });
+          }
         },
 
         _unmount(instanceKey) {
-           for (const [key, instance] of this._componentInstanceMap) {
-               if (key.startsWith(instanceKey)) {
-                   instance.cleanups.forEach(cleanup => cleanup());
-                   this._componentInstanceMap.delete(key);
-               }
-           }
+          const instance = this._componentInstanceMap.get(instanceKey);
+          if (instance) {
+            instance.cleanups.forEach((cleanup) => cleanup());
+            this._componentInstanceMap.delete(instanceKey);
+          }
         },
 
-        _reconcile(parentElement, newVNode, prevVNode, index = 0, instanceKey = "root") {
-          // 1. Remove node
+        _reconcile(
+          parentElement,
+          newVNode,
+          prevVNode,
+          index = 0,
+          instanceKey = "root"
+        ) {
+          // Debug Log
+          // console.log("_reconcile", { tag: newVNode?.tag, type: typeof newVNode?.tag });
+
+          // 1. Remove
           if (newVNode == null) {
             if (prevVNode) {
-                this._unmount(instanceKey);
-                if (parentElement.childNodes[index]) {
-                    parentElement.removeChild(parentElement.childNodes[index]);
-                }
+              this._unmount(instanceKey);
+              if (parentElement.childNodes[index]) {
+                parentElement.removeChild(parentElement.childNodes[index]);
+              }
             }
             return;
           }
 
           // 2. Text Node (Primitive)
-          if (typeof newVNode !== 'object') {
-             const domNode = parentElement.childNodes[index];
-             if (domNode && domNode.nodeType === Node.TEXT_NODE) {
-                 if (domNode.nodeValue !== String(newVNode)) {
-                     domNode.nodeValue = String(newVNode);
-                 }
-             } else {
-                 const newDomNode = document.createTextNode(String(newVNode));
-                 if (domNode) {
-                     parentElement.replaceChild(newDomNode, domNode);
-                 } else {
-                     parentElement.appendChild(newDomNode);
-                 }
-             }
-             return;
+          if (typeof newVNode !== "object") {
+            const domNode = parentElement.childNodes[index];
+            if (domNode && domNode.nodeType === Node.TEXT_NODE) {
+              if (domNode.nodeValue !== String(newVNode)) {
+                domNode.nodeValue = String(newVNode);
+              }
+            } else {
+              const newDomNode = document.createTextNode(String(newVNode));
+              if (domNode) {
+                parentElement.replaceChild(newDomNode, domNode);
+              } else {
+                parentElement.appendChild(newDomNode);
+              }
+            }
+            return;
           }
 
-          // 2. Component Node
+          // 3. Component Node
           if (typeof newVNode.tag === "function") {
             let instance = this._componentInstanceMap.get(instanceKey);
 
-            // If component type changed, unmount old and create new
-            if (instance && prevVNode?.tag !== newVNode.tag) {
-                this._unmount(instanceKey);
-                instance = null;
-            }
-
             if (!instance) {
               instance = this.createInstance(instanceKey, newVNode);
-            } else {
-                // Update vnode for next render
-                instance.vnode = newVNode;
+              this._componentInstanceMap.set(instanceKey, instance);
             }
 
             // Render component
             this._currentInstance = instance;
-            instance.watchIndex = 0; 
             
-            const componentRenderedVNode = instance.render();
+            // PASS PROPS TO RENDER FUNCTION
+            const componentRenderedVNode = instance.render(newVNode.props);
+            
             this._currentInstance = null;
 
             this._reconcile(
@@ -194,148 +209,245 @@
             return;
           }
 
-          // 3. DOM Node
-          // Reuse existing node if tag matches
+          // 4. DOM Node
+          // Debug if tag is weird
+          if (typeof newVNode.tag !== "string") {
+             console.error("Invalid Tag for DOM Node:", newVNode.tag, typeof newVNode.tag);
+          }
+
           const domNode = parentElement.childNodes[index];
-          const prevRenderedVNode = prevVNode; // For DOM nodes, prevVNode is the vnode itself
+          const prevRenderedVNode = prevVNode;
 
-          if (domNode && prevRenderedVNode && prevRenderedVNode.tag === newVNode.tag) {
-             // Update props
-             this._updateDomProps(domNode, newVNode.props, prevRenderedVNode.props);
-             // Update children
-             const newChildren = newVNode.children;
-             const oldChildren = prevRenderedVNode.children || [];
-             const maxLength = Math.max(newChildren.length, oldChildren.length);
-             
-             for (let i = 0; i < maxLength; i++) {
-                this._reconcile(
-                  domNode,
-                  newChildren[i],
-                  oldChildren[i],
-                  i,
-                  `${instanceKey}.${i}`
-                );
-             }
+          if (
+            domNode &&
+            prevRenderedVNode &&
+            prevRenderedVNode.tag === newVNode.tag
+          ) {
+            this._updateDomProps(domNode, newVNode.props, prevRenderedVNode.props);
+            const newChildren = newVNode.children;
+            const oldChildren = prevRenderedVNode.children || [];
+            const maxLength = Math.max(newChildren.length, oldChildren.length);
+
+            for (let i = 0; i < maxLength; i++) {
+              this._reconcile(
+                domNode,
+                newChildren[i],
+                oldChildren[i],
+                i,
+                `${instanceKey}.${i}`
+              );
+            }
           } else {
-             // Replace or Append
-             const newDomNode = this._createDomNode(newVNode);
-             // Render children
-             newVNode.children.forEach((child, i) => {
+            const newDomNode = this._createDomNode(newVNode);
+            if (
+              typeof newVNode === "object" &&
+              newVNode !== null &&
+              newVNode.children
+            ) {
+              newVNode.children.forEach((child, i) => {
                 this._reconcile(newDomNode, child, null, i, `${instanceKey}.${i}`);
-             });
+              });
+            }
 
-             if (domNode) {
-                parentElement.replaceChild(newDomNode, domNode);
-             } else {
-                parentElement.appendChild(newDomNode);
-             }
+            if (domNode) {
+              parentElement.replaceChild(newDomNode, domNode);
+            } else {
+              parentElement.appendChild(newDomNode);
+            }
           }
         },
-
-        init(RootComponent, containerElement) {
-          this._containerElement = containerElement;
-          this._RootComponent = RootComponent;
-          
-          // Initial Render
-          this._tick();
-          
-          // Start Loop
-          setInterval(() => {
-            this._tick();
-          }, 1000);
-        },
-
-        _tick() {
-          if (this._isRendering) return;
-          this._isRendering = true;
-
-          this._componentInstanceMap.forEach(instance => {
-             instance.watchStates.forEach(watcher => {
-                 const newDeps = watcher.getDeps();
-                 const hasChanged = !watcher.oldDeps || newDeps.some((d, i) => d !== watcher.oldDeps[i]);
-                 if (hasChanged) {
-                     watcher.callback();
-                     watcher.oldDeps = newDeps;
-                 }
-             });
-          });
-
-          const newVNode = this.createVNode(this._RootComponent);
-          this._reconcile(
-            this._containerElement,
-            newVNode,
-            this._previousVNode
-          );
-          this._previousVNode = newVNode;
-          
-          this._isRendering = false;
-        }
       };
 
-      // --- User Code ---
-      
-      const { createVNode } = AEUI;
-      
-      // Modified watch to accept dependency getter to work with "setup once" pattern
+      // Hooks
       function watch(callback, depsGetter) {
-         const instance = AEUI._currentInstance;
-         if (instance) {
-             // Initial check
-             const initialDeps = typeof depsGetter === 'function' ? depsGetter() : depsGetter;
-             instance.watchStates.push({
-                 callback,
-                 getDeps: typeof depsGetter === 'function' ? depsGetter : () => depsGetter,
-                 oldDeps: initialDeps
-             });
-         }
+        const instance = AEUI._currentInstance;
+        if (instance) {
+          const initialDeps =
+            typeof depsGetter === "function" ? depsGetter() : depsGetter;
+          instance.watchStates.push({
+            callback,
+            getDeps:
+              typeof depsGetter === "function" ? depsGetter : () => depsGetter,
+            oldDeps: initialDeps,
+          });
+        }
       }
-      
+
       function clean(callback) {
-          AEUI.clean(callback);
+        const instance = AEUI._currentInstance;
+        if (!instance) return;
+        instance.cleanups.push(callback);
       }
+    </script>
 
-      const Counter = () => {
-        let count = 0;
-        const increment = () => count++;
+    <!-- User Code Template (Not executed directly) -->
+    <script id="user-code" type="text/aeui-code">
+      /** @jsx AEUI.createVNode */
 
-        // Using a getter for dependencies so they can be re-evaluated
+      const CartItem = ({ item, onIncrease, onDecrease }) => {
+        console.log(`[CartItem:${item.id}] Setup`);
+
+        // Watch for quantity changes
         watch(() => {
-          console.log(`[Counter] count 변화: ${count}`);
-        }, () => [count]);
-        
-        clean(() => {
-            console.log("[Counter] Clean up!");
-        });
+           console.log(`[CartItem:${item.id}] Quantity changed to: ${item.quantity}`);
+        }, () => [item.quantity]);
 
-        return () => {
-          return createVNode(
-            "div",
-            {
-              style: "border: 1px solid blue; padding: 10px; margin-top: 10px;",
-            },
-            createVNode("h2", null, "Count: ", count),
-            createVNode("button", { onClick: increment }, "Click to increase")
-          );
+        // Render
+        return () => (
+            <li style="margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; display: flex; align-items: center;">
+              <span style="margin-right: 10px;">
+                {item.name} ({item.price}원)
+              </span>
+              <button onClick={() => onDecrease(item.id)}>-</button>
+              <span style="margin: 0 10px; font-weight: bold;">{item.quantity}</span>
+              <button onClick={() => onIncrease(item.id)}>+</button>
+            </li>
+        );
+      };
+
+      const ShoppingCart = () => {
+        // State
+        const items = [
+          { id: 1, name: "사과", price: 1000, quantity: 1 },
+          { id: 2, name: "바나나", price: 2000, quantity: 2 },
+          { id: 3, name: "체리", price: 3000, quantity: 5 },
+        ];
+
+        // Actions (Mutations)
+        const increase = (id) => {
+          const item = items.find((i) => i.id === id);
+          if (item) item.quantity++;
         };
+
+        const decrease = (id) => {
+          const item = items.find((i) => i.id === id);
+          if (item && item.quantity > 0) item.quantity--;
+        };
+
+        // Computed
+        const getTotal = () =>
+          items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+        // Watch
+        watch(() => {
+          console.log(`[ShoppingCart] Total Price: ${getTotal()}원`);
+        }, () => [getTotal()]);
+
+        return () => (
+          <div style="padding: 20px; font-family: sans-serif;">
+            <h1>장바구니 (AEUI Framework)</h1>
+            <ul style="list-style: none; padding: 0;">
+              {items.map((item) => (
+                <CartItem
+                  key={item.id}
+                  item={item}
+                  onIncrease={increase}
+                  onDecrease={decrease}
+                />
+              ))}
+            </ul>
+            <hr />
+            <h3>총 합계: {getTotal()}원</h3>
+            {getTotal() >= 20000 && (
+              <p style="color: green; font-weight: bold;">
+                🎉 무료 배송 대상입니다!
+              </p>
+            )}
+          </div>
+        );
       };
 
       const App = () => {
-        let showCounter = true;
-        const toggle = () => showCounter = !showCounter;
-
-        return () => {
-          return createVNode(
-            "div",
-            null,
-            createVNode("h1", null, "AEUI Framework"),
-            createVNode("button", { onClick: toggle }, "Toggle Counter"),
-            showCounter ? createVNode(Counter) : null
-          );
-        };
+        return () => (
+          <div>
+            <ShoppingCart />
+          </div>
+        );
       };
 
       const root = document.getElementById("root");
       AEUI.init(App, root);
+    </script>
+
+    <!-- Manual Compilation & Execution -->
+    <script>
+      // Register Plugin
+      if (window.Babel) {
+          Babel.registerPlugin("aeui-transform", ({ types: t }) => {
+            return {
+              visitor: {
+                ArrowFunctionExpression(path) {
+                  const params = path.node.params;
+                  if (params.length === 0) return;
+                  if (!t.isObjectPattern(params[0])) return;
+
+                  const propsParam = params[0];
+                  const newParamName = path.scope.generateUidIdentifier("props");
+                  path.node.params = [newParamName];
+
+                  const destructuringDecl = t.variableDeclaration("let", [
+                    t.variableDeclarator(propsParam, newParamName)
+                  ]);
+                  
+                  if (t.isBlockStatement(path.node.body)) {
+                     path.node.body.body.unshift(destructuringDecl);
+                     
+                     const returnStmt = path.node.body.body.find(node => 
+                       t.isReturnStatement(node) && 
+                       (t.isArrowFunctionExpression(node.argument) || t.isFunctionExpression(node.argument))
+                     );
+                     
+                     if (returnStmt) {
+                         const renderFn = returnStmt.argument;
+                         const newPropsParam = path.scope.generateUidIdentifier("newProps");
+                         
+                         renderFn.params = [newPropsParam];
+                         
+                         const updateLogic = t.ifStatement(
+                             newPropsParam,
+                             t.expressionStatement(
+                                 t.assignmentExpression(
+                                     "=",
+                                     propsParam, 
+                                     newPropsParam
+                                 )
+                             )
+                         );
+                         
+                         if (t.isBlockStatement(renderFn.body)) {
+                             renderFn.body.body.unshift(updateLogic);
+                         } else {
+                             renderFn.body = t.blockStatement([
+                                 updateLogic,
+                                 t.returnStatement(renderFn.body)
+                             ]);
+                         }
+                     }
+                  }
+                }
+              }
+            };
+          });
+
+          // Compile and Run
+          try {
+            const userCode = document.getElementById("user-code").textContent;
+            const output = Babel.transform(userCode, {
+              presets: ["react"],
+              plugins: ["aeui-transform"]
+            }).code;
+
+            console.log("Compiled Code:", output);
+            
+            // Execute
+            eval(output);
+          } catch (e) {
+            console.error("Compilation/Execution Error:", e);
+            document.body.innerHTML += `<pre style="color:red">${e.message}</pre>`;
+          }
+      } else {
+          console.error("Babel not loaded");
+      }
     </script>
   </body>
 </html>
