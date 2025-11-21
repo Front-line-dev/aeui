@@ -121,3 +121,5 @@ SSR, Static Build 2개의 방법을 제공한다.
 - https://github.com/facebook/react/blob/main/packages/react/src/jsx/ReactJSXElement.js 참고
 
 ## `aeui._reconcile`
+
+- Virtual DOM을 생성해서 `aeui._previousVNode`와 비교
