@@ -182,12 +182,18 @@ export const AEUI = {
       
       this._currentInstance = null;
 
+      // Fix: If component returns a component, use a unique key to avoid collision
+      let nextInstanceKey = instanceKey;
+      if (componentRenderedVNode && typeof componentRenderedVNode === "object" && typeof componentRenderedVNode.tag === "function") {
+         nextInstanceKey = instanceKey + "$";
+      }
+
       this._reconcile(
         parentElement,
         componentRenderedVNode,
         instance.prevRenderedVNode,
         index,
-        instanceKey
+        nextInstanceKey
       );
 
       instance.prevRenderedVNode = componentRenderedVNode;

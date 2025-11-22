@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AEUI Let Props Example</title>
+    <!-- Babel Standalone -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- Framework & Plugin Definition -->
+    <script type="module">
+      import { AEUI, watch, clean } from "../../src/index.js";
+      import aeuiTransform from "../../src/babel-plugin.js";
+
+      window.AEUI = AEUI;
+      window.watch = watch;
+      window.clean = clean;
+
+      console.log("AEUI Framework Loading...");
+
+      if (window.Babel) {
+          Babel.registerPlugin("aeui-transform", aeuiTransform);
+
+          try {
+            const userCode = document.getElementById("user-code").textContent;
+            const output = Babel.transform(userCode, {
+              presets: ["react"],
+              plugins: ["aeui-transform"]
+            }).code;
+
+            console.log("Compiled Code:", output);
+            eval(output);
+          } catch (e) {
+            console.error("Compilation/Execution Error:", e);
+            document.body.innerHTML += `<pre style="color:red">${e.message}</pre>`;
+          }
+      } else {
+          console.error("Babel not loaded");
+      }
+    </script>
+
+    <!-- User Code -->
+    <script id="user-code" type="text/aeui-code">
+      /** @jsx AEUI.createVNode */
+
+      const Child = ({ count, onIncrement }) => {
+        return (
+          <div style="border: 1px solid #ccc; padding: 10px; margin: 10px;">
+            <h3>Child Component</h3>
+            <p>Received Count: <strong>{count}</strong></p>
+            <button onClick={onIncrement}>Increment Parent's Let Variable</button>
+          </div>
+        );
+      };
+
+      const Parent = () => {
+        // Variable created via let
+        let count = 0;
+
+        const increment = () => {
+          count++;
+          console.log("Parent count incremented to:", count);
+        };
+
+        return (
+          <div style="padding: 20px;">
+            <h1>Parent Component</h1>
+            <p>Local Count: {count}</p>
+            <Child count={count} onIncrement={increment} />
+            <p style="font-size: 0.8em; color: #666;">
+              Note: AEUI updates every 1 second, so the UI might lag slightly behind the click.
+            </p>
+          </div>
+        );
+      };
+
+      const App = () => {
+        return <Parent />;
+      };
+
+      const root = document.getElementById("root");
+      AEUI.init(App, root);
+    </script>
+  </body>
+</html>
