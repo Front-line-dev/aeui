@@ -1,0 +1,4 @@
+- props, watch deps 딥 비교
+- local babel
+- test environment
+- export package
