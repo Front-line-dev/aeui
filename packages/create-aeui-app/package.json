@@ -1,0 +1,17 @@
+{
+  "name": "create-aeui-app",
+  "version": "0.0.1",
+  "description": "Scaffolding tool for AEUI apps",
+  "main": "index.js",
+  "bin": {
+    "create-aeui-app": "./index.js"
+  },
+  "type": "module",
+  "keywords": [
+    "aeui",
+    "cli",
+    "scaffold"
+  ],
+  "author": "",
+  "license": "ISC"
+}
