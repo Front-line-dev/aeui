@@ -26,7 +26,27 @@ export default function aeuiTransform({ types: t }) {
     let isUsedAsComponent = false;
 
     // 1. Identify Variable Name & Export Status
-    if (t.isVariableDeclarator(path.parent) && t.isIdentifier(path.parent.id)) {
+    if (t.isFunctionDeclaration(path.node) && path.node.id) {
+       varName = path.node.id.name;
+       const binding = path.scope.getBinding(varName);
+       if (binding) {
+          const parent = binding.path.parentPath; // Should be Program or Export
+          isExported = (parent && (parent.isExportNamedDeclaration() || parent.isExportDefaultDeclaration()));
+          
+          binding.referencePaths.forEach(refPath => {
+             if (t.isJSXOpeningElement(refPath.parent) && refPath.parent.name === refPath.node) {
+               isUsedAsComponent = true;
+             } else if (
+                t.isCallExpression(refPath.parent) && 
+                refPath.parent.arguments.length > 0 && 
+                refPath.parent.arguments[0] === refPath.node
+            ) {
+                isUsedAsComponent = true;
+            }
+          });
+       }
+    }
+    else if (t.isVariableDeclarator(path.parent) && t.isIdentifier(path.parent.id)) {
       varName = path.parent.id.name;
       const binding = path.scope.getBinding(varName);
       
@@ -174,7 +194,7 @@ export default function aeuiTransform({ types: t }) {
           }
         }
       },
-      ArrowFunctionExpression(path) {
+      "ArrowFunctionExpression|FunctionDeclaration|FunctionExpression"(path) {
         if (!shouldTransformComponent(path)) {
             return;
         }

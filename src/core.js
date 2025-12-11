@@ -248,3 +248,6 @@ export const AEUI = {
     }
   },
 };
+
+// Alias for standard JSX compatibility (React-like)
+AEUI.createElement = AEUI.createVNode;

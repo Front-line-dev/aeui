@@ -2,9 +2,22 @@
   "name": "aeui",
   "version": "0.0.1",
   "description": "A lightweight, custom frontend framework",
-  "main": "src/index.js",
-  "module": "src/index.js",
+  "main": "dist/aeui.js",
+  "module": "dist/aeui.esm.js",
+  "exports": {
+    ".": {
+      "import": "./dist/aeui.esm.js",
+      "require": "./dist/aeui.js"
+    },
+    "./babel-plugin": "./dist/babel-plugin.js"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
+    "build": "rollup -c",
+    "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -13,5 +26,9 @@
     "ui"
   ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "rollup": "^4.53.3"
+  }
 }
