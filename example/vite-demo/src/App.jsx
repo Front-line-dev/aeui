@@ -1,4 +1,5 @@
 import { AEUI, watch } from 'aeui';
+import TreeTest from './TreeTest.jsx';
 
 function Counter({ title }) {
   let count = 0;
@@ -24,6 +25,7 @@ export default function App() {
       <p>This is a standard Vite project using AEUI.</p>
       <Counter title="Counter 1" />
       <Counter title="Counter 2" />
+      <TreeTest />
     </div>
   );
 }
