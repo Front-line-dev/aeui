@@ -85,7 +85,7 @@ export default function aeuiTransform({ types: t }) {
       return true;
     }
 
-    if (isExported && varName && /^[A-Z]/.test(varName)) {
+    if (varName && /^[A-Z]/.test(varName)) {
       return true;
     }
 
@@ -122,78 +122,216 @@ export default function aeuiTransform({ types: t }) {
 
   /**
    * Injects props destructuring and reactive update logic.
-   * Converts `({ count }) => ...` to `(props) => { let { count } = props; ... }`
-   * And adds logic to update `props` when `newProps` are received.
+   * Handles:
+   * 1. (props) -> (_initialProps)
+   * 2. const __props = { ..._initialProps };
+   * 3. const props = __props; (or let { x } = _initialProps;)
+   * 4. watch() dependency transformation
+   * 5. return factory transformation with update logic
    */
   const injectReactiveProps = (path) => {
     const params = path.node.params;
     if (params.length === 0) return;
-    if (!t.isObjectPattern(params[0])) return;
 
-    const propsParam = params[0];
-    const newParamName = path.scope.generateUidIdentifier("props");
-    path.node.params = [newParamName];
+    // We only care if the first param is Identifier or ObjectPattern
+    if (!t.isIdentifier(params[0]) && !t.isObjectPattern(params[0])) return;
 
-    const destructuringDecl = t.variableDeclaration("let", [
-      t.variableDeclarator(propsParam, newParamName)
+    const originalParam = params[0];
+    const initialPropsId = path.scope.generateUidIdentifier("initialProps");
+    const propsId = t.identifier("__props");
+
+    // 1. Rename Param: (props) -> (_initialProps)
+    path.node.params[0] = initialPropsId;
+
+    // 2. Setup __props
+    // const __props = { ..._initialProps };
+    const propsSetup = t.variableDeclaration("const", [
+      t.variableDeclarator(
+        propsId,
+        t.objectExpression([t.spreadElement(initialPropsId)])
+      )
     ]);
 
+    const destructuredNames = new Set();
+    let restoreVars;
+
+    // 3. Restore User Variables
+    if (t.isIdentifier(originalParam)) {
+      // Case: function Component(p) {}
+      // Inject: const p = __props;
+      restoreVars = t.variableDeclaration("const", [
+        t.variableDeclarator(originalParam, propsId)
+      ]);
+    } else if (t.isObjectPattern(originalParam)) {
+      // Case: function Component({ count }) {}
+      // Inject: let { count } = _initialProps;
+      // Note: We use _initialProps for the destructuring to get the initial values (snapshot).
+
+      // Track destructured names for replacement in watch
+      originalParam.properties.forEach(prop => {
+        if (t.isObjectProperty(prop) && t.isIdentifier(prop.value)) {
+          destructuredNames.add(prop.value.name);
+        }
+      });
+
+      restoreVars = t.variableDeclaration("let", [
+        t.variableDeclarator(originalParam, initialPropsId)
+      ]);
+    }
+
+    // Insert setup code
     if (t.isBlockStatement(path.node.body)) {
-      path.node.body.body.unshift(destructuringDecl);
+      path.node.body.body.unshift(propsSetup, restoreVars);
+    }
 
-      path.traverse({
-        ReturnStatement(returnPath) {
-          if (returnPath.getFunctionParent().node === path.node) {
-            const arg = returnPath.node.argument;
-            // We expect the return argument to be a function (the factory) by now
-            if (t.isArrowFunctionExpression(arg) || t.isFunctionExpression(arg)) {
-              const renderFn = arg;
+    // 4. Transform watch() and Return
+    path.traverse({
+      CallExpression(callPath) {
+        if (!t.isIdentifier(callPath.node.callee, { name: "watch" })) return;
 
-              // Avoid re-injecting if already present
-              if (renderFn.params.length > 0 && renderFn.params[0].name.startsWith("_newProps")) {
+        const args = callPath.node.arguments;
+        if (args.length < 2) return;
+
+        // Transform deps: [] -> () => []
+        if (t.isArrayExpression(args[1])) {
+          args[1] = t.arrowFunctionExpression([], args[1]);
+        }
+
+        // Helper to replace identifiers in a path (callback or deps)
+        const replaceIdentifiers = (targetPath) => {
+          targetPath.traverse({
+            Identifier(idPath) {
+              const name = idPath.node.name;
+              // Only replace usage, not declarations or property keys
+              // Use idPath.isReferencedIdentifier() which works in Babel 7
+              if (
+                !idPath.isReferencedIdentifier() ||
+                !destructuredNames.has(name)
+              ) {
                 return;
               }
 
-              const newPropsParam = path.scope.generateUidIdentifier("newProps");
-              renderFn.params = [newPropsParam];
-
-              const updateLogic = t.ifStatement(
-                newPropsParam,
-                t.expressionStatement(
-                  t.assignmentExpression(
-                    "=",
-                    propsParam,
-                    newPropsParam
-                  )
-                )
-              );
-
-              if (t.isBlockStatement(renderFn.body)) {
-                renderFn.body.body.unshift(updateLogic);
-              } else {
-                renderFn.body = t.blockStatement([
-                  updateLogic,
-                  t.returnStatement(renderFn.body)
-                ]);
+              // Shadowing Check
+              // If the identifier is bound in a scope *inside* the component but *outside* the current usage
+              // it means it's shadowed.
+              if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) {
+                return;
               }
+
+              idPath.replaceWith(
+                t.memberExpression(propsId, t.identifier(name))
+              );
+            }
+          });
+        };
+
+        // Replace in Callback
+        if (args[0]) {
+          const callbackPath = callPath.get('arguments.0');
+          replaceIdentifiers(callbackPath);
+        }
+
+        // Replace in Deps (if it's a function now)
+        if (args[1] && (t.isArrowFunctionExpression(args[1]) || t.isFunctionExpression(args[1]))) {
+          const depsPath = callPath.get('arguments.1');
+          replaceIdentifiers(depsPath);
+        }
+      },
+
+      ReturnStatement(returnPath) {
+        if (returnPath.getFunctionParent().node === path.node) {
+          const arg = returnPath.node.argument;
+          if (t.isArrowFunctionExpression(arg) || t.isFunctionExpression(arg)) {
+            const renderFn = arg;
+            if (renderFn.params.length > 0 && renderFn.params[0].name.startsWith("_newProps")) return;
+
+            const newPropsParam = path.scope.generateUidIdentifier("newProps");
+            renderFn.params = [newPropsParam];
+
+            // Inline Update Logic:
+            // AEUI.updateProps(__props, _newProps);
+            // AEUI._runComponentWatchers(AEUI._currentInstance);
+            const updateLogic = [
+              t.expressionStatement(
+                t.callExpression(
+                  t.memberExpression(t.identifier("AEUI"), t.identifier("updateProps")),
+                  [propsId, newPropsParam]
+                )
+              ),
+              t.expressionStatement(
+                t.callExpression(
+                  t.memberExpression(t.identifier("AEUI"), t.identifier("_runComponentWatchers")),
+                  [t.memberExpression(t.identifier("AEUI"), t.identifier("_currentInstance"))]
+                )
+              )
+            ];
+
+            // Replace destructured usage in render body
+            if (destructuredNames.size > 0) {
+              const renderBodyPath = returnPath.get("argument").get("body");
+
+              // Helper to traverse and replace
+              const replaceInRender = (bodyPath) => {
+                bodyPath.traverse({
+                  Identifier(idPath) {
+                    const name = idPath.node.name;
+                    if (!idPath.isReferencedIdentifier() || !destructuredNames.has(name)) return;
+
+                    // Shadowing check
+                    if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) return;
+
+                    // Don't replace if it's inside the updateLogic we just added (though we haven't added it to body yet)
+
+                    idPath.replaceWith(t.memberExpression(propsId, t.identifier(name)));
+                  }
+                });
+              }
+
+              // Handle both BlockStatement and Expression (JSX)
+              if (t.isBlockStatement(renderFn.body)) {
+                // We need to traverse the body path, but we can't easily get the path of the body node itself if we just have the node.
+                // We can traverse the `returnPath` again or use the visitor pattern on the function path.
+                // Actually `returnPath.get("argument")` gives the function path.
+                const fnPath = returnPath.get("argument");
+                fnPath.traverse({
+                  Identifier(idPath) {
+                    const name = idPath.node.name;
+                    if (!idPath.isReferencedIdentifier() || !destructuredNames.has(name)) return;
+                    if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) return;
+                    idPath.replaceWith(t.memberExpression(propsId, t.identifier(name)));
+                  }
+                });
+              } else {
+                // Expression body (JSX)
+                const fnPath = returnPath.get("argument");
+                fnPath.traverse({
+                  Identifier(idPath) {
+                    const name = idPath.node.name;
+                    if (!idPath.isReferencedIdentifier() || !destructuredNames.has(name)) return;
+                    if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) return;
+                    idPath.replaceWith(t.memberExpression(propsId, t.identifier(name)));
+                  }
+                });
+              }
+            }
+
+
+            if (t.isBlockStatement(renderFn.body)) {
+              renderFn.body.body.unshift(...updateLogic);
+            } else {
+              renderFn.body = t.blockStatement([
+                ...updateLogic,
+                t.returnStatement(renderFn.body)
+              ]);
             }
           }
         }
-      });
-    }
+      }
+    });
   };
 
   return {
     visitor: {
-      CallExpression(path) {
-        // 1. Watch Dependencies: watch(fn, []) -> watch(fn, () => [])
-        if (t.isIdentifier(path.node.callee, { name: "watch" })) {
-          const args = path.node.arguments;
-          if (args.length >= 2 && t.isArrayExpression(args[1])) {
-            args[1] = t.arrowFunctionExpression([], args[1]);
-          }
-        }
-      },
       "ArrowFunctionExpression|FunctionDeclaration|FunctionExpression"(path) {
         if (!shouldTransformComponent(path)) {
           return;

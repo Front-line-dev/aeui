@@ -20,25 +20,27 @@ export const AEUI = {
       children: [],
       parentElement: null,
       isMounted: true,
-      
+
       update() {
         if (!this.isMounted) return;
-        
+
         let startIndex = 0;
         if (this.parent) {
           // Calculate start index based on previous siblings' DOM nodes
           const siblings = this.parent.children;
           const instanceIndex = siblings.indexOf(this);
-          
+
           for (let i = 0; i < instanceIndex; i++) {
-             startIndex += AEUI._getDomNodeCount(siblings[i].prevRenderedVNode);
+            startIndex += AEUI._getDomNodeCount(siblings[i].prevRenderedVNode);
           }
         }
-        
+
+        this._childCursor = 0; // Fix: Reset cursor for reuse
         AEUI._currentInstance = this;
+        // AEUI._runComponentWatchers(this); // Moved to component render
         const newVNode = this.render(this.props);
         AEUI._currentInstance = null;
-        
+
         AEUI._reconcile(
           this.parentElement,
           newVNode,
@@ -46,7 +48,7 @@ export const AEUI = {
           startIndex,
           this
         );
-        
+
         this.prevRenderedVNode = newVNode;
       }
     };
@@ -57,18 +59,18 @@ export const AEUI = {
 
     return instance;
   },
-  
+
   _getDomNodeCount(vnode) {
-      if (vnode == null) return 0;
-      if (typeof vnode !== 'object') return 1; // Text
-      if (Array.isArray(vnode)) {
-          return vnode.reduce((acc, c) => acc + this._getDomNodeCount(c), 0);
-      }
-      if (typeof vnode.tag === 'function') {
-          // For components, we count the nodes of their rendered content
-          return 1; // Simplification: assuming single root for now
-      }
-      return 1; // DOM Node
+    if (vnode == null) return 0;
+    if (typeof vnode !== 'object') return 1; // Text
+    if (Array.isArray(vnode)) {
+      return vnode.reduce((acc, c) => acc + this._getDomNodeCount(c), 0);
+    }
+    if (typeof vnode.tag === 'function') {
+      // For components, we count the nodes of their rendered content
+      return 1; // Simplification: assuming single root for now
+    }
+    return 1; // DOM Node
   },
 
   createVNode(tag, props, ...children) {
@@ -82,7 +84,7 @@ export const AEUI = {
     // Initial Render
     this._tick();
 
-    // Start Loop (1s)
+    // Start Loop
     setInterval(() => {
       this._tick();
     }, 1000);
@@ -93,37 +95,36 @@ export const AEUI = {
     this._isRendering = true;
 
     if (this._rootInstance) {
-        this._runWatchers(this._rootInstance);
+      // Force root update for immediate mode behavior
+      this._rootInstance.update();
     } else {
-        const newVNode = this.createVNode(this._RootComponent);
-        this._reconcile(
-          this._containerElement,
-          newVNode,
-          this._previousVNode || null,
-          0,
-          null
-        );
-        this._previousVNode = newVNode;
+      const newVNode = this.createVNode(this._RootComponent);
+      this._reconcile(
+        this._containerElement,
+        newVNode,
+        this._previousVNode || null,
+        0,
+        null
+      );
+      this._previousVNode = newVNode;
     }
 
     this._isRendering = false;
   },
-  
-  _runWatchers(instance) {
-      instance.watchStates.forEach((watcher) => {
-        const newDeps = watcher.getDeps();
-        const hasChanged =
-          !watcher.oldDeps ||
-          newDeps.some((d, i) => d !== watcher.oldDeps[i]);
 
-        if (hasChanged) {
-          watcher.callback();
-          watcher.oldDeps = newDeps;
-          instance.update();
-        }
-      });
-      
-      instance.children.forEach(child => this._runWatchers(child));
+  _runComponentWatchers(instance) {
+    if (!instance.watchStates) return;
+    instance.watchStates.forEach((watcher) => {
+      const newDeps = watcher.getDeps();
+      const hasChanged =
+        !watcher.oldDeps ||
+        newDeps.some((d, i) => d !== watcher.oldDeps[i]);
+
+      if (hasChanged) {
+        watcher.callback();
+        watcher.oldDeps = newDeps;
+      }
+    });
   },
 
   _createDomNode(vnode) {
@@ -132,13 +133,18 @@ export const AEUI = {
     }
 
     if (typeof vnode.tag !== "string") {
-       console.error("_createDomNode: Invalid Tag", vnode.tag, typeof vnode.tag);
+      console.error("_createDomNode: Invalid Tag", vnode.tag, typeof vnode.tag);
     }
 
     const domNode = document.createElement(vnode.tag);
     this._updateDomProps(domNode, vnode.props);
 
     return domNode;
+  },
+
+  updateProps(target, newProps) {
+    for (const key in target) delete target[key];
+    if (newProps) Object.assign(target, newProps);
   },
 
   _updateDomProps(domNode, props, oldProps = {}) {
@@ -180,18 +186,18 @@ export const AEUI = {
   ) {
     // 1. Array / Fragment Handling
     if (Array.isArray(newVNode)) {
-        newVNode.forEach((child, i) => {
-            this._reconcile(parentElement, child, prevVNode ? prevVNode[i] : null, index + i, parentInstance);
-        });
-        return;
+      newVNode.forEach((child, i) => {
+        this._reconcile(parentElement, child, prevVNode ? prevVNode[i] : null, index + i, parentInstance);
+      });
+      return;
     }
 
     // 2. Remove
     if (newVNode == null) {
       if (prevVNode) {
-          if (parentElement.childNodes[index]) {
-            parentElement.removeChild(parentElement.childNodes[index]);
-          }
+        if (parentElement.childNodes[index]) {
+          parentElement.removeChild(parentElement.childNodes[index]);
+        }
       }
       return;
     }
@@ -217,47 +223,48 @@ export const AEUI = {
     // 4. Component Node
     if (typeof newVNode.tag === "function") {
       let instance;
-      
+
       if (parentInstance) {
-          if (!parentInstance._childCursor) parentInstance._childCursor = 0;
-          instance = parentInstance.children[parentInstance._childCursor];
-          
-          if (instance && instance.vnode.tag === newVNode.tag) {
-             // Reuse existing instance
-             parentInstance._childCursor++;
-             instance.vnode = newVNode;
-             instance.props = newVNode.props || {};
+        if (!parentInstance._childCursor) parentInstance._childCursor = 0;
+        instance = parentInstance.children[parentInstance._childCursor];
+
+        if (instance && instance.vnode.tag === newVNode.tag) {
+          // Reuse existing instance
+          parentInstance._childCursor++;
+          instance.vnode = newVNode;
+          instance.props = newVNode.props || {};
+        } else {
+          // Create new instance
+          instance = this.createInstance(newVNode, parentInstance);
+          if (parentInstance.children[parentInstance._childCursor]) {
+            this._unmount(parentInstance.children[parentInstance._childCursor]);
+            parentInstance.children[parentInstance._childCursor] = instance;
           } else {
-             // Create new instance
-             instance = this.createInstance(newVNode, parentInstance);
-             if (parentInstance.children[parentInstance._childCursor]) {
-                 this._unmount(parentInstance.children[parentInstance._childCursor]);
-                 parentInstance.children[parentInstance._childCursor] = instance;
-             } else {
-                 parentInstance.children.push(instance);
-             }
-             parentInstance._childCursor++;
+            parentInstance.children.push(instance);
           }
+          parentInstance._childCursor++;
+        }
       } else {
-          // Root Case
-          if (this._rootInstance && this._rootInstance.vnode.tag === newVNode.tag) {
-              instance = this._rootInstance;
-              instance.vnode = newVNode;
-              instance.props = newVNode.props || {};
-          } else {
-              if (this._rootInstance) this._unmount(this._rootInstance);
-              instance = this.createInstance(newVNode, null);
-              this._rootInstance = instance;
-          }
+        // Root Case
+        if (this._rootInstance && this._rootInstance.vnode.tag === newVNode.tag) {
+          instance = this._rootInstance;
+          instance.vnode = newVNode;
+          instance.props = newVNode.props || {};
+        } else {
+          if (this._rootInstance) this._unmount(this._rootInstance);
+          instance = this.createInstance(newVNode, null);
+          this._rootInstance = instance;
+        }
       }
-      
+
       instance.parentElement = parentElement;
       instance._childCursor = 0;
-      
+
       AEUI._currentInstance = instance;
+      // AEUI._runComponentWatchers(instance); // Moved to component render
       const componentRenderedVNode = instance.render(newVNode.props);
       AEUI._currentInstance = null;
-      
+
       this._reconcile(
         parentElement,
         componentRenderedVNode,
@@ -265,49 +272,49 @@ export const AEUI = {
         index,
         instance
       );
-      
+
       instance.prevRenderedVNode = componentRenderedVNode;
-      
+
       // Cleanup extra children
       if (instance._childCursor < instance.children.length) {
-          const removed = instance.children.splice(instance._childCursor);
-          removed.forEach(child => this._unmount(child));
+        const removed = instance.children.splice(instance._childCursor);
+        removed.forEach(child => this._unmount(child));
       }
-      
+
       return;
     }
 
     // 5. DOM Node
     const domNode = parentElement.childNodes[index];
     if (domNode && prevVNode && prevVNode.tag === newVNode.tag) {
-       this._updateDomProps(domNode, newVNode.props, prevVNode.props);
-       
-       const newChildren = newVNode.children || [];
-       const oldChildren = prevVNode.children || [];
-       const maxLength = Math.max(newChildren.length, oldChildren.length);
-       
-       for (let i = 0; i < maxLength; i++) {
-         this._reconcile(
-           domNode,
-           newChildren[i],
-           oldChildren[i],
-           i,
-           parentInstance
-         );
-       }
+      this._updateDomProps(domNode, newVNode.props, prevVNode.props);
+
+      const newChildren = newVNode.children || [];
+      const oldChildren = prevVNode.children || [];
+      const maxLength = Math.max(newChildren.length, oldChildren.length);
+
+      for (let i = 0; i < maxLength; i++) {
+        this._reconcile(
+          domNode,
+          newChildren[i],
+          oldChildren[i],
+          i,
+          parentInstance
+        );
+      }
     } else {
-       const newDomNode = this._createDomNode(newVNode);
-       if (newVNode.children) {
-         newVNode.children.forEach((child, i) => {
-           this._reconcile(newDomNode, child, null, i, parentInstance);
-         });
-       }
-       
-       if (domNode) {
-         parentElement.replaceChild(newDomNode, domNode);
-       } else {
-         parentElement.appendChild(newDomNode);
-       }
+      const newDomNode = this._createDomNode(newVNode);
+      if (newVNode.children) {
+        newVNode.children.forEach((child, i) => {
+          this._reconcile(newDomNode, child, null, i, parentInstance);
+        });
+      }
+
+      if (domNode) {
+        parentElement.replaceChild(newDomNode, domNode);
+      } else {
+        parentElement.appendChild(newDomNode);
+      }
     }
   },
 };
