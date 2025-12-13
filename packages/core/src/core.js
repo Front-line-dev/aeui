@@ -35,11 +35,14 @@ export const AEUI = {
           }
         }
 
-        this._childCursor = 0; // Fix: Reset cursor for reuse
+
+        this._childCursor = 0;
         AEUI._currentInstance = this;
-        // AEUI._runComponentWatchers(this); // Moved to component render
+
+        // Render the component
         const newVNode = this.render(this.props);
         AEUI._currentInstance = null;
+
 
         AEUI._reconcile(
           this.parentElement,
@@ -95,7 +98,7 @@ export const AEUI = {
     this._isRendering = true;
 
     if (this._rootInstance) {
-      // Force root update for immediate mode behavior
+      // Force root update for immediate mode behavior logic is handled by the loop and component internals
       this._rootInstance.update();
     } else {
       const newVNode = this.createVNode(this._RootComponent);
@@ -261,7 +264,9 @@ export const AEUI = {
       instance._childCursor = 0;
 
       AEUI._currentInstance = instance;
-      // AEUI._runComponentWatchers(instance); // Moved to component render
+
+      // Note: _runComponentWatchers is called inside the component's render function 
+      // (injected by babel-plugin) to ensure prop updates are visible to watchers.
       const componentRenderedVNode = instance.render(newVNode.props);
       AEUI._currentInstance = null;
 

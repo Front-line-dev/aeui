@@ -280,40 +280,18 @@ export default function aeuiTransform({ types: t }) {
                     // Shadowing check
                     if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) return;
 
-                    // Don't replace if it's inside the updateLogic we just added (though we haven't added it to body yet)
-
+                    // Replace with __props.name
                     idPath.replaceWith(t.memberExpression(propsId, t.identifier(name)));
                   }
                 });
               }
 
-              // Handle both BlockStatement and Expression (JSX)
-              if (t.isBlockStatement(renderFn.body)) {
-                // We need to traverse the body path, but we can't easily get the path of the body node itself if we just have the node.
-                // We can traverse the `returnPath` again or use the visitor pattern on the function path.
-                // Actually `returnPath.get("argument")` gives the function path.
-                const fnPath = returnPath.get("argument");
-                fnPath.traverse({
-                  Identifier(idPath) {
-                    const name = idPath.node.name;
-                    if (!idPath.isReferencedIdentifier() || !destructuredNames.has(name)) return;
-                    if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) return;
-                    idPath.replaceWith(t.memberExpression(propsId, t.identifier(name)));
-                  }
-                });
-              } else {
-                // Expression body (JSX)
-                const fnPath = returnPath.get("argument");
-                fnPath.traverse({
-                  Identifier(idPath) {
-                    const name = idPath.node.name;
-                    if (!idPath.isReferencedIdentifier() || !destructuredNames.has(name)) return;
-                    if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) return;
-                    idPath.replaceWith(t.memberExpression(propsId, t.identifier(name)));
-                  }
-                });
-              }
+              // Apply replacement to the render function body (whether block or expression)
+              // We traverse the function itself to cover parameters and body, but we filter by scope/shadowing
+              const fnPath = returnPath.get("argument");
+              replaceInRender(fnPath);
             }
+
 
 
             if (t.isBlockStatement(renderFn.body)) {
