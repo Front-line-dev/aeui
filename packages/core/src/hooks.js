@@ -9,7 +9,7 @@ export function watch(callback, depsGetter) {
       callback,
       getDeps:
         typeof depsGetter === "function" ? depsGetter : () => depsGetter,
-      oldDeps: initialDeps,
+      oldDeps: AEUI._deepClone(initialDeps),
     });
   }
 }

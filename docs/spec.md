@@ -30,6 +30,7 @@ function App() {
 - 상태 선언, 사용시 일반 자바스크립트 코드를 사용한다. 원시값이 아닌경우에도 recursive 하게 상태 변화를 추적한다.
   - 원시 값: number, bigint, string, boolean
   - 그 외: Array, Map, Set, Object(key 값만 비교)
+    - TODO: 내부 순환 구조일 경우, 파악해서 루프 방지
 - state가 변경될 때 렌더하는게 아니라, `tick`마다 렌더한다.
 
 ## tick
@@ -110,7 +111,7 @@ SSR, Static Build 2개의 방법을 제공한다.
 ## `aeui.init`
 
 - containerElement에 AEUI가 들어갈 DOM 지정
-- \_componentInstanceTree에 루트 컴포넌트 지정
+- _componentInstanceTree에 루트 컴포넌트 지정
 - 렌더
 - 1초마다 렌더 이벤트를 생성하는 코드 실행
 

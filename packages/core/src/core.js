@@ -39,6 +39,9 @@ export const AEUI = {
         this._childCursor = 0;
         AEUI._currentInstance = this;
 
+        // Run watchers before render
+        AEUI._runComponentWatchers(this);
+
         // Render the component
         const newVNode = this.render(this.props);
         AEUI._currentInstance = null;
@@ -77,7 +80,10 @@ export const AEUI = {
   },
 
   createVNode(tag, props, ...children) {
-    return { tag, props: props || {}, children: children.flat().filter(c => c != null) };
+    const validChildren = children.flat().filter(c => c != null);
+    const finalProps = props || {};
+    finalProps.children = validChildren;
+    return { tag, props: finalProps, children: validChildren };
   },
 
   init(RootComponent, containerElement) {
@@ -115,17 +121,95 @@ export const AEUI = {
     this._isRendering = false;
   },
 
+  _deepEqual(a, b) {
+    if (Object.is(a, b)) return true;
+    if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
+
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (!this._deepEqual(a[i], b[i])) return false;
+      }
+      return true;
+    }
+
+    if (a instanceof Date) {
+      return b instanceof Date && a.getTime() === b.getTime();
+    }
+
+    if (a instanceof RegExp) {
+      return b instanceof RegExp && a.source === b.source && a.flags === b.flags;
+    }
+
+    if (a instanceof Map) {
+      if (!(b instanceof Map) || a.size !== b.size) return false;
+      for (const [key, val] of a) {
+        if (!b.has(key) || !this._deepEqual(val, b.get(key))) return false;
+      }
+      return true;
+    }
+
+    if (a instanceof Set) {
+      if (!(b instanceof Set) || a.size !== b.size) return false;
+      for (const val of a) {
+        let hasMatch = false;
+        for (const bVal of b) {
+          if (this._deepEqual(val, bVal)) {
+            hasMatch = true;
+            break;
+          }
+        }
+        if (!hasMatch) return false;
+      }
+      return true;
+    }
+
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
+    if (keysA.length !== keysB.length) return false;
+
+    for (const key of keysA) {
+      if (!keysB.includes(key) || !this._deepEqual(a[key], b[key])) return false;
+    }
+
+    return true;
+  },
+
+  _deepClone(v) {
+    if (v === null || typeof v !== 'object') return v;
+
+    if (Array.isArray(v)) {
+      return v.map(item => this._deepClone(item));
+    }
+
+    if (v instanceof Date) return new Date(v.getTime());
+    if (v instanceof RegExp) return new RegExp(v.source, v.flags);
+
+    if (v instanceof Map) {
+      return new Map([...v].map(([k, val]) => [k, this._deepClone(val)]));
+    }
+
+    if (v instanceof Set) {
+      return new Set([...v].map(item => this._deepClone(item)));
+    }
+
+    return Object.fromEntries(
+      Object.entries(v).map(([k, val]) => [k, this._deepClone(val)])
+    );
+  },
+
   _runComponentWatchers(instance) {
     if (!instance.watchStates) return;
-    instance.watchStates.forEach((watcher) => {
+    instance.watchStates.forEach((watcher, idx) => {
       const newDeps = watcher.getDeps();
       const hasChanged =
         !watcher.oldDeps ||
-        newDeps.some((d, i) => d !== watcher.oldDeps[i]);
+        newDeps.some((d, i) => !this._deepEqual(d, watcher.oldDeps[i]));
 
       if (hasChanged) {
         watcher.callback();
-        watcher.oldDeps = newDeps;
+        watcher.oldDeps = this._deepClone(newDeps);
       }
     });
   },
@@ -157,7 +241,7 @@ export const AEUI = {
       const newValue = props ? props[key] : undefined;
       const oldValue = oldProps ? oldProps[key] : undefined;
 
-      if (newValue === oldValue) continue;
+      if (this._deepEqual(newValue, oldValue)) continue;
 
       if (key.startsWith("on") && typeof newValue === "function") {
         const eventName = key.substring(2).toLowerCase();
@@ -264,6 +348,9 @@ export const AEUI = {
       instance._childCursor = 0;
 
       AEUI._currentInstance = instance;
+
+      // Run watchers before render
+      AEUI._runComponentWatchers(instance);
 
       // Note: _runComponentWatchers is called inside the component's render function 
       // (injected by babel-plugin) to ensure prop updates are visible to watchers.
