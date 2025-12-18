@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # AEUI Project Context
 
 이 프로젝트는 **AEUI (A Easy UI)**라는 자체 개발 프론트엔드 프레임워크의 모노레포입니다.
