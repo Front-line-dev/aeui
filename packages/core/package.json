@@ -1,6 +1,7 @@
 {
   "name": "aeui",
   "version": "0.0.1",
+  "type": "module",
   "description": "A lightweight, custom frontend framework",
   "main": "dist/aeui.js",
   "module": "dist/aeui.esm.js",
@@ -9,7 +10,10 @@
       "import": "./dist/aeui.esm.js",
       "require": "./dist/aeui.js"
     },
-    "./babel-plugin": "./dist/babel-plugin.js"
+    "./babel-plugin": {
+      "import": "./dist/babel-plugin.js",
+      "require": "./dist/babel-plugin.cjs"
+    }
   },
   "files": [
     "dist",

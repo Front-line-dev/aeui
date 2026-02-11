@@ -80,21 +80,33 @@ export const AEUI = {
   },
 
   createVNode(tag, props, ...children) {
-    const validChildren = children.flat().filter(c => c != null);
+    const validChildren = children.flat().filter(c => c != null && typeof c !== 'boolean');
     const finalProps = props || {};
     finalProps.children = validChildren;
     return { tag, props: finalProps, children: validChildren };
   },
 
   init(RootComponent, containerElement) {
+    // 중복 호출 방어: 이전 인터벌 해제 및 이전 루트 언마운트
+    if (this._tickTimer) {
+      clearInterval(this._tickTimer);
+      this._tickTimer = null;
+    }
+    if (this._rootInstance) {
+      this._unmount(this._rootInstance);
+    }
+
     this._RootComponent = RootComponent;
     this._containerElement = containerElement;
+    this._rootInstance = null;
+    this._previousVNode = null;
+    containerElement.innerHTML = '';
 
     // Initial Render
     this._tick();
 
     // Start Loop
-    setInterval(() => {
+    this._tickTimer = setInterval(() => {
       this._tick();
     }, 1000);
   },
@@ -103,22 +115,25 @@ export const AEUI = {
     if (this._isRendering) return;
     this._isRendering = true;
 
-    if (this._rootInstance) {
-      // Force root update for immediate mode behavior logic is handled by the loop and component internals
-      this._rootInstance.update();
-    } else {
-      const newVNode = this.createVNode(this._RootComponent);
-      this._reconcile(
-        this._containerElement,
-        newVNode,
-        this._previousVNode || null,
-        0,
-        null
-      );
-      this._previousVNode = newVNode;
+    try {
+      if (this._rootInstance) {
+        this._rootInstance.update();
+      } else {
+        const newVNode = this.createVNode(this._RootComponent);
+        this._reconcile(
+          this._containerElement,
+          newVNode,
+          this._previousVNode || null,
+          0,
+          null
+        );
+        this._previousVNode = newVNode;
+      }
+    } catch (e) {
+      console.error('[AEUI] Render error:', e);
+    } finally {
+      this._isRendering = false;
     }
-
-    this._isRendering = false;
   },
 
   _deepEqual(a, b) {
@@ -201,15 +216,19 @@ export const AEUI = {
 
   _runComponentWatchers(instance) {
     if (!instance.watchStates) return;
-    instance.watchStates.forEach((watcher, idx) => {
-      const newDeps = watcher.getDeps();
-      const hasChanged =
-        !watcher.oldDeps ||
-        newDeps.some((d, i) => !this._deepEqual(d, watcher.oldDeps[i]));
+    instance.watchStates.forEach((watcher) => {
+      try {
+        const newDeps = watcher.getDeps();
+        const hasChanged =
+          !watcher.oldDeps ||
+          newDeps.some((d, i) => !this._deepEqual(d, watcher.oldDeps[i]));
 
-      if (hasChanged) {
-        watcher.callback();
-        watcher.oldDeps = this._deepClone(newDeps);
+        if (hasChanged) {
+          watcher.callback();
+          watcher.oldDeps = this._deepClone(newDeps);
+        }
+      } catch (e) {
+        console.error('[AEUI] Watcher error:', e);
       }
     });
   },
@@ -238,6 +257,9 @@ export const AEUI = {
     const allProps = { ...oldProps, ...props };
 
     for (const key in allProps) {
+      // 내부 전용 prop은 DOM에 설정하지 않음
+      if (key === 'children' || key === 'key' || key === 'ref') continue;
+
       const newValue = props ? props[key] : undefined;
       const oldValue = oldProps ? oldProps[key] : undefined;
 
@@ -247,9 +269,18 @@ export const AEUI = {
         const eventName = key.substring(2).toLowerCase();
         if (oldValue) domNode.removeEventListener(eventName, oldValue);
         if (newValue) domNode.addEventListener(eventName, newValue);
+      } else if (key === 'className') {
+        domNode.className = newValue ?? '';
+      } else if (key === "style" && typeof newValue === "object" && newValue !== null) {
+        domNode.style.cssText = '';
+        Object.assign(domNode.style, newValue);
       } else if (key === "style" && typeof newValue === "string") {
         domNode.style.cssText = newValue;
-      } else if (newValue === undefined) {
+      } else if (typeof newValue === 'boolean') {
+        domNode[key] = newValue;
+        if (newValue) domNode.setAttribute(key, '');
+        else domNode.removeAttribute(key);
+      } else if (newValue === undefined || newValue === null) {
         domNode.removeAttribute(key);
       } else {
         domNode.setAttribute(key, newValue);
@@ -259,8 +290,13 @@ export const AEUI = {
 
   _unmount(instance) {
     if (instance) {
-      instance.cleanups.forEach((cleanup) => cleanup());
+      instance.isMounted = false;
+      instance.cleanups.forEach((cleanup) => {
+        try { cleanup(); } catch (e) { console.error('[AEUI] Cleanup error:', e); }
+      });
       instance.children.forEach(child => this._unmount(child));
+      instance.watchStates = [];
+      instance.cleanups = [];
     }
   },
 
@@ -273,9 +309,17 @@ export const AEUI = {
   ) {
     // 1. Array / Fragment Handling
     if (Array.isArray(newVNode)) {
-      newVNode.forEach((child, i) => {
-        this._reconcile(parentElement, child, prevVNode ? prevVNode[i] : null, index + i, parentInstance);
-      });
+      const prevArr = Array.isArray(prevVNode) ? prevVNode : [];
+      const maxLen = Math.max(newVNode.length, prevArr.length);
+      for (let i = 0; i < maxLen; i++) {
+        this._reconcile(
+          parentElement,
+          i < newVNode.length ? newVNode[i] : null,
+          i < prevArr.length ? prevArr[i] : null,
+          index + i,
+          parentInstance
+        );
+      }
       return;
     }
 
@@ -412,3 +456,4 @@ export const AEUI = {
 };
 
 AEUI.createElement = AEUI.createVNode;
+AEUI.Fragment = ({ children }) => children;

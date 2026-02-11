@@ -20,11 +20,17 @@ export default [
   // Build Babel Plugin (CJS only, default export)
   {
     input: 'src/babel-plugin.js',
-    output: {
-      file: 'dist/babel-plugin.js',
-      format: 'cjs',
-      exports: 'default'
-    },
+    output: [
+      {
+        file: 'dist/babel-plugin.cjs',
+        format: 'cjs',
+        exports: 'default'
+      },
+      {
+        file: 'dist/babel-plugin.js',
+        format: 'es'
+      }
+    ],
     plugins: [resolve()]
   }
 ];

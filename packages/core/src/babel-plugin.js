@@ -7,9 +7,15 @@ export default function aeuiTransform({ types: t }) {
     if (t.isJSXElement(node) || t.isJSXFragment(node)) return true;
     if (t.isParenthesizedExpression(node)) return isJSX(node.expression);
 
-    // Check for React.createElement or AEUI.createVNode calls (transformed JSX)
+    // Check for AEUI.createVNode or AEUI.createElement calls (transformed JSX)
     if (t.isCallExpression(node)) {
-      return true;
+      const callee = node.callee;
+      return (
+        t.isMemberExpression(callee) &&
+        t.isIdentifier(callee.object, { name: 'AEUI' }) &&
+        (t.isIdentifier(callee.property, { name: 'createVNode' }) ||
+         t.isIdentifier(callee.property, { name: 'createElement' }))
+      );
     }
     return false;
   };
@@ -131,59 +137,53 @@ export default function aeuiTransform({ types: t }) {
    */
   const injectReactiveProps = (path) => {
     const params = path.node.params;
-    if (params.length === 0) return;
 
-    // We only care if the first param is Identifier or ObjectPattern
-    if (!t.isIdentifier(params[0]) && !t.isObjectPattern(params[0])) return;
+    let propsId = null;
+    let destructuredNames = new Set();
 
-    const originalParam = params[0];
-    const initialPropsId = path.scope.generateUidIdentifier("initialProps");
-    const propsId = t.identifier("__props");
+    // --- Props-specific setup (only when params exist) ---
+    if (params.length > 0 && (t.isIdentifier(params[0]) || t.isObjectPattern(params[0]))) {
+      const originalParam = params[0];
+      const initialPropsId = path.scope.generateUidIdentifier("initialProps");
+      propsId = t.identifier("__props");
 
-    // 1. Rename Param: (props) -> (_initialProps)
-    path.node.params[0] = initialPropsId;
+      // 1. Rename Param: (props) -> (_initialProps)
+      path.node.params[0] = initialPropsId;
 
-    // 2. Setup __props
-    // const __props = { ..._initialProps };
-    const propsSetup = t.variableDeclaration("const", [
-      t.variableDeclarator(
-        propsId,
-        t.objectExpression([t.spreadElement(initialPropsId)])
-      )
-    ]);
-
-    const destructuredNames = new Set();
-    let restoreVars;
-
-    // 3. Restore User Variables
-    if (t.isIdentifier(originalParam)) {
-      // Case: function Component(p) {}
-      // Inject: const p = __props;
-      restoreVars = t.variableDeclaration("const", [
-        t.variableDeclarator(originalParam, propsId)
+      // 2. Setup __props
+      const propsSetup = t.variableDeclaration("const", [
+        t.variableDeclarator(
+          propsId,
+          t.objectExpression([t.spreadElement(initialPropsId)])
+        )
       ]);
-    } else if (t.isObjectPattern(originalParam)) {
-      // Case: function Component({ count }) {}
-      // Inject: let { count } = _initialProps;
-      // Note: We use _initialProps for the destructuring to get the initial values (snapshot).
 
-      // Track destructured names for replacement in watch
-      originalParam.properties.forEach(prop => {
-        if (t.isObjectProperty(prop) && t.isIdentifier(prop.value)) {
-          destructuredNames.add(prop.value.name);
-        }
-      });
+      let restoreVars;
 
-      restoreVars = t.variableDeclaration("let", [
-        t.variableDeclarator(originalParam, initialPropsId)
-      ]);
+      // 3. Restore User Variables
+      if (t.isIdentifier(originalParam)) {
+        restoreVars = t.variableDeclaration("const", [
+          t.variableDeclarator(originalParam, propsId)
+        ]);
+      } else if (t.isObjectPattern(originalParam)) {
+        originalParam.properties.forEach(prop => {
+          if (t.isObjectProperty(prop) && t.isIdentifier(prop.value)) {
+            destructuredNames.add(prop.value.name);
+          }
+        });
+
+        restoreVars = t.variableDeclaration("let", [
+          t.variableDeclarator(originalParam, initialPropsId)
+        ]);
+      }
+
+      // Insert setup code
+      if (t.isBlockStatement(path.node.body)) {
+        path.node.body.body.unshift(propsSetup, restoreVars);
+      }
     }
 
-    // Insert setup code
-    if (t.isBlockStatement(path.node.body)) {
-      path.node.body.body.unshift(propsSetup, restoreVars);
-    }
-
+    // --- Watch & Return transformation (always runs) ---
     // 4. Transform watch() and Return
     path.traverse({
       CallExpression(callPath) {
@@ -194,7 +194,8 @@ export default function aeuiTransform({ types: t }) {
 
         // Transform deps: [] -> () => []
         if (t.isArrayExpression(args[1])) {
-          args[1] = t.arrowFunctionExpression([], args[1]);
+          const depsPath = callPath.get('arguments.1');
+          depsPath.replaceWith(t.arrowFunctionExpression([], t.cloneNode(args[1], true)));
         }
 
         // Helper to replace identifiers in a path (callback or deps)
@@ -225,14 +226,14 @@ export default function aeuiTransform({ types: t }) {
           });
         };
 
-        // Replace in Callback
-        if (args[0]) {
+        // Replace in Callback (only if has destructured prop names)
+        if (args[0] && destructuredNames.size > 0 && propsId) {
           const callbackPath = callPath.get('arguments.0');
           replaceIdentifiers(callbackPath);
         }
 
-        // Replace in Deps (if it's a function now)
-        if (args[1] && (t.isArrowFunctionExpression(args[1]) || t.isFunctionExpression(args[1]))) {
+        // Replace in Deps (if it's a function now and has destructured prop names)
+        if (args[1] && destructuredNames.size > 0 && propsId && (t.isArrowFunctionExpression(args[1]) || t.isFunctionExpression(args[1]))) {
           const depsPath = callPath.get('arguments.1');
           replaceIdentifiers(depsPath);
         }
@@ -248,23 +249,26 @@ export default function aeuiTransform({ types: t }) {
             const newPropsParam = path.scope.generateUidIdentifier("newProps");
             renderFn.params = [newPropsParam];
 
-            // Inline Update Logic:
-            // AEUI.updateProps(__props, _newProps);
-            // AEUI._runComponentWatchers(AEUI._currentInstance);
-            const updateLogic = [
-              t.expressionStatement(
-                t.callExpression(
-                  t.memberExpression(t.identifier("AEUI"), t.identifier("updateProps")),
-                  [propsId, newPropsParam]
+            // Inline Update Logic (only when props exist)
+            const updateLogic = [];
+            if (propsId) {
+              updateLogic.push(
+                t.expressionStatement(
+                  t.callExpression(
+                    t.memberExpression(t.identifier("AEUI"), t.identifier("updateProps")),
+                    [propsId, newPropsParam]
+                  )
                 )
-              ),
+              );
+            }
+            updateLogic.push(
               t.expressionStatement(
                 t.callExpression(
                   t.memberExpression(t.identifier("AEUI"), t.identifier("_runComponentWatchers")),
                   [t.memberExpression(t.identifier("AEUI"), t.identifier("_currentInstance"))]
                 )
               )
-            ];
+            );
 
             // Replace destructured usage in render body
             if (destructuredNames.size > 0) {

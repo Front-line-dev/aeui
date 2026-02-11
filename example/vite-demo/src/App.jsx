@@ -1,5 +1,6 @@
 import { AEUI, watch, clean } from 'aeui';
 import TreeTest from './TreeTest.jsx';
+import ComplexExample from './ComplexExample.jsx';
 
 // --- Original Demo Components ---
 function Counter({ title }) {
@@ -97,6 +98,8 @@ export default function App() {
       </div>
 
       <TreeTest />
+
+      <ComplexExample />
 
       <TestingContainer />
     </div>
