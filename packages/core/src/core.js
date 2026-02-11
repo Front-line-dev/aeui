@@ -37,14 +37,17 @@ export const AEUI = {
 
 
         this._childCursor = 0;
+        let newVNode;
         AEUI._currentInstance = this;
+        try {
+          // Run watchers before render
+          AEUI._runComponentWatchers(this);
 
-        // Run watchers before render
-        AEUI._runComponentWatchers(this);
-
-        // Render the component
-        const newVNode = this.render(this.props);
-        AEUI._currentInstance = null;
+          // Render the component
+          newVNode = this.render(this.props);
+        } finally {
+          AEUI._currentInstance = null;
+        }
 
 
         AEUI._reconcile(
@@ -60,8 +63,11 @@ export const AEUI = {
     };
 
     AEUI._currentInstance = instance;
-    instance.render = vnode.tag(vnode.props);
-    AEUI._currentInstance = null;
+    try {
+      instance.render = vnode.tag(vnode.props);
+    } finally {
+      AEUI._currentInstance = null;
+    }
 
     return instance;
   },
@@ -265,10 +271,14 @@ export const AEUI = {
 
       if (this._deepEqual(newValue, oldValue)) continue;
 
-      if (key.startsWith("on") && typeof newValue === "function") {
+      if (key.startsWith("on")) {
         const eventName = key.substring(2).toLowerCase();
-        if (oldValue) domNode.removeEventListener(eventName, oldValue);
-        if (newValue) domNode.addEventListener(eventName, newValue);
+        if (typeof oldValue === "function") {
+          domNode.removeEventListener(eventName, oldValue);
+        }
+        if (typeof newValue === "function") {
+          domNode.addEventListener(eventName, newValue);
+        }
       } else if (key === 'className') {
         domNode.className = newValue ?? '';
       } else if (key === "style" && typeof newValue === "object" && newValue !== null) {
@@ -391,15 +401,18 @@ export const AEUI = {
       instance.parentElement = parentElement;
       instance._childCursor = 0;
 
+      let componentRenderedVNode;
       AEUI._currentInstance = instance;
+      try {
+        // Run watchers before render
+        AEUI._runComponentWatchers(instance);
 
-      // Run watchers before render
-      AEUI._runComponentWatchers(instance);
-
-      // Note: _runComponentWatchers is called inside the component's render function 
-      // (injected by babel-plugin) to ensure prop updates are visible to watchers.
-      const componentRenderedVNode = instance.render(newVNode.props);
-      AEUI._currentInstance = null;
+        // Note: _runComponentWatchers is called inside the component's render function
+        // (injected by babel-plugin) to ensure prop updates are visible to watchers.
+        componentRenderedVNode = instance.render(newVNode.props);
+      } finally {
+        AEUI._currentInstance = null;
+      }
 
       this._reconcile(
         parentElement,

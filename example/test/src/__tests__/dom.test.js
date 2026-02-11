@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { AEUI } from 'aeui';
+import { AEUI, watch } from 'aeui';
 
 describe('_updateDomProps', () => {
   let div;
@@ -78,6 +78,18 @@ describe('_updateDomProps', () => {
     div.click();
     expect(handler1).toHaveBeenCalledTimes(1); // 이전 핸들러 미호출
     expect(handler2).toHaveBeenCalledTimes(1);
+  });
+
+  it('이벤트 핸들러 제거 시 기존 리스너 해제', () => {
+    const handler = vi.fn();
+
+    AEUI._updateDomProps(div, { onClick: handler });
+    div.click();
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    AEUI._updateDomProps(div, { onClick: undefined }, { onClick: handler });
+    div.click();
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -238,6 +250,38 @@ describe('init 중복 호출 방어', () => {
 });
 
 describe('에러 처리', () => {
+  it('createInstance setup 에러가 발생해도 _currentInstance가 복구됨', () => {
+    let leakedInstance = null;
+    const BrokenComponent = () => {
+      leakedInstance = AEUI._currentInstance;
+      throw new Error('setup boom');
+    };
+
+    expect(() => {
+      AEUI.createInstance({ tag: BrokenComponent, props: {} }, null);
+    }).toThrow('setup boom');
+
+    expect(AEUI._currentInstance).toBeNull();
+
+    // setup 밖 watch 호출은 등록되지 않아야 함
+    watch(() => {}, []);
+    expect(leakedInstance.watchStates.length).toBe(0);
+  });
+
+  it('reconcile 중 render 에러가 발생해도 _currentInstance가 복구됨', () => {
+    const parent = document.createElement('div');
+    const vnode = {
+      tag: () => () => { throw new Error('render boom'); },
+      props: {}
+    };
+
+    expect(() => {
+      AEUI._reconcile(parent, vnode, null, 0, null);
+    }).toThrow('render boom');
+
+    expect(AEUI._currentInstance).toBeNull();
+  });
+
   it('watcher 에러가 다른 watcher를 차단하지 않음', () => {
     const watcherResults = [];
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
