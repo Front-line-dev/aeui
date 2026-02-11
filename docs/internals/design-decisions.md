@@ -157,7 +157,7 @@ watch(() => { ... }, [count]);            // 깔끔한 API
 
 ### 향후 계획
 
-비동기 렌더링이나 Concurrent Mode를 도입하게 되면 **스택 구조**로 전환 필요. 이미 `spec.md` TODO에 기재되어 있다.
+비동기 렌더링이나 Concurrent Mode를 도입하게 되면 **스택 구조**로 전환이 필요하다. 관련 항목은 `docs/roadmap.md`에서 관리한다.
 
 ---
 
@@ -180,19 +180,19 @@ watch(() => { ... }, [count]);            // 깔끔한 API
 
 ### 향후 계획
 
-key 기반 reconciliation 도입 예정. `spec.md` TODO에 기재되어 있다.
+key 기반 reconciliation 도입 예정이며, 관련 항목은 `docs/roadmap.md`에서 관리한다.
 
 ---
 
-## 8. SSR 지원, 하이드레이션 미지원
+## 8. 하이드레이션 미지원 (SSR 런타임 미구현)
 
 ### 결정
 
-서버 사이드 렌더링은 지원하지만, **하이드레이션(Hydration)은 의도적으로 미지원**한다.
+현재 코어 런타임에는 SSR 렌더 API가 구현되어 있지 않으며, **하이드레이션(Hydration)도 미지원**한다.
 
 ### 이유
 
-`init()`에서 `containerElement.innerHTML = ''`로 기존 DOM을 모두 제거하고 처음부터 렌더링한다. SSR로 생성된 HTML은 **SEO 목적으로만 제공**되며, AEUI가 로드되면 완전히 새로 그린다.
+`init()`에서 `containerElement.innerHTML = ''`로 기존 DOM을 모두 제거하고 처음부터 렌더링한다. 즉, 클라이언트 마운트 시점에 기존 마크업 재사용(하이드레이션)은 수행하지 않는다.
 
 하이드레이션은 서버에서 생성된 DOM을 클라이언트에서 재활용하여 초기 로딩 속도를 개선하는 기법이지만, 구현 복잡도가 매우 높고 AEUI의 polling 기반 반응성과의 통합이 까다롭다.
 

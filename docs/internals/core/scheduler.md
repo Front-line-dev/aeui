@@ -75,7 +75,7 @@ if (this._rootInstance) {
 
 ### `containerElement.innerHTML = ''` 의 의미
 
-컨테이너의 기존 HTML 내용을 전부 삭제한다. AEUI는 SSR(서버 사이드 렌더링)을 지원하지만 **하이드레이션(Hydration)은 의도적으로 미지원**한다. 즉, 서버에서 생성된 HTML은 SEO 목적으로만 제공되고, 클라이언트에서 AEUI가 로드되면 기존 DOM을 모두 제거하고 처음부터 다시 생성한다.
+컨테이너의 기존 HTML 내용을 전부 삭제한다. 현재 코어 런타임은 하이드레이션(Hydration)을 지원하지 않으며, 마운트 시 기존 DOM을 재사용하지 않고 처음부터 다시 생성한다.
 
 ---
 

@@ -1,6 +1,6 @@
 # 로드맵 (Roadmap)
 
-> 기존 `spec.md`, `feature-to-be-implemented.md`, `implementing.md`의 TODO 항목과 분석 결과를 통합한 문서이다.
+> 기존 `docs/old-docs/spec.md`, `docs/old-docs/feature-to-be-implemented.md`의 TODO 항목과 분석 결과를 통합한 문서이다.
 
 ---
 

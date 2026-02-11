@@ -10,10 +10,10 @@
 
 ```
 packages/core/src/
-├── core.js          460줄  모든 런타임 로직
-├── hooks.js          22줄  watch, clean 훅
-├── babel-plugin.js  331줄  Babel 변환 플러그인
-└── index.js           3줄  진입점 (re-export)
+├── core.js          모든 런타임 로직
+├── hooks.js         watch, clean 훅
+├── babel-plugin.js  Babel 변환 플러그인
+└── index.js         진입점 (re-export)
 ```
 
 ### core.js 내부 모듈 (물리적으로는 하나의 파일)

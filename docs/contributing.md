@@ -66,8 +66,9 @@ npm run build
 
 `dist/` 폴더에 ESM과 CJS 형식의 번들이 생성된다:
 - `dist/aeui.esm.js` — ES Module
-- `dist/aeui.cjs.js` — CommonJS
-- `dist/babel-plugin.cjs.js` — Babel 플러그인
+- `dist/aeui.js` — CommonJS
+- `dist/babel-plugin.cjs` — Babel 플러그인 (CJS)
+- `dist/babel-plugin.js` — Babel 플러그인 (ESM)
 
 ---
 

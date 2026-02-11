@@ -25,29 +25,22 @@ npm install aeui
 
 ```javascript
 import { defineConfig } from 'vite';
-import aeuiPlugin from 'aeui/babel-plugin';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  esbuild: {
-    jsxFactory: 'AEUI.createElement',
-    jsxFragment: 'AEUI.Fragment',
-    jsxInject: `import { AEUI } from 'aeui'`
-  },
   plugins: [
-    {
-      name: 'aeui-transform',
-      enforce: 'pre',
-      transform(code, id) {
-        if (id.endsWith('.jsx')) {
-          const { transformSync } = require('@babel/core');
-          const result = transformSync(code, {
-            plugins: [aeuiPlugin],
-            parserOpts: { plugins: ['jsx'] }
-          });
-          return result?.code;
-        }
+    react({
+      jsxRuntime: 'classic',
+      babel: {
+        plugins: [
+          ['aeui/babel-plugin'],
+          ['@babel/plugin-transform-react-jsx', {
+            pragma: 'AEUI.createElement',
+            pragmaFrag: 'AEUI.Fragment'
+          }]
+        ]
       }
-    }
+    })
   ]
 });
 ```
