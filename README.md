@@ -75,6 +75,7 @@ aeui/
 ├── packages/core/          프레임워크 코어 (core.js, hooks.js, babel-plugin.js)
 ├── packages/create-aeui-app/  프로젝트 스캐폴딩 CLI
 ├── example/vite-demo/      데모 앱
+├── example/commerce-admin/  오프라인 E-commerce + Admin 쇼케이스 예제
 ├── example/test/            테스트
 └── docs/                    문서
 ```

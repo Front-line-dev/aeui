@@ -55,6 +55,8 @@ function Counter() {
 }
 ```
 
+> 참고: 사용자는 React처럼 **JSX를 그대로 `return`** 하면 된다. `return () => ...` 같은 팩토리 형태는 **Babel 플러그인이 자동으로 변환한 결과**이며, 직접 작성할 필요가 없다.
+
 이 변환의 결과:
 - `let count = 0`은 **한 번만** 실행된다 (setup)
 - `return AEUI.createVNode(...)` 부분은 **매 tick마다** 실행된다 (render)
@@ -142,8 +144,8 @@ AEUI.init(App, container)
 AEUI가 `let` 변수의 직접 수정을 감지하기 위해 Polling을 사용한다. JavaScript에는 "변수가 변경되었을 때 알림을 받는" 기능이 없으므로, 주기적으로 현재 값을 이전 값과 비교하는 방식이 유일하다.
 
 이 방식의 자연스러운 결과:
-- **장점**: `count++`, `items.push()` 등 일반 JavaScript 코드가 그대로 동작
-- **단점**: 변경 후 최대 1초를 기다려야 화면에 반영
+- `count++`, `items.push()` 등 일반 JavaScript 코드가 그대로 동작
+- 변경 사항은 **다음 tick**에서 화면에 반영된다. (기본 tick: 1초)
 
 ---
 
