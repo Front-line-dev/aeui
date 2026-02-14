@@ -469,4 +469,4 @@ export const AEUI = {
 };
 
 AEUI.createElement = AEUI.createVNode;
-AEUI.Fragment = ({ children }) => children;
+AEUI.Fragment = (initialProps) => (props) => props.children;
