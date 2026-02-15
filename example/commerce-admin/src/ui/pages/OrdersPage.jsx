@@ -1,4 +1,5 @@
 import { AEUI } from "aeui";
+import { state, actions } from "../../store.js";
 import { formatKRW } from "../../lib/money.js";
 
 function asArray(value) {
@@ -135,11 +136,11 @@ function OrderDetailView({ order }) {
   );
 }
 
-function OrderDetail({ orders, selectedOrderId }) {
-  return <OrderDetailView order={asArray(orders).find((o) => o.id === selectedOrderId) || null} />;
+function OrderDetail() {
+  return <OrderDetailView order={asArray(state.orders).find((o) => o.id === state.selectedOrderId) || null} />;
 }
 
-export default function OrdersPage({ orders, selectedOrderId, actions }) {
+export default function OrdersPage() {
   const onSelect = (e) => {
     const id = e.currentTarget.getAttribute("data-order-id");
     if (!id) return;
@@ -152,19 +153,19 @@ export default function OrdersPage({ orders, selectedOrderId, actions }) {
         <div>
           <h2 className="panel__title">주문 내역</h2>
           <div className="panel__sub">
-            주문 {(Array.isArray(orders) ? orders : []).length}건 · 클릭해서 상세를 확인하세요
+            주문 {asArray(state.orders).length}건 · 클릭해서 상세를 확인하세요
           </div>
         </div>
       </div>
       <div className="panel__body">
         <div className="split">
           <div>
-            <OrdersTable orders={orders} selectedOrderId={selectedOrderId} onSelect={onSelect} />
+            <OrdersTable orders={state.orders} selectedOrderId={state.selectedOrderId} onSelect={onSelect} />
           </div>
 
           <div className="card" style="align-self: start;">
             <div className="card__kicker">상세</div>
-            <OrderDetail orders={orders} selectedOrderId={selectedOrderId} />
+            <OrderDetail />
           </div>
         </div>
       </div>

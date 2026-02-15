@@ -1,21 +1,63 @@
-import { AEUI } from "aeui";
+import { AEUI, watch, clean } from "aeui";
+import { state, actions } from "../../store.js";
 
-export default function ToastHost({ toasts, onDismiss }) {
-  const onClickToast = (e) => {
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+export default function ToastHost() {
+  const timers = new Map();
+
+  const syncTimers = () => {
+    const list = asArray(state.toasts);
+
+    const alive = new Set(list.map((t) => t?.id).filter(Boolean));
+
+    // Clear removed timers first.
+    for (const [id, timerId] of timers.entries()) {
+      if (!alive.has(id)) {
+        clearTimeout(timerId);
+        timers.delete(id);
+      }
+    }
+
+    // Add new timers.
+    for (const t of list) {
+      if (!t?.id) continue;
+      if (timers.has(t.id)) continue;
+
+      const ttlMs = Number(t.ttlMs || 0);
+      if (ttlMs <= 0) continue;
+
+      const createdAt = Number(t.createdAt || Date.now());
+      const remainingMs = Math.max(0, createdAt + ttlMs - Date.now());
+      const timerId = setTimeout(() => actions.dismissToast(t.id), remainingMs);
+      timers.set(t.id, timerId);
+    }
+  };
+
+  syncTimers();
+  watch(syncTimers, [state.toasts]);
+  clean(() => {
+    for (const timerId of timers.values()) clearTimeout(timerId);
+    timers.clear();
+  });
+
+  const handleToastClick = (e) => {
     const id = e.currentTarget.getAttribute("data-toast-id");
     if (!id) return;
-    if (typeof onDismiss === "function") onDismiss(id);
+    actions.dismissToast(id);
   };
 
   return (
     <div className="toastHost" aria-live="polite" aria-relevant="additions removals">
-      {(toasts || []).map((t) => (
+      {asArray(state.toasts).map((t) => (
         <div
           className={`toast ${t.tone === "ok" ? "toast--ok" : ""} ${
             t.tone === "danger" ? "toast--danger" : ""
           }`}
           data-toast-id={t.id}
-          onClick={onClickToast}
+          onClick={handleToastClick}
         >
           <div className="toast__title">{t.title || "알림"}</div>
           <div className="toast__body">{t.message}</div>

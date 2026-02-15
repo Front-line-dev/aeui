@@ -1,4 +1,5 @@
 import { AEUI } from "aeui";
+import { state, actions } from "../../store.js";
 import Modal from "../components/Modal.jsx";
 
 function ConfirmModalFooter({ tone, confirmLabel, onClose, onConfirm }) {
@@ -18,24 +19,30 @@ function ConfirmModalFooter({ tone, confirmLabel, onClose, onConfirm }) {
   );
 }
 
-export default function ConfirmModal({ title, message, detail, confirmLabel, tone, onConfirm, onClose }) {
-  const handleConfirm = () => {
-    if (typeof onConfirm === "function") onConfirm();
-  };
+export default function ConfirmModal() {
+  const handleClose = () => actions.closeModal();
+  const handleConfirm = () => actions.confirmModal();
+
+  if (state.modal?.type !== "confirm") return null;
 
   return (
     <Modal
-      title={title || "확인"}
-      onClose={onClose}
+      title={state.modal.title || "확인"}
+      onClose={handleClose}
       footer={
-        <ConfirmModalFooter tone={tone} confirmLabel={confirmLabel} onClose={onClose} onConfirm={handleConfirm} />
+        <ConfirmModalFooter
+          tone={state.modal.tone}
+          confirmLabel={state.modal.confirmLabel}
+          onClose={handleClose}
+          onConfirm={handleConfirm}
+        />
       }
     >
       <div style="line-height: 1.55;">
         <div style="font-weight: 800; letter-spacing: -0.01em; margin-bottom: 6px;">
-          {message}
+          {state.modal.message}
         </div>
-        {detail ? <div className="help">{detail}</div> : null}
+        {state.modal.detail ? <div className="help">{state.modal.detail}</div> : null}
       </div>
     </Modal>
   );

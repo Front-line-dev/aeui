@@ -1,4 +1,5 @@
-import { AEUI, clean, watch } from "aeui";
+import { AEUI, clean } from "aeui";
+import { state, actions } from "../../store.js";
 import { calcCartTotals, normalizeCoupon } from "../../lib/money.js";
 import { fakeAuthorizePayment } from "../../lib/fakeApi.js";
 
@@ -7,18 +8,7 @@ function isEmail(v) {
   return s.includes("@") && s.includes(".");
 }
 
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function safeCart(cart) {
-  const c = cart && typeof cart === "object" ? cart : { items: [], couponCode: "" };
-  if (!Array.isArray(c.items)) c.items = [];
-  if (typeof c.couponCode !== "string") c.couponCode = "";
-  return c;
-}
-
-export default function CheckoutPage({ cart, products, actions }) {
+export default function CheckoutPage() {
   let step = 1;
 
   let name = "";
@@ -33,32 +23,24 @@ export default function CheckoutPage({ cart, products, actions }) {
 
   let pending = null;
 
-  let currentCart = safeCart(cart);
-  let currentProducts = asArray(products);
-  let hasItems = (currentCart.items || []).length > 0;
-  let totals = calcCartTotals({ cart: currentCart, products: currentProducts });
-  let coupon = normalizeCoupon(currentCart.couponCode || "");
-
-  const recompute = (nextCart, nextProducts) => {
-    currentCart = safeCart(nextCart);
-    currentProducts = asArray(nextProducts);
-    hasItems = (currentCart.items || []).length > 0;
-    totals = calcCartTotals({ cart: currentCart, products: currentProducts });
-    coupon = normalizeCoupon(currentCart.couponCode || "");
-  };
-
-  recompute(cart, products);
-  watch(() => {
-    recompute(cart, products);
-  }, [cart, products]);
-
   clean(() => {
     if (pending && typeof pending.cancel === "function") {
       pending.cancel();
     }
   });
 
+  const hasItems = () => Array.isArray(state.cart?.items) && state.cart.items.length > 0;
+  const totals = () => calcCartTotals({ cart: state.cart, products: state.products });
+  const coupon = () => normalizeCoupon(state.cart?.couponCode || "");
+
   const goBack = () => actions.goCart();
+
+  const onNameInput = (e) => (name = e.target.value);
+  const onEmailInput = (e) => (email = e.target.value);
+  const onAddress1Input = (e) => (address1 = e.target.value);
+  const onAddress2Input = (e) => (address2 = e.target.value);
+  const onZipInput = (e) => (zip = e.target.value);
+  const onAgreeChange = (e) => (agree = e.target.checked);
 
   const onNext = () => {
     error = "";
@@ -83,7 +65,7 @@ export default function CheckoutPage({ cart, products, actions }) {
     error = "";
     if (processing) return;
 
-    if (!hasItems) {
+    if (!hasItems()) {
       error = "장바구니가 비어있습니다.";
       return;
     }
@@ -95,7 +77,7 @@ export default function CheckoutPage({ cart, products, actions }) {
 
     processing = true;
 
-    pending = fakeAuthorizePayment({ amount: totals.total });
+    pending = fakeAuthorizePayment({ amount: totals().total });
     pending.promise
       .then((payment) => {
         processing = false;
@@ -123,9 +105,9 @@ export default function CheckoutPage({ cart, products, actions }) {
       <div className="panel__head">
         <div>
           <h2 className="panel__title">체크아웃</h2>
-          {hasItems ? (
+          {hasItems() ? (
             <div className="panel__sub">
-              단계 {step}/3 · 총액 {totals.total.toLocaleString("ko-KR")}원 · 쿠폰 {coupon || "없음"}
+              단계 {step}/3 · 총액 {totals().total.toLocaleString("ko-KR")}원 · 쿠폰 {coupon() || "없음"}
             </div>
           ) : (
             <div className="panel__sub">장바구니가 비어있습니다.</div>
@@ -136,7 +118,7 @@ export default function CheckoutPage({ cart, products, actions }) {
         </button>
       </div>
       <div className="panel__body">
-        {!hasItems ? (
+        {!hasItems() ? (
           <div className="card">
             <div style="font-weight: 900; letter-spacing: -0.02em;">장바구니가 비어있습니다.</div>
             <div className="help">스토어에서 상품을 담아주세요.</div>
@@ -149,23 +131,23 @@ export default function CheckoutPage({ cart, products, actions }) {
                   <div style="font-weight: 900; letter-spacing: -0.02em; margin-bottom: 10px;">1) 배송 정보</div>
                   <div className="formRow">
                     <div className="label">이름</div>
-                    <input className="input" value={name} onInput={(e) => (name = e.target.value)} />
+                    <input className="input" value={name} onInput={onNameInput} />
                   </div>
                   <div className="formRow">
                     <div className="label">이메일</div>
-                    <input className="input" value={email} onInput={(e) => (email = e.target.value)} />
+                    <input className="input" value={email} onInput={onEmailInput} />
                   </div>
                   <div className="formRow">
                     <div className="label">주소 1</div>
-                    <input className="input" value={address1} onInput={(e) => (address1 = e.target.value)} />
+                    <input className="input" value={address1} onInput={onAddress1Input} />
                   </div>
                   <div className="formRow">
                     <div className="label">주소 2</div>
-                    <input className="input" value={address2} onInput={(e) => (address2 = e.target.value)} />
+                    <input className="input" value={address2} onInput={onAddress2Input} />
                   </div>
                   <div className="formRow" style="margin-bottom: 0;">
                     <div className="label">우편번호</div>
-                    <input className="input" value={zip} onInput={(e) => (zip = e.target.value)} />
+                    <input className="input" value={zip} onInput={onZipInput} />
                   </div>
                 </div>
               ) : null}
@@ -180,7 +162,7 @@ export default function CheckoutPage({ cart, products, actions }) {
                     <input
                       type="checkbox"
                       checked={agree}
-                      onChange={(e) => (agree = e.target.checked)}
+                      onChange={onAgreeChange}
                       style="margin-right: 8px;"
                     />
                     결제 진행에 동의합니다
@@ -238,23 +220,23 @@ export default function CheckoutPage({ cart, products, actions }) {
               <div className="grid" style="gap: 10px;">
                 <div className="pill" style="justify-content: space-between;">
                   <span>소계</span>
-                  <span style="font-weight: 900;">{totals.subtotal.toLocaleString("ko-KR")}원</span>
+                  <span style="font-weight: 900;">{totals().subtotal.toLocaleString("ko-KR")}원</span>
                 </div>
                 <div className="pill" style="justify-content: space-between;">
                   <span>할인</span>
-                  <span style="font-weight: 900;">-{totals.discount.toLocaleString("ko-KR")}원</span>
+                  <span style="font-weight: 900;">-{totals().discount.toLocaleString("ko-KR")}원</span>
                 </div>
                 <div className="pill" style="justify-content: space-between;">
                   <span>배송</span>
-                  <span style="font-weight: 900;">{totals.shipping.toLocaleString("ko-KR")}원</span>
+                  <span style="font-weight: 900;">{totals().shipping.toLocaleString("ko-KR")}원</span>
                 </div>
                 <div className="pill" style="justify-content: space-between;">
                   <span>부가세</span>
-                  <span style="font-weight: 900;">{totals.tax.toLocaleString("ko-KR")}원</span>
+                  <span style="font-weight: 900;">{totals().tax.toLocaleString("ko-KR")}원</span>
                 </div>
                 <div className="pill" style="justify-content: space-between; border-color: rgba(0,0,0,0.22);">
                   <span style="font-weight: 900;">총액</span>
-                  <span style="font-weight: 900;">{totals.total.toLocaleString("ko-KR")}원</span>
+                  <span style="font-weight: 900;">{totals().total.toLocaleString("ko-KR")}원</span>
                 </div>
               </div>
             </div>

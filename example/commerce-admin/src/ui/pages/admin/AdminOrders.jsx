@@ -1,4 +1,5 @@
 import { AEUI } from "aeui";
+import { state, actions } from "../../../store.js";
 import { formatKRW } from "../../../lib/money.js";
 
 function asArray(value) {
@@ -159,7 +160,7 @@ function AdminOrdersFilter({ value, onChange }) {
   );
 }
 
-export default function AdminOrders({ orders, selectedOrderId, actions }) {
+export default function AdminOrders() {
   let statusFilter = "ALL";
 
   const onFilter = (e) => (statusFilter = e.target.value);
@@ -196,21 +197,25 @@ export default function AdminOrders({ orders, selectedOrderId, actions }) {
           <h2 className="panel__title">주문 관리</h2>
           <div className="panel__sub">상태 변경/취소 + 상세 확인</div>
         </div>
-        <div className="pill">총 {asArray(orders).length}건</div>
+        <div className="pill">총 {asArray(state.orders).length}건</div>
       </div>
       <div className="panel__body">
         <div className="split">
           <div>
             <AdminOrdersFilter value={statusFilter} onChange={onFilter} />
 
-            <AdminOrdersTable orders={getVisible(asArray(orders))} selectedOrderId={selectedOrderId} onSelect={onSelect} />
+            <AdminOrdersTable
+              orders={getVisible(asArray(state.orders))}
+              selectedOrderId={state.selectedOrderId}
+              onSelect={onSelect}
+            />
           </div>
 
           <div className="card" style="align-self: start;">
             <div className="card__kicker">선택 주문</div>
             <AdminOrderDetail
-              orders={orders}
-              selectedOrderId={selectedOrderId}
+              orders={state.orders}
+              selectedOrderId={state.selectedOrderId}
               onStatusChange={onStatusChange}
               onCancel={onCancel}
             />

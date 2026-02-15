@@ -1,4 +1,5 @@
 import { AEUI } from "aeui";
+import { state, actions } from "../../../store.js";
 import { formatKRW } from "../../../lib/money.js";
 
 function cmp(a, b) {
@@ -123,7 +124,7 @@ function ProductsFilters({
   );
 }
 
-export default function AdminProducts({ products, actions }) {
+export default function AdminProducts() {
   let query = "";
   let category = "ALL";
   let showInactive = true;
@@ -187,7 +188,7 @@ export default function AdminProducts({ products, actions }) {
           query={query}
           category={category}
           showInactive={showInactive}
-          categories={getCategories(asArray(products))}
+          categories={getCategories(asArray(state.products))}
           onQueryInput={onQueryInput}
           onCategoryChange={onCategoryChange}
           onShowInactive={onShowInactive}
@@ -195,7 +196,7 @@ export default function AdminProducts({ products, actions }) {
 
         <div style="margin-top: 14px;">
           <ProductsTable
-            products={getVisible(asArray(products))}
+            products={getVisible(asArray(state.products))}
             onEdit={onEdit}
             onDelete={onDelete}
             onToggleActive={onToggleActive}

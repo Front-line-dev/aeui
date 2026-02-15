@@ -1,4 +1,5 @@
-import { AEUI, watch } from "aeui";
+import { AEUI } from "aeui";
+import { state, actions } from "../../store.js";
 import { formatKRW } from "../../lib/money.js";
 
 function cmp(a, b) {
@@ -157,33 +158,11 @@ function ProductGrid({ items, onView, onAdd }) {
   );
 }
 
-export default function ShopPage({ products, actions }) {
+export default function ShopPage() {
   let query = "";
   let category = "ALL";
   let inStockOnly = true;
   let sort = "FEATURED";
-
-  let activeCount = 0;
-  let categories = [];
-  let visibleProducts = [];
-
-  const recompute = (nextProducts, nextQuery, nextCategory, nextInStockOnly, nextSort) => {
-    const list = asArray(nextProducts);
-    activeCount = list.filter((p) => p?.active).length;
-    categories = computeCategories(list);
-    visibleProducts = selectVisibleProducts(list, {
-      query: nextQuery,
-      category: nextCategory,
-      inStockOnly: nextInStockOnly,
-      sort: nextSort,
-    });
-  };
-
-  recompute(products, query, category, inStockOnly, sort);
-
-  watch(() => {
-    recompute(products, query, category, inStockOnly, sort);
-  }, [products, query, category, inStockOnly, sort]);
 
   const onQueryInput = (e) => {
     query = e.target.value;
@@ -210,6 +189,17 @@ export default function ShopPage({ products, actions }) {
     actions.addToCart(id, 1);
   };
 
+  const products = () => asArray(state.products);
+  const activeCount = () => products().filter((p) => p?.active).length;
+  const categories = () => computeCategories(products());
+  const visibleProducts = () =>
+    selectVisibleProducts(products(), {
+      query,
+      category,
+      inStockOnly,
+      sort,
+    });
+
   return (
     <div className="panel">
       <div className="panel__head">
@@ -217,7 +207,7 @@ export default function ShopPage({ products, actions }) {
           <h2 className="panel__title">스토어</h2>
           <div className="panel__sub">실제 네트워크 없이 동작합니다. AEUI는 tick 기반(기본 1초)으로 렌더링합니다.</div>
         </div>
-        <div className="pill">활성 상품 {activeCount}개</div>
+        <div className="pill">활성 상품 {activeCount()}개</div>
       </div>
       <div className="panel__body">
         <ShopFilters
@@ -225,16 +215,15 @@ export default function ShopPage({ products, actions }) {
           category={category}
           inStockOnly={inStockOnly}
           sort={sort}
-          categories={categories}
+          categories={categories()}
           onQueryInput={onQueryInput}
           onCategoryChange={onCategoryChange}
           onStockToggle={onStockToggle}
           onSortChange={onSortChange}
         />
 
-        <ProductGrid items={visibleProducts} onView={onView} onAdd={onAdd} />
+        <ProductGrid items={visibleProducts()} onView={onView} onAdd={onAdd} />
       </div>
     </div>
   );
 }
-

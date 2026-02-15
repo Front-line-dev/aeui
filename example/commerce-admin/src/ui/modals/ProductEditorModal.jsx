@@ -1,4 +1,5 @@
-import { AEUI, watch } from "aeui";
+import { AEUI } from "aeui";
+import { state, actions } from "../../store.js";
 import Modal from "../components/Modal.jsx";
 import { clampInt } from "../../lib/money.js";
 
@@ -26,108 +27,76 @@ function ProductEditorFooter({ onClose, onSubmit }) {
   );
 }
 
-export default function ProductEditorModal({ mode, product, nonce, onClose, onSave }) {
-  let lastNonce = nonce;
+export default function ProductEditorModal() {
+  if (state.modal?.type !== "productEditor") return null;
 
-  let currentMode = mode;
-  let currentProductId = product?.id || null;
-  let currentOnSave = onSave;
+  const handleClose = () => actions.closeModal();
 
-  let name = product?.name || "";
-  let category = product?.category || "굿즈";
-  let price = product?.price ?? 1000;
-  let stock = product?.stock ?? 0;
-  let rating = product?.rating ?? 4.2;
-  let active = product?.active ?? true;
-  let description = product?.description || "";
-  let tagsText = (product?.tags || []).join(", ");
+  const handleNameInput = (e) => (state.modal.draft.name = e.target.value);
+  const handleDescInput = (e) => (state.modal.draft.description = e.target.value);
+  const handleTagsInput = (e) => (state.modal.draft.tagsText = e.target.value);
+  const handleCategoryInput = (e) => (state.modal.draft.category = e.target.value);
+  const handlePriceInput = (e) => (state.modal.draft.price = e.target.value);
+  const handleStockInput = (e) => (state.modal.draft.stock = e.target.value);
+  const handleRatingInput = (e) => (state.modal.draft.rating = e.target.value);
+  const handleActiveChange = (e) => (state.modal.draft.active = e.target.checked);
 
-  let error = "";
+  const handleSubmit = () => {
+    if (state.modal?.type !== "productEditor") return;
 
-  const resetFromProduct = (p) => {
-    name = p?.name || "";
-    category = p?.category || "굿즈";
-    price = p?.price ?? 1000;
-    stock = p?.stock ?? 0;
-    rating = p?.rating ?? 4.2;
-    active = p?.active ?? true;
-    description = p?.description || "";
-    tagsText = (p?.tags || []).join(", ");
-    error = "";
-  };
+    const m = state.modal;
+    const d = m.draft || {};
 
-  watch(() => {
-    currentMode = mode;
-    currentProductId = product?.id || null;
-    currentOnSave = onSave;
+    const cleanName = String(d.name || "").trim();
+    const cleanCategory = String(d.category || "").trim();
+    const cleanDesc = String(d.description || "").trim();
 
-    if (nonce !== lastNonce) {
-      lastNonce = nonce;
-      resetFromProduct(product);
-    }
-  }, [nonce, mode, product?.id, onSave]);
+    const nPrice = clampInt(d.price, 0, 100000000);
+    const nStock = clampInt(d.stock, 0, 1000000);
+    const nRating = Math.max(0, Math.min(5, Number(d.rating) || 0));
+    const tags = parseTags(d.tagsText);
 
-  const onSubmit = () => {
-    const cleanName = String(name).trim();
-    const cleanCategory = String(category).trim();
-    const cleanDesc = String(description).trim();
+    if (!cleanName) return (m.error = "상품명을 입력해주세요.");
+    if (!cleanCategory) return (m.error = "카테고리를 입력해주세요.");
+    if (nPrice <= 0) return (m.error = "가격은 1원 이상이어야 합니다.");
 
-    const nPrice = clampInt(price, 0, 100000000);
-    const nStock = clampInt(stock, 0, 1000000);
-    const nRating = Math.max(0, Math.min(5, Number(rating) || 0));
-    const tags = parseTags(tagsText);
-
-    if (!cleanName) {
-      error = "상품명을 입력해주세요.";
-      return;
-    }
-    if (!cleanCategory) {
-      error = "카테고리를 입력해주세요.";
-      return;
-    }
-    if (nPrice <= 0) {
-      error = "가격은 1원 이상이어야 합니다.";
-      return;
-    }
-
-    if (typeof currentOnSave === "function") {
-      currentOnSave({
-        mode: currentMode,
-        productId: currentProductId,
-        draft: {
-          name: cleanName,
-          category: cleanCategory,
-          price: nPrice,
-          stock: nStock,
-          rating: nRating,
-          active: !!active,
-          description: cleanDesc,
-          tags,
-        },
-      });
-    }
+    m.error = "";
+    actions.saveProductFromEditor({
+      mode: m.mode,
+      productId: m.productId,
+      draft: {
+        name: cleanName,
+        category: cleanCategory,
+        price: nPrice,
+        stock: nStock,
+        rating: nRating,
+        active: !!d.active,
+        description: cleanDesc,
+        tags,
+      },
+    });
   };
 
   return (
     <Modal
-      title={mode === "edit" ? "상품 수정" : "새 상품"}
-      onClose={onClose}
-      footer={<ProductEditorFooter onClose={onClose} onSubmit={onSubmit} />}
+      title={state.modal.mode === "edit" ? "상품 수정" : "새 상품"}
+      onClose={handleClose}
+      footer={<ProductEditorFooter onClose={handleClose} onSubmit={handleSubmit} />}
       wide
     >
       <div className="split">
         <div>
           <div className="formRow">
             <div className="label">상품명</div>
-            <input className="input" value={name} onInput={(e) => (name = e.target.value)} />
+            <input className="input" value={state.modal.draft.name} onInput={handleNameInput} />
           </div>
 
           <div className="formRow">
             <div className="label">설명</div>
             <textarea
               className="textarea"
-              value={description}
-              onInput={(e) => (description = e.target.value)}
+              value={state.modal.draft.description}
+              onInput={handleDescInput}
               placeholder="스토어 상세 페이지에 보여줄 설명을 적어주세요."
             />
           </div>
@@ -136,8 +105,8 @@ export default function ProductEditorModal({ mode, product, nonce, onClose, onSa
             <div className="label">태그</div>
             <input
               className="input"
-              value={tagsText}
-              onInput={(e) => (tagsText = e.target.value)}
+              value={state.modal.draft.tagsText}
+              onInput={handleTagsInput}
               placeholder="new, hot, low-stock"
             />
           </div>
@@ -146,7 +115,7 @@ export default function ProductEditorModal({ mode, product, nonce, onClose, onSa
         <div>
           <div className="formRow">
             <div className="label">카테고리</div>
-            <input className="input" value={category} onInput={(e) => (category = e.target.value)} />
+            <input className="input" value={state.modal.draft.category} onInput={handleCategoryInput} />
           </div>
 
           <div className="formRow">
@@ -155,8 +124,8 @@ export default function ProductEditorModal({ mode, product, nonce, onClose, onSa
               className="input"
               type="number"
               min="0"
-              value={price}
-              onInput={(e) => (price = e.target.value)}
+              value={state.modal.draft.price}
+              onInput={handlePriceInput}
             />
           </div>
 
@@ -166,8 +135,8 @@ export default function ProductEditorModal({ mode, product, nonce, onClose, onSa
               className="input"
               type="number"
               min="0"
-              value={stock}
-              onInput={(e) => (stock = e.target.value)}
+              value={state.modal.draft.stock}
+              onInput={handleStockInput}
             />
           </div>
 
@@ -179,8 +148,8 @@ export default function ProductEditorModal({ mode, product, nonce, onClose, onSa
               min="0"
               max="5"
               step="0.1"
-              value={rating}
-              onInput={(e) => (rating = e.target.value)}
+              value={state.modal.draft.rating}
+              onInput={handleRatingInput}
             />
             <div className="help">단순 데모용 값입니다.</div>
           </div>
@@ -189,15 +158,15 @@ export default function ProductEditorModal({ mode, product, nonce, onClose, onSa
             <label className="pill" style="display: inline-flex;">
               <input
                 type="checkbox"
-                checked={active}
-                onChange={(e) => (active = e.target.checked)}
+                checked={state.modal.draft.active}
+                onChange={handleActiveChange}
                 style="margin-right: 8px;"
               />
               스토어에 노출(활성)
             </label>
           </div>
 
-          {error ? <div className="error">{error}</div> : null}
+          {state.modal.error ? <div className="error">{state.modal.error}</div> : null}
         </div>
       </div>
     </Modal>

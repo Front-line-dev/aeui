@@ -1,15 +1,9 @@
 import { AEUI, watch } from "aeui";
-import { calcCartTotals, clampInt, formatKRW, normalizeCoupon } from "../../lib/money.js";
+import { state, actions, select } from "../../store.js";
+import { calcCartTotals, clampInt, formatKRW } from "../../lib/money.js";
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function safeCart(cart) {
-  const c = cart && typeof cart === "object" ? cart : { items: [], couponCode: "" };
-  if (!Array.isArray(c.items)) c.items = [];
-  if (typeof c.couponCode !== "string") c.couponCode = "";
-  return c;
 }
 
 function makeProductIndex(products) {
@@ -20,8 +14,8 @@ function makeProductIndex(products) {
   return map;
 }
 
-function countCartItems(cart) {
-  return (safeCart(cart).items || []).reduce((acc, it) => acc + (it?.qty || 0), 0);
+function countCartItems() {
+  return select.cartCount();
 }
 
 function CartEmptyState({ onGoShop }) {
@@ -167,25 +161,48 @@ function CartSummary({ totals, couponDraft, onCouponInput, onApplyCoupon, onGoCh
   );
 }
 
-export default function CartPage({ cart, products, actions }) {
-  let couponDraft = safeCart(cart).couponCode;
-  let lastCouponSeen = normalizeCoupon(safeCart(cart).couponCode);
+export default function CartPage() {
+  let couponDraft = state.cart.couponCode;
 
-  let items = safeCart(cart).items;
-  let productsById = makeProductIndex(products);
-  let totals = calcCartTotals({ cart: safeCart(cart), products: asArray(products) });
-  let itemCount = countCartItems(cart);
-  let rows = [];
+  watch(() => {
+    couponDraft = state.cart.couponCode;
+  }, [state.cart.couponCode]);
 
-  const recompute = (nextCart, nextProducts) => {
-    const c = safeCart(nextCart);
-    const list = asArray(nextProducts);
-    items = c.items;
-    productsById = makeProductIndex(list);
-    totals = calcCartTotals({ cart: c, products: list });
-    itemCount = countCartItems(c);
-    rows = asArray(items).map((it) => {
-      const p = productsById instanceof Map ? productsById.get(it.productId) : null;
+  const onCouponInput = (e) => {
+    couponDraft = e.target.value;
+  };
+
+  const onApplyCoupon = () => {
+    actions.setCoupon(couponDraft);
+  };
+
+  const onInc = (e) => {
+    const id = e.currentTarget.getAttribute("data-product-id");
+    if (!id) return;
+    actions.adjustCartQty(id, +1);
+  };
+
+  const onDec = (e) => {
+    const id = e.currentTarget.getAttribute("data-product-id");
+    if (!id) return;
+    actions.adjustCartQty(id, -1);
+  };
+
+  const onRemove = (e) => {
+    const id = e.currentTarget.getAttribute("data-product-id");
+    if (!id) return;
+    actions.removeFromCart(id);
+  };
+
+  const onGoShop = () => actions.goShop();
+  const onGoCheckout = () => actions.goCheckout();
+
+  const items = () => asArray(state.cart.items);
+  const totals = () => calcCartTotals({ cart: state.cart, products: asArray(state.products) });
+  const rows = () => {
+    const byId = makeProductIndex(state.products);
+    return items().map((it) => {
+      const p = byId.get(it.productId) || null;
       const qty = clampInt(it?.qty, 0, 999);
       const price = p ? Number(p.price || 0) : 0;
       const stock = p ? Number(p.stock || 0) : 0;
@@ -208,57 +225,13 @@ export default function CartPage({ cart, products, actions }) {
     });
   };
 
-  // Initial derive.
-  recompute(cart, products);
-
-  watch(() => {
-    recompute(cart, products);
-  }, [cart, products]);
-
-  watch(() => {
-    const normalized = normalizeCoupon(safeCart(cart).couponCode);
-    if (normalized !== lastCouponSeen) {
-      lastCouponSeen = normalized;
-      couponDraft = safeCart(cart).couponCode;
-    }
-  }, [cart?.couponCode]);
-
-  const onCouponInput = (e) => {
-    couponDraft = e.target.value;
-  };
-
-  const onApplyCoupon = () => {
-    actions.setCoupon(couponDraft);
-  };
-
-  const onInc = (e) => {
-    const id = e.currentTarget.getAttribute("data-product-id");
-    if (!id) return;
-    actions.addToCart(id, 1);
-  };
-
-  const onDec = (e) => {
-    const id = e.currentTarget.getAttribute("data-product-id");
-    if (!id) return;
-    actions.adjustCartQty(id, -1);
-  };
-
-  const onRemove = (e) => {
-    const id = e.currentTarget.getAttribute("data-product-id");
-    if (!id) return;
-    actions.removeFromCart(id);
-  };
-
-  const onGoShop = () => actions.goShop();
-  const onGoCheckout = () => actions.goCheckout();
-
   return (
     <div className="panel">
       <div className="panel__head">
         <div>
           <h2 className="panel__title">장바구니</h2>
           <div className="panel__sub">
-            아이템 {itemCount}개 · 쿠폰 {totals?.coupon || "없음"}
+            아이템 {countCartItems()}개 · 쿠폰 {totals().coupon || "없음"}
           </div>
         </div>
         <button className="btn" type="button" onClick={onGoShop}>
@@ -269,7 +242,7 @@ export default function CartPage({ cart, products, actions }) {
         <div className="split">
           <div>
             <CartTable
-              rows={rows}
+              rows={rows()}
               onGoShop={onGoShop}
               onInc={onInc}
               onDec={onDec}
@@ -278,12 +251,12 @@ export default function CartPage({ cart, products, actions }) {
           </div>
           <div>
             <CartSummary
-              totals={totals}
+              totals={totals()}
               couponDraft={couponDraft}
               onCouponInput={onCouponInput}
               onApplyCoupon={onApplyCoupon}
               onGoCheckout={onGoCheckout}
-              canCheckout={asArray(items).length > 0}
+              canCheckout={items().length > 0}
             />
           </div>
         </div>
