@@ -1,23 +1,10 @@
 import { AEUI } from "aeui";
 import { state, actions } from "../../store.js";
 import { formatKRW } from "../../lib/money.js";
+import { formatDateTime } from "../../lib/util.js";
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function formatDateTime(ts) {
-  try {
-    return new Intl.DateTimeFormat("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(ts));
-  } catch {
-    return String(ts);
-  }
 }
 
 function statusLabel(status) {
@@ -39,11 +26,7 @@ function OrdersEmptyState() {
 
 function OrdersTableRow({ order, selectedOrderId, onSelect }) {
   return (
-    <tr
-      data-order-id={order?.id}
-      onClick={onSelect}
-      style={order?.id === selectedOrderId ? "background: rgba(0,0,0,0.03);" : ""}
-    >
+    <tr onClick={() => onSelect(order?.id)} style={order?.id === selectedOrderId ? "background: rgba(0,0,0,0.03);" : ""}>
       <td style="font-weight: 900; cursor: pointer;">{String(order?.id || "").slice(0, 12)}…</td>
       <td>
         <span className={`pill ${order?.status === "CANCELED" ? "pill--danger" : "pill--ok"}`}>
@@ -141,10 +124,9 @@ function OrderDetail() {
 }
 
 export default function OrdersPage() {
-  const onSelect = (e) => {
-    const id = e.currentTarget.getAttribute("data-order-id");
-    if (!id) return;
-    actions.selectOrder(id);
+  const onSelect = (orderId) => {
+    if (!orderId) return;
+    actions.selectOrder(orderId);
   };
 
   return (

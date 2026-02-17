@@ -2,6 +2,7 @@ import { AEUI, watch, clean } from "aeui";
 
 import { state, actions, select } from "./store.js";
 import { savePersistedState } from "./lib/storage.js";
+import { formatShortTime } from "./lib/util.js";
 
 import ToastHost from "./ui/components/ToastHost.jsx";
 import ShopPage from "./ui/pages/ShopPage.jsx";
@@ -14,19 +15,6 @@ import AdminProducts from "./ui/pages/admin/AdminProducts.jsx";
 import AdminOrders from "./ui/pages/admin/AdminOrders.jsx";
 import ProductEditorModal from "./ui/modals/ProductEditorModal.jsx";
 import ConfirmModal from "./ui/modals/ConfirmModal.jsx";
-
-function formatShortTime(ts) {
-  if (!ts) return "-";
-  try {
-    return new Intl.DateTimeFormat("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }).format(new Date(ts));
-  } catch {
-    return String(ts);
-  }
-}
 
 export default function App() {
   const clockTimer = setInterval(() => {
@@ -51,16 +39,6 @@ export default function App() {
     }
   }, [state.products, state.cart, state.orders, state.activity]);
 
-  const handleGoShop = () => actions.goShop();
-  const handleGoCart = () => actions.goCart();
-  const handleGoOrders = () => actions.goOrders();
-  const handleGoAdmin = () => actions.goAdminDashboard();
-  const handleResetAll = () => actions.resetAll();
-
-  const handleGoAdminDashboard = () => actions.goAdminDashboard();
-  const handleGoAdminProducts = () => actions.goAdminProducts();
-  const handleGoAdminOrders = () => actions.goAdminOrders();
-
   const layoutClass = () => `layout ${select.isAdmin() ? "layout--admin" : ""}`;
   const sidebarStyle = () => (select.isAdmin() ? "" : "display:none;");
   const adminTab = () =>
@@ -82,24 +60,24 @@ export default function App() {
             <button
               className={`btn btn--tab ${state.route === "shop" || state.route === "product" ? "is-active" : ""}`}
               type="button"
-              onClick={handleGoShop}
+              onClick={() => actions.goShop()}
             >
               스토어
             </button>
-            <button className={`btn btn--tab ${state.route === "cart" ? "is-active" : ""}`} type="button" onClick={handleGoCart}>
+            <button className={`btn btn--tab ${state.route === "cart" ? "is-active" : ""}`} type="button" onClick={() => actions.goCart()}>
               장바구니 <span className="pill">{select.cartCount()}</span>
             </button>
-            <button className={`btn btn--tab ${state.route === "orders" ? "is-active" : ""}`} type="button" onClick={handleGoOrders}>
+            <button className={`btn btn--tab ${state.route === "orders" ? "is-active" : ""}`} type="button" onClick={() => actions.goOrders()}>
               주문
             </button>
-            <button className={`btn btn--tab ${select.isAdmin() ? "is-active" : ""}`} type="button" onClick={handleGoAdmin}>
+            <button className={`btn btn--tab ${select.isAdmin() ? "is-active" : ""}`} type="button" onClick={() => actions.goAdminDashboard()}>
               Admin
             </button>
 
             <span className={`pill ${state.lastSaveError ? "pill--danger" : "pill--ok"}`}>
               저장 {state.lastSavedAt ? formatShortTime(state.lastSavedAt) : "-"}
             </span>
-            <button className="btn btn--ghost" type="button" onClick={handleResetAll}>
+            <button className="btn btn--ghost" type="button" onClick={() => actions.resetAll()}>
               초기화
             </button>
           </div>
@@ -111,13 +89,25 @@ export default function App() {
           <div className="sidebar" style={sidebarStyle()}>
             <div className="sidebar__title">Admin</div>
             <div className="sidebar__items">
-              <button className={`btn btn--tab ${adminTab() === "dashboard" ? "is-active" : ""}`} type="button" onClick={handleGoAdminDashboard}>
+              <button
+                className={`btn btn--tab ${adminTab() === "dashboard" ? "is-active" : ""}`}
+                type="button"
+                onClick={() => actions.goAdminDashboard()}
+              >
                 대시보드
               </button>
-              <button className={`btn btn--tab ${adminTab() === "products" ? "is-active" : ""}`} type="button" onClick={handleGoAdminProducts}>
+              <button
+                className={`btn btn--tab ${adminTab() === "products" ? "is-active" : ""}`}
+                type="button"
+                onClick={() => actions.goAdminProducts()}
+              >
                 상품
               </button>
-              <button className={`btn btn--tab ${adminTab() === "orders" ? "is-active" : ""}`} type="button" onClick={handleGoAdminOrders}>
+              <button
+                className={`btn btn--tab ${adminTab() === "orders" ? "is-active" : ""}`}
+                type="button"
+                onClick={() => actions.goAdminOrders()}
+              >
                 주문
               </button>
             </div>

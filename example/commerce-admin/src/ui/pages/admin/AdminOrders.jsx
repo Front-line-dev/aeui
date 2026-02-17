@@ -1,22 +1,10 @@
 import { AEUI } from "aeui";
 import { state, actions } from "../../../store.js";
 import { formatKRW } from "../../../lib/money.js";
+import { formatDateTimeShort } from "../../../lib/util.js";
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function formatDateTime(ts) {
-  try {
-    return new Intl.DateTimeFormat("ko-KR", {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(ts));
-  } catch {
-    return String(ts);
-  }
 }
 
 function statusLabel(status) {
@@ -29,11 +17,7 @@ function statusLabel(status) {
 
 function AdminOrdersRow({ order, selectedOrderId, onSelect }) {
   return (
-    <tr
-      data-order-id={order?.id}
-      onClick={onSelect}
-      style={order?.id === selectedOrderId ? "background: rgba(0,0,0,0.03);" : ""}
-    >
+    <tr onClick={() => onSelect(order?.id)} style={order?.id === selectedOrderId ? "background: rgba(0,0,0,0.03);" : ""}>
       <td style="font-weight: 900; cursor: pointer;">{String(order?.id || "").slice(0, 12)}…</td>
       <td>
         <span className={`pill ${order?.status === "CANCELED" ? "pill--danger" : "pill--ok"}`}>
@@ -41,7 +25,7 @@ function AdminOrdersRow({ order, selectedOrderId, onSelect }) {
         </span>
       </td>
       <td>{formatKRW(order?.totals?.total || 0)}</td>
-      <td className="help">{formatDateTime(order?.createdAt)}</td>
+      <td className="help">{formatDateTimeShort(order?.createdAt)}</td>
     </tr>
   );
 }
@@ -97,8 +81,7 @@ function AdminOrderDetailView({ order, onStatusChange, onCancel }) {
             <select
               className="select"
               value={order.status}
-              data-order-id={order.id}
-              onChange={onStatusChange}
+              onChange={(e) => onStatusChange(order.id, e.target.value)}
               disabled={order.status === "CANCELED"}
             >
               <option value="PAID">결제 완료</option>
@@ -111,8 +94,7 @@ function AdminOrderDetailView({ order, onStatusChange, onCancel }) {
           <button
             className="btn btn--danger"
             type="button"
-            data-order-id={order.id}
-            onClick={onCancel}
+            onClick={() => onCancel(order.id)}
             disabled={order.status !== "PAID"}
           >
             주문 취소(재고 복구)
@@ -165,23 +147,19 @@ export default function AdminOrders() {
 
   const onFilter = (e) => (statusFilter = e.target.value);
 
-  const onSelect = (e) => {
-    const id = e.currentTarget.getAttribute("data-order-id");
-    if (!id) return;
-    actions.selectOrder(id);
+  const onSelect = (orderId) => {
+    if (!orderId) return;
+    actions.selectOrder(orderId);
   };
 
-  const onStatusChange = (e) => {
-    const id = e.currentTarget.getAttribute("data-order-id");
-    if (!id) return;
-    const next = e.target.value;
-    actions.setOrderStatus(id, next);
+  const onStatusChange = (orderId, nextStatus) => {
+    if (!orderId) return;
+    actions.setOrderStatus(orderId, nextStatus);
   };
 
-  const onCancel = (e) => {
-    const id = e.currentTarget.getAttribute("data-order-id");
-    if (!id) return;
-    actions.openOrderCancel(id);
+  const onCancel = (orderId) => {
+    if (!orderId) return;
+    actions.openOrderCancel(orderId);
   };
 
   const getVisible = (list) =>

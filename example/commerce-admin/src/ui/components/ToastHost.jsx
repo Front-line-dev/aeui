@@ -43,10 +43,9 @@ export default function ToastHost() {
     timers.clear();
   });
 
-  const handleToastClick = (e) => {
-    const id = e.currentTarget.getAttribute("data-toast-id");
-    if (!id) return;
-    actions.dismissToast(id);
+  const handleToastClick = (toastId) => {
+    if (!toastId) return;
+    actions.dismissToast(toastId);
   };
 
   return (
@@ -56,8 +55,7 @@ export default function ToastHost() {
           className={`toast ${t.tone === "ok" ? "toast--ok" : ""} ${
             t.tone === "danger" ? "toast--danger" : ""
           }`}
-          data-toast-id={t.id}
-          onClick={handleToastClick}
+          onClick={() => handleToastClick(t.id)}
         >
           <div className="toast__title">{t.title || "알림"}</div>
           <div className="toast__body">{t.message}</div>

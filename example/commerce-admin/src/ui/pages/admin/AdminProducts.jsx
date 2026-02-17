@@ -38,18 +38,17 @@ function ProductRow({ product, onEdit, onDelete, onToggleActive }) {
         <button
           className={`btn btn--tab ${product?.active ? "is-active" : ""}`}
           type="button"
-          data-product-id={product?.id}
-          onClick={onToggleActive}
+          onClick={() => onToggleActive(product?.id)}
         >
           {product?.active ? "활성" : "비활성"}
         </button>
       </td>
       <td>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <button className="btn" type="button" data-product-id={product?.id} onClick={onEdit}>
+          <button className="btn" type="button" onClick={() => onEdit(product?.id)}>
             수정
           </button>
-          <button className="btn btn--danger" type="button" data-product-id={product?.id} onClick={onDelete}>
+          <button className="btn btn--danger" type="button" onClick={() => onDelete(product?.id)}>
             삭제
           </button>
         </div>
@@ -135,22 +134,19 @@ export default function AdminProducts() {
 
   const onNew = () => actions.openProductCreate();
 
-  const onEdit = (e) => {
-    const id = e.currentTarget.getAttribute("data-product-id");
-    if (!id) return;
-    actions.openProductEdit(id);
+  const onEdit = (productId) => {
+    if (!productId) return;
+    actions.openProductEdit(productId);
   };
 
-  const onDelete = (e) => {
-    const id = e.currentTarget.getAttribute("data-product-id");
-    if (!id) return;
-    actions.openProductDelete(id);
+  const onDelete = (productId) => {
+    if (!productId) return;
+    actions.openProductDelete(productId);
   };
 
-  const onToggleActive = (e) => {
-    const id = e.currentTarget.getAttribute("data-product-id");
-    if (!id) return;
-    actions.toggleProductActive(id);
+  const onToggleActive = (productId) => {
+    if (!productId) return;
+    actions.toggleProductActive(productId);
   };
 
   const getCategories = (list) =>
