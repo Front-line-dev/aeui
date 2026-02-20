@@ -11,8 +11,6 @@ export default function ShopFilters({
   onStockToggle,
   onSortChange,
 }) {
-  const list = Array.isArray(categories) ? categories : [];
-
   return (
     <div className="grid" style="gap: 10px;">
       <div className="split" style="grid-template-columns: 1fr 1fr;">
@@ -37,9 +35,9 @@ export default function ShopFilters({
           <div className="label">카테고리</div>
           <select className="select" value={category} onChange={onCategoryChange}>
             <option value="ALL">전체</option>
-            {list.map((c) => (
+            {Array.isArray(categories) ? categories.map((c) => (
               <option value={c}>{c}</option>
-            ))}
+            )) : null}
           </select>
         </div>
         <div className="formRow" style="margin-bottom: 0;">

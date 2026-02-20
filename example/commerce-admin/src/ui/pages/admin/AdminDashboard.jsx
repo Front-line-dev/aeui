@@ -1,13 +1,10 @@
 import { AEUI } from "aeui";
 import { state, actions } from "../../../store.js";
 import { formatKRW } from "../../../lib/money.js";
+import { asArray } from "../../../models/query.js";
 
 import ActivityFeed from "../../components/admin/ActivityFeed.jsx";
 import StatCard from "../../components/admin/StatCard.jsx";
-
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
-}
 
 function sumRevenue(orders) {
   return asArray(orders)

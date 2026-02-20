@@ -44,17 +44,15 @@ function ProductCard({ product, onView, onAdd }) {
 }
 
 export default function ProductGrid({ items, onView, onAdd }) {
-  const list = Array.isArray(items) ? items : [];
-
   return (
     <div className="grid grid--cards" style="margin-top: 14px;">
-      {list.length === 0 ? (
+      {!Array.isArray(items) || items.length === 0 ? (
         <div className="card" style="grid-column: span 12;">
           <div style="font-weight: 900; letter-spacing: -0.02em;">표시할 상품이 없습니다.</div>
           <div className="help">필터를 조정하거나, 어드민에서 상품을 활성화해보세요.</div>
         </div>
       ) : (
-        list.map((p) => <ProductCard product={p} onView={onView} onAdd={onAdd} />)
+        items.map((p) => <ProductCard product={p} onView={onView} onAdd={onAdd} />)
       )}
     </div>
   );

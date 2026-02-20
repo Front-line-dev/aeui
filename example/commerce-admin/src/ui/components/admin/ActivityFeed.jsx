@@ -1,9 +1,6 @@
 import { AEUI } from "aeui";
 import { formatDateTimeShort } from "../../../lib/util.js";
-
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
-}
+import { asArray } from "../../../models/query.js";
 
 function ActivityRow({ event }) {
   return (
@@ -15,19 +12,17 @@ function ActivityRow({ event }) {
 }
 
 export default function ActivityFeed({ items }) {
-  const list = asArray(items);
-
   return (
     <div className="card" style="align-self: start;">
       <div className="card__kicker">최근 활동</div>
       <div style="font-weight: 900; letter-spacing: -0.01em; margin-bottom: 8px;">활동</div>
-      {list.length === 0 ? (
+      {!Array.isArray(items) || items.length === 0 ? (
         <div className="help">아직 활동이 없습니다.</div>
       ) : (
         <div className="grid" style="gap: 8px;">
-          {list.map((e) => (
+          {Array.isArray(items) ? items.map((e) => (
             <ActivityRow event={e} />
-          ))}
+          )) : null}
         </div>
       )}
     </div>

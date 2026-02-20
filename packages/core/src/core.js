@@ -273,11 +273,40 @@ export const AEUI = {
 
       if (key.startsWith("on")) {
         const eventName = key.substring(2).toLowerCase();
-        if (typeof oldValue === "function") {
-          domNode.removeEventListener(eventName, oldValue);
+
+        // 1. Initialize proxy storage on the DOM node if it doesn't exist
+        if (!domNode._aeuiHandlers) {
+          domNode._aeuiHandlers = {};
         }
+        if (!domNode._aeuiProxyListeners) {
+          domNode._aeuiProxyListeners = {};
+        }
+
+        // 2. Handle listener removal: if newValue is falsey (e.g., null, undefined, false)
+        if (!newValue) {
+          if (domNode._aeuiProxyListeners[eventName]) {
+            domNode.removeEventListener(eventName, domNode._aeuiProxyListeners[eventName]);
+            delete domNode._aeuiProxyListeners[eventName];
+          }
+          delete domNode._aeuiHandlers[eventName];
+          continue;
+        }
+
+        // 3. Update the reference to the latest handler
         if (typeof newValue === "function") {
-          domNode.addEventListener(eventName, newValue);
+          domNode._aeuiHandlers[eventName] = newValue;
+
+          // 4. Attach the proxy listener ONLY ONCE per event type
+          if (!domNode._aeuiProxyListeners[eventName]) {
+            const proxyListener = (event) => {
+              // Execute the most up-to-date handler stored on the DOM node
+              if (typeof domNode._aeuiHandlers[eventName] === 'function') {
+                domNode._aeuiHandlers[eventName](event);
+              }
+            };
+            domNode.addEventListener(eventName, proxyListener);
+            domNode._aeuiProxyListeners[eventName] = proxyListener;
+          }
         }
       } else if (key === 'className') {
         domNode.className = newValue ?? '';

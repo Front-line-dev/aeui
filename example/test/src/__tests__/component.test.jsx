@@ -313,10 +313,10 @@ describe('Fragment', () => {
     function FragmentUser() {
       return (
         <div id="frag-wrap">
-          {AEUI.Fragment({ children: [
+          {AEUI.createVNode(AEUI.Fragment, null,
             AEUI.createVNode('p', { id: 'frag1' }, 'First'),
             AEUI.createVNode('p', { id: 'frag2' }, 'Second')
-          ]})}
+          )}
         </div>
       );
     }

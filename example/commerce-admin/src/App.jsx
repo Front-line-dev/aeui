@@ -16,6 +16,18 @@ import AdminOrders from "./ui/pages/admin/AdminOrders.jsx";
 import ProductEditorModal from "./ui/modals/ProductEditorModal.jsx";
 import ConfirmModal from "./ui/modals/ConfirmModal.jsx";
 
+function NavItem({ active, onClick, children, className = "" }) {
+  return (
+    <button
+      className={`btn btn--tab ${active ? "is-active" : ""} ${className}`}
+      type="button"
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function App() {
   const clockTimer = setInterval(() => {
     state.clockNow = Date.now();
@@ -57,22 +69,18 @@ export default function App() {
           </div>
 
           <div className="nav">
-            <button
-              className={`btn btn--tab ${state.route === "shop" || state.route === "product" ? "is-active" : ""}`}
-              type="button"
-              onClick={() => actions.goShop()}
-            >
+            <NavItem active={state.route === "shop" || state.route === "product"} onClick={() => actions.goShop()}>
               스토어
-            </button>
-            <button className={`btn btn--tab ${state.route === "cart" ? "is-active" : ""}`} type="button" onClick={() => actions.goCart()}>
+            </NavItem>
+            <NavItem active={state.route === "cart"} onClick={() => actions.goCart()}>
               장바구니 <span className="pill">{select.cartCount()}</span>
-            </button>
-            <button className={`btn btn--tab ${state.route === "orders" ? "is-active" : ""}`} type="button" onClick={() => actions.goOrders()}>
+            </NavItem>
+            <NavItem active={state.route === "orders"} onClick={() => actions.goOrders()}>
               주문
-            </button>
-            <button className={`btn btn--tab ${select.isAdmin() ? "is-active" : ""}`} type="button" onClick={() => actions.goAdminDashboard()}>
+            </NavItem>
+            <NavItem active={select.isAdmin()} onClick={() => actions.goAdminDashboard()}>
               Admin
-            </button>
+            </NavItem>
 
             <span className={`pill ${state.lastSaveError ? "pill--danger" : "pill--ok"}`}>
               저장 {state.lastSavedAt ? formatShortTime(state.lastSavedAt) : "-"}
@@ -89,27 +97,15 @@ export default function App() {
           <div className="sidebar" style={sidebarStyle()}>
             <div className="sidebar__title">Admin</div>
             <div className="sidebar__items">
-              <button
-                className={`btn btn--tab ${adminTab() === "dashboard" ? "is-active" : ""}`}
-                type="button"
-                onClick={() => actions.goAdminDashboard()}
-              >
+              <NavItem active={adminTab() === "dashboard"} onClick={() => actions.goAdminDashboard()}>
                 대시보드
-              </button>
-              <button
-                className={`btn btn--tab ${adminTab() === "products" ? "is-active" : ""}`}
-                type="button"
-                onClick={() => actions.goAdminProducts()}
-              >
+              </NavItem>
+              <NavItem active={adminTab() === "products"} onClick={() => actions.goAdminProducts()}>
                 상품
-              </button>
-              <button
-                className={`btn btn--tab ${adminTab() === "orders" ? "is-active" : ""}`}
-                type="button"
-                onClick={() => actions.goAdminOrders()}
-              >
+              </NavItem>
+              <NavItem active={adminTab() === "orders"} onClick={() => actions.goAdminOrders()}>
                 주문
-              </button>
+              </NavItem>
             </div>
           </div>
 

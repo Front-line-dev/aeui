@@ -115,9 +115,9 @@ describe('AEUI.Fragment', () => {
 
   it('children을 그대로 반환', () => {
     const items = ['a', 'b', 'c'];
-    // Fragment는 일반 함수처럼 호출
     const fn = AEUI.Fragment;
-    const result = fn({ children: items });
+    const render = fn({ children: items });
+    const result = render({ children: items });
     expect(result).toEqual(items);
   });
 });

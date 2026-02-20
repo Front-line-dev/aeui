@@ -58,13 +58,9 @@ function CartLineRow({
 }
 
 export default function CartTable({ rows, onGoShop, onInc, onDec, onRemove }) {
-  const list = Array.isArray(rows) ? rows : [];
-
   return (
     <>
-      {list.length === 0 ? (
-        <CartEmptyState onGoShop={onGoShop} />
-      ) : (
+      {Array.isArray(rows) && rows.length > 0 ? (
         <table className="table">
           <thead>
             <tr>
@@ -76,7 +72,7 @@ export default function CartTable({ rows, onGoShop, onInc, onDec, onRemove }) {
             </tr>
           </thead>
           <tbody>
-            {list.map((r) => (
+            {Array.isArray(rows) ? rows.map((r) => (
               <CartLineRow
                 productId={r.productId}
                 name={r.name}
@@ -91,9 +87,11 @@ export default function CartTable({ rows, onGoShop, onInc, onDec, onRemove }) {
                 onDec={onDec}
                 onRemove={onRemove}
               />
-            ))}
+            )) : null}
           </tbody>
         </table>
+      ) : (
+        <CartEmptyState onGoShop={onGoShop} />
       )}
     </>
   );

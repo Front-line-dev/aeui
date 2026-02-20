@@ -1,15 +1,12 @@
 import { AEUI } from "aeui";
 import { state, actions } from "../../store.js";
+import { asArray } from "../../models/query.js";
 
 import ShopFilters from "../components/shop/ShopFilters.jsx";
 import ProductGrid from "../components/shop/ProductGrid.jsx";
 
 function cmp(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
 }
 
 function computeCategories(products) {

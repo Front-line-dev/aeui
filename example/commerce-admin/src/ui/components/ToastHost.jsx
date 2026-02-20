@@ -1,9 +1,6 @@
 import { AEUI, watch, clean } from "aeui";
 import { state, actions } from "../../store.js";
-
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
-}
+import { asArray } from "../../models/query.js";
 
 export default function ToastHost() {
   const timers = new Map();
@@ -52,9 +49,8 @@ export default function ToastHost() {
     <div className="toastHost" aria-live="polite" aria-relevant="additions removals">
       {asArray(state.toasts).map((t) => (
         <div
-          className={`toast ${t.tone === "ok" ? "toast--ok" : ""} ${
-            t.tone === "danger" ? "toast--danger" : ""
-          }`}
+          className={`toast ${t.tone === "ok" ? "toast--ok" : ""} ${t.tone === "danger" ? "toast--danger" : ""
+            }`}
           onClick={() => handleToastClick(t.id)}
         >
           <div className="toast__title">{t.title || "알림"}</div>

@@ -1,13 +1,10 @@
 import { AEUI } from "aeui";
 import { state, actions } from "../../../store.js";
 import { formatKRW } from "../../../lib/money.js";
+import { asArray } from "../../../models/query.js";
 
 function cmp(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
 }
 
 function ProductsEmptyRow() {

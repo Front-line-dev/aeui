@@ -1,25 +1,10 @@
 import { AEUI, watch } from "aeui";
 import { state, actions, select } from "../../store.js";
 import { calcCartTotals, clampInt } from "../../lib/money.js";
+import { asArray } from "../../models/query.js";
 
 import CartTable from "../components/cart/CartTable.jsx";
 import CartSummary from "../components/cart/CartSummary.jsx";
-
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function makeProductIndex(products) {
-  const map = new Map();
-  for (const p of asArray(products)) {
-    if (p && p.id) map.set(p.id, p);
-  }
-  return map;
-}
-
-function countCartItems() {
-  return select.cartCount();
-}
 
 export default function CartPage() {
   let couponDraft = state.cart.couponCode;
@@ -57,7 +42,7 @@ export default function CartPage() {
   const items = () => asArray(state.cart.items);
   const totals = () => calcCartTotals({ cart: state.cart, products: asArray(state.products) });
   const rows = () => {
-    const byId = makeProductIndex(state.products);
+    const byId = new Map(asArray(state.products).filter(p => p?.id).map(p => [p.id, p]));
     return items().map((it) => {
       const p = byId.get(it.productId) || null;
       const qty = clampInt(it?.qty, 0, 999);
@@ -88,7 +73,7 @@ export default function CartPage() {
         <div>
           <h2 className="panel__title">장바구니</h2>
           <div className="panel__sub">
-            아이템 {countCartItems()}개 · 쿠폰 {totals().coupon || "없음"}
+            아이템 {select.cartCount()}개 · 쿠폰 {totals().coupon || "없음"}
           </div>
         </div>
         <button className="btn" type="button" onClick={onGoShop}>

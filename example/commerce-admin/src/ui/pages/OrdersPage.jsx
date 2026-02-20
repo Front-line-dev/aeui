@@ -2,10 +2,7 @@ import { AEUI } from "aeui";
 import { state, actions } from "../../store.js";
 import { formatKRW } from "../../lib/money.js";
 import { formatDateTime } from "../../lib/util.js";
-
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
-}
+import { asArray } from "../../models/query.js";
 
 function statusLabel(status) {
   if (status === "PAID") return "결제 완료";
