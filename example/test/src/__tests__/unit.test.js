@@ -113,11 +113,13 @@ describe('AEUI.Fragment', () => {
     expect(typeof AEUI.Fragment).toBe('function');
   });
 
-  it('children을 그대로 반환', () => {
-    const items = ['a', 'b', 'c'];
-    const fn = AEUI.Fragment;
-    const render = fn({ children: items });
-    const result = render({ children: items });
-    expect(result).toEqual(items);
+  it('렌더 시점 props.children을 반환', () => {
+    const initialItems = ['a'];
+    const nextItems = ['a', 'b', 'c'];
+
+    const render = AEUI.Fragment({ children: initialItems });
+    const result = render({ children: nextItems });
+
+    expect(result).toEqual(nextItems);
   });
 });

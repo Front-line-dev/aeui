@@ -282,8 +282,8 @@ export const AEUI = {
           domNode._aeuiProxyListeners = {};
         }
 
-        // 2. Handle listener removal: if newValue is falsey (e.g., null, undefined, false)
-        if (!newValue) {
+        // 2. Detach listener for any non-function value
+        if (typeof newValue !== "function") {
           if (domNode._aeuiProxyListeners[eventName]) {
             domNode.removeEventListener(eventName, domNode._aeuiProxyListeners[eventName]);
             delete domNode._aeuiProxyListeners[eventName];
@@ -293,20 +293,19 @@ export const AEUI = {
         }
 
         // 3. Update the reference to the latest handler
-        if (typeof newValue === "function") {
-          domNode._aeuiHandlers[eventName] = newValue;
+        domNode._aeuiHandlers[eventName] = newValue;
 
-          // 4. Attach the proxy listener ONLY ONCE per event type
-          if (!domNode._aeuiProxyListeners[eventName]) {
-            const proxyListener = (event) => {
-              // Execute the most up-to-date handler stored on the DOM node
-              if (typeof domNode._aeuiHandlers[eventName] === 'function') {
-                domNode._aeuiHandlers[eventName](event);
-              }
-            };
-            domNode.addEventListener(eventName, proxyListener);
-            domNode._aeuiProxyListeners[eventName] = proxyListener;
-          }
+        // 4. Attach the proxy listener ONLY ONCE per event type
+        if (!domNode._aeuiProxyListeners[eventName]) {
+          const proxyListener = (event) => {
+            // Keep native listener semantics: "this" should be the current DOM node
+            const currentHandler = domNode._aeuiHandlers[eventName];
+            if (typeof currentHandler === "function") {
+              currentHandler.call(domNode, event);
+            }
+          };
+          domNode.addEventListener(eventName, proxyListener);
+          domNode._aeuiProxyListeners[eventName] = proxyListener;
         }
       } else if (key === 'className') {
         domNode.className = newValue ?? '';

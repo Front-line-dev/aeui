@@ -91,6 +91,30 @@ describe('_updateDomProps', () => {
     div.click();
     expect(handler).toHaveBeenCalledTimes(1);
   });
+
+  it('이벤트 핸들러가 truthy 비함수로 바뀌면 기존 리스너 해제', () => {
+    const handler = vi.fn();
+
+    AEUI._updateDomProps(div, { onClick: handler });
+    div.click();
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    AEUI._updateDomProps(div, { onClick: 'invalid-handler' }, { onClick: handler });
+    div.click();
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('이벤트 핸들러의 this는 현재 DOM 노드', () => {
+    let boundThis = null;
+    function handler() {
+      boundThis = this;
+    }
+
+    AEUI._updateDomProps(div, { onClick: handler });
+    div.click();
+
+    expect(boundThis).toBe(div);
+  });
 });
 
 describe('_reconcile 배열 처리', () => {

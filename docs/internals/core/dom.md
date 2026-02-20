@@ -109,25 +109,52 @@ if (this._deepEqual(newValue, oldValue)) continue;
 ### 이벤트 핸들러 처리
 
 ```javascript
-if (key.startsWith("on") && typeof newValue === "function") {
-  const eventName = key.substring(2).toLowerCase();  // "onClick" → "click"
-  if (oldValue) domNode.removeEventListener(eventName, oldValue);
-  if (newValue) domNode.addEventListener(eventName, newValue);
+if (key.startsWith("on")) {
+  const eventName = key.substring(2).toLowerCase();
+
+  domNode._aeuiHandlers ||= {};
+  domNode._aeuiProxyListeners ||= {};
+
+  if (typeof newValue !== "function") {
+    // 함수가 아니면 리스너를 제거한다.
+    if (domNode._aeuiProxyListeners[eventName]) {
+      domNode.removeEventListener(eventName, domNode._aeuiProxyListeners[eventName]);
+      delete domNode._aeuiProxyListeners[eventName];
+    }
+    delete domNode._aeuiHandlers[eventName];
+    continue;
+  }
+
+  // 최신 핸들러 참조만 교체
+  domNode._aeuiHandlers[eventName] = newValue;
+
+  // 이벤트 타입별 프록시 리스너는 1회만 등록
+  if (!domNode._aeuiProxyListeners[eventName]) {
+    const proxy = (event) => {
+      const handler = domNode._aeuiHandlers[eventName];
+      if (typeof handler === "function") handler.call(domNode, event);
+    };
+    domNode.addEventListener(eventName, proxy);
+    domNode._aeuiProxyListeners[eventName] = proxy;
+  }
 }
 ```
 
 **동작**:
 1. JSX의 이벤트 prop 이름에서 `on` 접두사를 제거하고 소문자로 변환하여 표준 DOM 이벤트 이름을 얻는다. 예: `onClick` → `click`, `onInput` → `input`
-2. 이전 핸들러가 있으면 먼저 `removeEventListener`로 제거
-3. 새 핸들러를 `addEventListener`로 등록
+2. DOM 노드에 이벤트별 핸들러 저장소(`_aeuiHandlers`)와 프록시 리스너 저장소(`_aeuiProxyListeners`)를 유지한다.
+3. 새 값이 함수가 아니면 기존 프록시 리스너를 제거한다.
+4. 새 값이 함수면 저장된 핸들러 참조만 갱신한다.
+5. 프록시 리스너가 아직 없을 때만 `addEventListener`를 1회 등록한다.
 
-**인라인 함수와 매 tick 교체 문제**:
+**인라인 함수 처리 최적화**:
 
 ```jsx
 <button onClick={() => count++}>클릭</button>
 ```
 
-인라인 화살표 함수(`() => count++`)는 렌더 함수가 실행될 때마다 **새 함수 객체**가 생성된다. `_deepEqual`은 함수를 참조 비교(`Object.is`)하므로 매번 "다름"으로 판단되어, 매 tick마다 `removeEventListener` → `addEventListener`가 실행된다. 기능적으로 문제는 없지만 성능상 비효율적이다.
+인라인 화살표 함수(`() => count++`)는 렌더 함수가 실행될 때마다 **새 함수 객체**가 생성된다. `_deepEqual`은 함수를 참조 비교(`Object.is`)하므로 매번 "다름"으로 판단된다.  
+현재 구현은 DOM 리스너를 매번 재등록하지 않고, 저장된 핸들러 참조만 갱신하므로 불필요한 `removeEventListener`/`addEventListener` 호출을 줄인다.
 
 ---
 
