@@ -328,6 +328,51 @@ describe('Fragment', () => {
     expect(container.querySelector('#frag1').textContent).toBe('First');
     expect(container.querySelector('#frag2').textContent).toBe('Second');
   });
+
+  it('Fragment를 반환하는 중첩 컴포넌트 다음 형제 컴포넌트가 정상 업데이트됨', () => {
+    function Pair() {
+      return AEUI.createVNode(
+        AEUI.Fragment,
+        null,
+        AEUI.createVNode('p', { className: 'pair-1' }, 'A'),
+        AEUI.createVNode('p', { className: 'pair-2' }, 'B')
+      );
+    }
+
+    function Wrapper() {
+      return <Pair />;
+    }
+
+    function Counter() {
+      let count = 0;
+      return (
+        <p id="counter" onClick={() => count++}>
+          {count}
+        </p>
+      );
+    }
+
+    function App() {
+      return (
+        <div id="frag-app">
+          <Wrapper />
+          <Counter />
+        </div>
+      );
+    }
+
+    AEUI.init(App, container);
+
+    const appRoot = container.querySelector('#frag-app');
+    expect(Array.from(appRoot.childNodes).map(node => node.textContent)).toEqual(['A', 'B', '0']);
+
+    container.querySelector('#counter').click();
+    AEUI._tick();
+
+    expect(Array.from(appRoot.childNodes).map(node => node.textContent)).toEqual(['A', 'B', '1']);
+    expect(container.querySelector('.pair-2').textContent).toBe('B');
+    expect(container.querySelectorAll('#counter').length).toBe(1);
+  });
 });
 
 // ─── 여러 컴포넌트 상태 독립성 ───

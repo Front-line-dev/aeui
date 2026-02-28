@@ -234,15 +234,26 @@ if (domNode && prevVNode && prevVNode.tag === newVNode.tag) {
   const oldChildren = prevVNode.children || [];
   const maxLength = Math.max(newChildren.length, oldChildren.length);
 
+  let childIndex = 0;
+  const childCursor = parentInstance ? { value: parentInstance._childCursor || 0 } : null;
+
   for (let i = 0; i < maxLength; i++) {
-    this._reconcile(domNode, newChildren[i], oldChildren[i], i, parentInstance);
+    const newChild = newChildren[i];
+    const oldChild = oldChildren[i];
+
+    this._reconcile(domNode, newChild, oldChild, childIndex, parentInstance);
+    childIndex += this._getDomNodeCount(newChild, parentInstance, childCursor);
   }
 } else {
   // 태그가 다르거나 새로 생성해야 함
   const newDomNode = this._createDomNode(newVNode);
   if (newVNode.children) {
-    newVNode.children.forEach((child, i) => {
-      this._reconcile(newDomNode, child, null, i, parentInstance);
+    let childIndex = 0;
+    const childCursor = parentInstance ? { value: parentInstance._childCursor || 0 } : null;
+
+    newVNode.children.forEach((child) => {
+      this._reconcile(newDomNode, child, null, childIndex, parentInstance);
+      childIndex += this._getDomNodeCount(child, parentInstance, childCursor);
     });
   }
 
@@ -277,22 +288,33 @@ if (domNode && prevVNode && prevVNode.tag === newVNode.tag) {
 ### 현재 구현
 
 ```javascript
-_getDomNodeCount(vnode) {
-  if (vnode == null) return 0;
-  if (typeof vnode !== 'object') return 1;    // 텍스트 → 1개
+_getDomNodeCount(vnode, ownerInstance = null, cursor = null) {
+  if (vnode == null || typeof vnode === 'boolean') return 0;
+  if (typeof vnode !== 'object') return 1; // 텍스트
+
   if (Array.isArray(vnode)) {
-    return vnode.reduce((acc, c) => acc + this._getDomNodeCount(c), 0);
+    return vnode.reduce((acc, child) => {
+      return acc + this._getDomNodeCount(child, ownerInstance, cursor);
+    }, 0);
   }
+
   if (typeof vnode.tag === 'function') {
-    return 1; // ⚠️ 단순화: 컴포넌트는 항상 1개의 DOM 노드로 가정
+    if (!ownerInstance || !cursor) return 1;
+    const childInstance = ownerInstance.children[cursor.value++];
+    if (!childInstance) return 0;
+    return childInstance._domNodeCount;
   }
+
+  // DOM 노드 자체는 1개로 계산하지만,
+  // 하위 컴포넌트 커서 정렬을 위해 children은 순회한다.
+  const children = vnode.children || [];
+  for (let i = 0; i < children.length; i++) {
+    this._getDomNodeCount(children[i], ownerInstance, cursor);
+  }
+
   return 1; // DOM 요소 → 1개
 }
 ```
-
-### 현재 제한 사항 (향후 수정 예정)
-
-컴포넌트가 Fragment나 배열을 반환하면 실제 DOM 노드 수는 1이 아닐 수 있다. 예를 들어 Fragment로 3개의 `<p>`를 반환하는 컴포넌트의 실제 DOM 노드 수는 3이지만, 현재는 1로 계산한다. 이로 인해 형제 컴포넌트의 startIndex가 틀어져 DOM 업데이트가 잘못된 위치에 적용될 수 있다.
 
 ---
 
@@ -316,5 +338,5 @@ key 기반 비교가 도입되면 노드를 key로 식별하여 이동/삽입/�
 
 ## 관련 코드 위치
 
-- `_reconcile`: `packages/core/src/core.js` L303-L455
-- `_getDomNodeCount`: `packages/core/src/core.js` L69-L80
+- `_reconcile`: `packages/core/src/core.js` L435-L619
+- `_getDomNodeCount`: `packages/core/src/core.js` L82-L120

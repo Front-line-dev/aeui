@@ -24,6 +24,7 @@ export const AEUI = {
       props: vnode.props || {},
       parent: parentInstance,
       children: [],
+      _domNodeCount: 0,
       parentElement: null,
       isMounted: true,
 
@@ -37,7 +38,7 @@ export const AEUI = {
           const instanceIndex = siblings.indexOf(this);
 
           for (let i = 0; i < instanceIndex; i++) {
-            startIndex += AEUI._getDomNodeCount(siblings[i].prevRenderedVNode);
+            startIndex += AEUI._getDomNodeCountForInstance(siblings[i]);
           }
         }
 
@@ -78,16 +79,43 @@ export const AEUI = {
     return instance;
   },
 
-  _getDomNodeCount(vnode) {
-    if (vnode == null) return 0;
+  _getDomNodeCountForInstance(instance) {
+    if (!instance) return 0;
+    return this._getDomNodeCount(instance.prevRenderedVNode, instance, { value: 0 });
+  },
+
+  _getDomNodeCount(vnode, ownerInstance = null, cursor = null) {
+    if (vnode == null || typeof vnode === 'boolean') return 0;
     if (typeof vnode !== 'object') return 1; // Text
+
     if (Array.isArray(vnode)) {
-      return vnode.reduce((acc, c) => acc + this._getDomNodeCount(c), 0);
+      return vnode.reduce((acc, child) => {
+        return acc + this._getDomNodeCount(child, ownerInstance, cursor);
+      }, 0);
     }
+
     if (typeof vnode.tag === 'function') {
-      // For components, we count the nodes of their rendered content
-      return 1; // Simplification: assuming single root for now
+      if (!ownerInstance || !cursor) return 1;
+      const childInstance = ownerInstance.children[cursor.value++];
+      if (!childInstance) return 0;
+
+      if (typeof childInstance._domNodeCount === 'number') {
+        return childInstance._domNodeCount;
+      }
+
+      return this._getDomNodeCount(
+        childInstance.prevRenderedVNode,
+        childInstance,
+        { value: 0 }
+      );
     }
+
+    // DOM 노드는 항상 1개지만, 내부 컴포넌트 child cursor 정렬을 위해 순회한다.
+    const children = vnode.children || [];
+    for (let i = 0; i < children.length; i++) {
+      this._getDomNodeCount(children[i], ownerInstance, cursor);
+    }
+
     return 1; // DOM Node
   },
 
@@ -394,6 +422,7 @@ export const AEUI = {
   _unmount(instance) {
     if (instance) {
       instance.isMounted = false;
+      instance._domNodeCount = 0;
       instance.cleanups.forEach((cleanup) => {
         try { cleanup(); } catch (e) { console.error('[AEUI] Cleanup error:', e); }
       });
@@ -414,14 +443,22 @@ export const AEUI = {
     if (Array.isArray(newVNode)) {
       const prevArr = Array.isArray(prevVNode) ? prevVNode : [];
       const maxLen = Math.max(newVNode.length, prevArr.length);
+      let currentIndex = index;
+      const childCursor = parentInstance ? { value: parentInstance._childCursor || 0 } : null;
+
       for (let i = 0; i < maxLen; i++) {
+        const nextChild = i < newVNode.length ? newVNode[i] : null;
+        const prevChild = i < prevArr.length ? prevArr[i] : null;
+
         this._reconcile(
           parentElement,
-          i < newVNode.length ? newVNode[i] : null,
-          i < prevArr.length ? prevArr[i] : null,
-          index + i,
+          nextChild,
+          prevChild,
+          currentIndex,
           parentInstance
         );
+
+        currentIndex += this._getDomNodeCount(nextChild, parentInstance, childCursor);
       }
       return;
     }
@@ -526,6 +563,12 @@ export const AEUI = {
         removed.forEach(child => this._unmount(child));
       }
 
+      instance._domNodeCount = this._getDomNodeCount(
+        componentRenderedVNode,
+        instance,
+        { value: 0 }
+      );
+
       return;
     }
 
@@ -537,21 +580,32 @@ export const AEUI = {
       const newChildren = newVNode.children || [];
       const oldChildren = prevVNode.children || [];
       const maxLength = Math.max(newChildren.length, oldChildren.length);
+      let childIndex = 0;
+      const childCursor = parentInstance ? { value: parentInstance._childCursor || 0 } : null;
 
       for (let i = 0; i < maxLength; i++) {
+        const newChild = newChildren[i];
+        const oldChild = oldChildren[i];
+
         this._reconcile(
           domNode,
-          newChildren[i],
-          oldChildren[i],
-          i,
+          newChild,
+          oldChild,
+          childIndex,
           parentInstance
         );
+
+        childIndex += this._getDomNodeCount(newChild, parentInstance, childCursor);
       }
     } else {
       const newDomNode = this._createDomNode(newVNode);
       if (newVNode.children) {
-        newVNode.children.forEach((child, i) => {
-          this._reconcile(newDomNode, child, null, i, parentInstance);
+        let childIndex = 0;
+        const childCursor = parentInstance ? { value: parentInstance._childCursor || 0 } : null;
+
+        newVNode.children.forEach((child) => {
+          this._reconcile(newDomNode, child, null, childIndex, parentInstance);
+          childIndex += this._getDomNodeCount(child, parentInstance, childCursor);
         });
       }
 
