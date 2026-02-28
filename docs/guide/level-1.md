@@ -55,7 +55,7 @@ import App from './App.jsx';
 AEUI.init(App, document.getElementById('root'));
 ```
 
-`AEUI.init`은 `App` 컴포넌트를 `#root` 요소에 렌더링하고, 1초마다 자동으로 화면을 업데이트한다.
+`AEUI.init`은 `App` 컴포넌트를 `#root` 요소에 렌더링하고, `requestAnimationFrame` 기반 tick 루프를 시작해 자동으로 화면을 업데이트한다.
 
 ---
 
@@ -88,7 +88,7 @@ function App() {
 
 ## 상태 (State) — `let`
 
-AEUI에서 상태는 단순한 `let` 변수이다. 변수를 수정하면 다음 tick(최대 1초)에 화면이 자동으로 업데이트된다.
+AEUI에서 상태는 단순한 `let` 변수이다. 변수를 수정하면 다음 tick에서 화면이 자동으로 업데이트된다. (변화가 없으면 tick 간격이 점진적으로 늘어난다.)
 
 ```jsx
 function Counter() {

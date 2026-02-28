@@ -15,12 +15,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (AEUI._tickTimer) {
-    clearInterval(AEUI._tickTimer);
-    AEUI._tickTimer = null;
-  }
+  AEUI._stopScheduler();
+  AEUI._rafId = null;
+  AEUI._frameDelay = 1;
+  AEUI._framesUntilNextTick = 0;
   AEUI._rootInstance = null;
   AEUI._previousVNode = null;
+  AEUI._RootComponent = null;
+  AEUI._containerElement = null;
   AEUI._isRendering = false;
   container.remove();
 });

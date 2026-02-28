@@ -246,30 +246,144 @@ describe('init 중복 호출 방어', () => {
   });
 
   afterEach(() => {
-    if (AEUI._tickTimer) {
-      clearInterval(AEUI._tickTimer);
-      AEUI._tickTimer = null;
-    }
+    AEUI._stopScheduler();
+    AEUI._rafId = null;
+    AEUI._frameDelay = 1;
+    AEUI._framesUntilNextTick = 0;
     AEUI._rootInstance = null;
     AEUI._previousVNode = null;
+    AEUI._RootComponent = null;
+    AEUI._containerElement = null;
     container.remove();
   });
 
-  it('init 호출 시 _tickTimer가 설정됨', () => {
+  it('init 호출 시 RAF 스케줄러가 설정됨', () => {
     const App = () => () => AEUI.createVNode('div', null, 'hello');
     AEUI.init(App, container);
-    expect(AEUI._tickTimer).not.toBeNull();
+    expect(AEUI._rafId).not.toBeNull();
   });
 
-  it('init 재호출 시 이전 타이머가 정리됨', () => {
+  it('init 재호출 시 새 RAF 요청이 등록됨', () => {
     const App = () => () => AEUI.createVNode('div', null, 'hello');
     AEUI.init(App, container);
-    const firstTimer = AEUI._tickTimer;
+    const firstTimer = AEUI._rafId;
 
     AEUI.init(App, container);
-    const secondTimer = AEUI._tickTimer;
+    const secondTimer = AEUI._rafId;
 
     expect(secondTimer).not.toBe(firstTimer);
+  });
+});
+
+describe('스케줄러 프레임 백오프', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    AEUI._stopScheduler();
+    AEUI._rafId = null;
+    AEUI._frameDelay = 1;
+    AEUI._framesUntilNextTick = 0;
+    AEUI._rootInstance = null;
+    AEUI._previousVNode = null;
+    AEUI._RootComponent = null;
+    AEUI._containerElement = null;
+  });
+
+  it('변화가 없으면 1 -> 2 -> 4 프레임으로 간격이 늘어남', () => {
+    const tickSpy = vi.spyOn(AEUI, '_tick').mockReturnValue(false);
+    const startSpy = vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => {});
+
+    AEUI._RootComponent = () => {};
+    AEUI._containerElement = document.createElement('div');
+    AEUI._frameDelay = 1;
+    AEUI._framesUntilNextTick = 0;
+
+    AEUI._onAnimationFrame();
+    expect(tickSpy).toHaveBeenCalledTimes(1);
+    expect(AEUI._frameDelay).toBe(2);
+    expect(AEUI._framesUntilNextTick).toBe(1);
+
+    AEUI._onAnimationFrame();
+    expect(tickSpy).toHaveBeenCalledTimes(1);
+    expect(AEUI._frameDelay).toBe(2);
+    expect(AEUI._framesUntilNextTick).toBe(0);
+
+    AEUI._onAnimationFrame();
+    expect(tickSpy).toHaveBeenCalledTimes(2);
+    expect(AEUI._frameDelay).toBe(4);
+    expect(AEUI._framesUntilNextTick).toBe(3);
+    expect(startSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('변화가 생기면 프레임 간격이 1로 즉시 리셋됨', () => {
+    vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => {});
+    vi.spyOn(AEUI, '_tick').mockReturnValue(true);
+
+    AEUI._RootComponent = () => {};
+    AEUI._containerElement = document.createElement('div');
+    AEUI._frameDelay = 16;
+    AEUI._framesUntilNextTick = 0;
+
+    AEUI._onAnimationFrame();
+
+    expect(AEUI._frameDelay).toBe(1);
+    expect(AEUI._framesUntilNextTick).toBe(0);
+  });
+
+  it('프레임 간격은 최대 60까지 증가함', () => {
+    vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => {});
+    vi.spyOn(AEUI, '_tick').mockReturnValue(false);
+
+    AEUI._RootComponent = () => {};
+    AEUI._containerElement = document.createElement('div');
+    AEUI._frameDelay = 48;
+    AEUI._framesUntilNextTick = 0;
+
+    AEUI._onAnimationFrame();
+
+    expect(AEUI._frameDelay).toBe(60);
+    expect(AEUI._framesUntilNextTick).toBe(59);
+  });
+});
+
+describe('수동 렌더 API', () => {
+  let container;
+  let increment;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    AEUI._stopScheduler();
+    AEUI._rafId = null;
+    AEUI._frameDelay = 1;
+    AEUI._framesUntilNextTick = 0;
+    AEUI._rootInstance = null;
+    AEUI._previousVNode = null;
+    AEUI._RootComponent = null;
+    AEUI._containerElement = null;
+    container.remove();
+  });
+
+  it('AEUI.render()로 즉시 렌더를 트리거할 수 있음', () => {
+    function App() {
+      let count = 0;
+      increment = () => {
+        count += 1;
+      };
+      return () => AEUI.createVNode('div', { id: 'count' }, count);
+    }
+
+    AEUI.init(App, container);
+    expect(container.querySelector('#count').textContent).toBe('0');
+
+    increment();
+    const didMutate = AEUI.render();
+
+    expect(didMutate).toBe(true);
+    expect(container.querySelector('#count').textContent).toBe('1');
+    expect(AEUI._frameDelay).toBe(1);
   });
 });
 

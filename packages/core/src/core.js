@@ -1,12 +1,18 @@
 /**
  * AEUI Framework Core
  */
+const MAX_FRAME_DELAY = 60;
+
 export const AEUI = {
   _rootInstance: null,
   _containerElement: null,
   _RootComponent: null,
   _currentInstance: null,
   _isRendering: false,
+  _rafId: null,
+  _frameDelay: 1,
+  _framesUntilNextTick: 0,
+  _didMutate: false,
 
   createInstance(vnode, parentInstance = null) {
     const instance = {
@@ -93,11 +99,8 @@ export const AEUI = {
   },
 
   init(RootComponent, containerElement) {
-    // 중복 호출 방어: 이전 인터벌 해제 및 이전 루트 언마운트
-    if (this._tickTimer) {
-      clearInterval(this._tickTimer);
-      this._tickTimer = null;
-    }
+    // 중복 호출 방어: 이전 루프 해제 및 이전 루트 언마운트
+    this._stopScheduler();
     if (this._rootInstance) {
       this._unmount(this._rootInstance);
     }
@@ -109,17 +112,72 @@ export const AEUI = {
     containerElement.innerHTML = '';
 
     // Initial Render
-    this._tick();
+    const didMutate = this._tick();
+    this._frameDelay = didMutate ? 1 : 2;
+    this._framesUntilNextTick = this._frameDelay - 1;
 
     // Start Loop
-    this._tickTimer = setInterval(() => {
-      this._tick();
-    }, 1000);
+    this._startScheduler();
+  },
+
+  // 사용자 수동 렌더: 즉시 한 번 렌더링한다.
+  render() {
+    if (!this._RootComponent || !this._containerElement) return false;
+    const didMutate = this._tick();
+    this._frameDelay = didMutate ? 1 : Math.min(this._frameDelay * 2, MAX_FRAME_DELAY);
+    this._framesUntilNextTick = this._frameDelay - 1;
+    this._startScheduler();
+    return didMutate;
+  },
+
+  _stopScheduler() {
+    if (this._rafId != null) {
+      if (typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(this._rafId);
+      } else {
+        clearTimeout(this._rafId);
+      }
+    }
+    this._rafId = null;
+  },
+
+  _startScheduler() {
+    if (this._rafId != null) return;
+    if (typeof requestAnimationFrame === "function") {
+      this._rafId = requestAnimationFrame(() => this._onAnimationFrame());
+    } else {
+      this._rafId = setTimeout(() => this._onAnimationFrame(), 16);
+    }
+  },
+
+  _onAnimationFrame() {
+    this._rafId = null;
+    if (!this._RootComponent || !this._containerElement) return;
+
+    if (this._framesUntilNextTick <= 0) {
+      const didMutate = this._tick();
+      const hasManualRequestDuringTick = this._rafId != null;
+
+      if (hasManualRequestDuringTick) {
+        this._framesUntilNextTick = 0;
+      } else {
+        this._frameDelay = didMutate
+          ? 1
+          : Math.min(this._frameDelay * 2, MAX_FRAME_DELAY);
+        this._framesUntilNextTick = this._frameDelay - 1;
+      }
+    } else {
+      this._framesUntilNextTick -= 1;
+    }
+
+    this._startScheduler();
   },
 
   _tick() {
-    if (this._isRendering) return;
+    if (!this._RootComponent || !this._containerElement) return false;
+    if (this._isRendering) return false;
     this._isRendering = true;
+    this._didMutate = false;
 
     try {
       if (this._rootInstance) {
@@ -140,6 +198,7 @@ export const AEUI = {
     } finally {
       this._isRendering = false;
     }
+    return this._didMutate;
   },
 
   _deepEqual(a, b) {
@@ -309,19 +368,25 @@ export const AEUI = {
         }
       } else if (key === 'className') {
         domNode.className = newValue ?? '';
+        this._didMutate = true;
       } else if (key === "style" && typeof newValue === "object" && newValue !== null) {
         domNode.style.cssText = '';
         Object.assign(domNode.style, newValue);
+        this._didMutate = true;
       } else if (key === "style" && typeof newValue === "string") {
         domNode.style.cssText = newValue;
+        this._didMutate = true;
       } else if (typeof newValue === 'boolean') {
         domNode[key] = newValue;
         if (newValue) domNode.setAttribute(key, '');
         else domNode.removeAttribute(key);
+        this._didMutate = true;
       } else if (newValue === undefined || newValue === null) {
         domNode.removeAttribute(key);
+        this._didMutate = true;
       } else {
         domNode.setAttribute(key, newValue);
+        this._didMutate = true;
       }
     }
   },
@@ -366,6 +431,7 @@ export const AEUI = {
       if (prevVNode) {
         if (parentElement.childNodes[index]) {
           parentElement.removeChild(parentElement.childNodes[index]);
+          this._didMutate = true;
         }
       }
       return;
@@ -377,6 +443,7 @@ export const AEUI = {
       if (domNode && domNode.nodeType === Node.TEXT_NODE) {
         if (domNode.nodeValue !== String(newVNode)) {
           domNode.nodeValue = String(newVNode);
+          this._didMutate = true;
         }
       } else {
         const newDomNode = document.createTextNode(String(newVNode));
@@ -385,6 +452,7 @@ export const AEUI = {
         } else {
           parentElement.appendChild(newDomNode);
         }
+        this._didMutate = true;
       }
       return;
     }
@@ -492,6 +560,7 @@ export const AEUI = {
       } else {
         parentElement.appendChild(newDomNode);
       }
+      this._didMutate = true;
     }
   },
 };

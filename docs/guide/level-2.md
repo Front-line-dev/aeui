@@ -130,7 +130,8 @@ tick 2: VNode = { tag: "p", children: ["카운트: 1"] }
 ```
 AEUI.init(App, container)
   ├── 최초 tick 즉시 실행 → 화면에 첫 렌더링
-  └── setInterval(tick, 1000) → 1초마다 반복
+  └── requestAnimationFrame 기반 scheduler 시작
+      (변화가 있으면 빠르게, 없으면 프레임 간격 점진 증가)
 
 각 tick에서:
   1. watcher 의존성 체크 → 변경된 watcher의 callback 실행
@@ -145,7 +146,7 @@ AEUI가 `let` 변수의 직접 수정을 감지하기 위해 Polling을 사용�
 
 이 방식의 자연스러운 결과:
 - `count++`, `items.push()` 등 일반 JavaScript 코드가 그대로 동작
-- 변경 사항은 **다음 tick**에서 화면에 반영된다. (기본 tick: 1초)
+- 변경 사항은 **다음 tick**에서 화면에 반영된다.
 
 ---
 
@@ -158,7 +159,7 @@ AEUI가 `let` 변수의 직접 수정을 감지하기 위해 Polling을 사용�
    └→ onClick 핸들러 실행: count++
    └→ count가 0에서 1로 변경됨 (메모리상 변수만 변경, 화면은 아직 그대로)
 
-2. (최대 1초 후) 다음 tick 시작
+2. 다음 tick 시작 (상황에 따라 프레임 간격이 달라짐)
    └→ _runComponentWatchers: count를 감시하는 watcher 의존성 체크
    └→ [count]의 현재값 [1]과 이전 스냅샷 [0] 비교 → 변경 감지
    └→ watcher callback 실행 (있는 경우)

@@ -48,10 +48,10 @@ AEUI.init(App, document.getElementById('root'))
   │           └── return () => JSX (렌더 함수)
   │       └── 렌더 함수 실행 → VNode 생성 → DOM 생성
   │
-  └── setInterval(_tick, 1000) 시작
+  └── requestAnimationFrame 기반 scheduler 시작
 ```
 
-### 매 tick (1초마다)
+### 매 tick (적응형 프레임 간격)
 
 ```
 _tick()
@@ -78,7 +78,7 @@ _tick()
 사용자 클릭 → onClick 핸들러 실행 → let 변수 변경
   (이 시점에서는 DOM 변경 없음, 메모리상 변수만 변경됨)
   
-... 최대 1초 후 ...
+... 다음 scheduler tick 시점 ...
 
 다음 tick → render 실행 → 클로저에서 변경된 변수 읽음 → 새 VNode → reconcile → DOM 업데이트
 ```
