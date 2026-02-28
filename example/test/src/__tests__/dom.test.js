@@ -156,25 +156,28 @@ describe('_reconcile 배열 처리', () => {
 });
 
 describe('_unmount', () => {
-  it('isMounted를 false로 설정', () => {
+  it('isMounted를 false로 설정하고 _domNodeCount를 0으로 초기화', () => {
     const instance = {
       isMounted: true,
+      _domNodeCount: 3,
       cleanups: [],
       children: [],
-      watchStates: [{ callback: () => {}, getDeps: () => [], oldDeps: [] }],
+      watchStates: [{ callback: () => { }, getDeps: () => [], oldDeps: [] }],
     };
 
     AEUI._unmount(instance);
 
     expect(instance.isMounted).toBe(false);
+    expect(instance._domNodeCount).toBe(0);
   });
 
   it('watchStates를 비움', () => {
     const instance = {
       isMounted: true,
+      _domNodeCount: 1,
       cleanups: [],
       children: [],
-      watchStates: [{ callback: () => {}, getDeps: () => [], oldDeps: [] }],
+      watchStates: [{ callback: () => { }, getDeps: () => [], oldDeps: [] }],
     };
 
     AEUI._unmount(instance);
@@ -186,6 +189,7 @@ describe('_unmount', () => {
     const cleanup = vi.fn();
     const instance = {
       isMounted: true,
+      _domNodeCount: 1,
       cleanups: [cleanup],
       children: [],
       watchStates: [],
@@ -199,10 +203,11 @@ describe('_unmount', () => {
   it('cleanup 에러가 다른 정리작업을 차단하지 않음', () => {
     const errorCleanup = () => { throw new Error('cleanup error'); };
     const goodCleanup = vi.fn();
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
     const instance = {
       isMounted: true,
+      _domNodeCount: 1,
       cleanups: [errorCleanup, goodCleanup],
       children: [],
       watchStates: [],
@@ -219,12 +224,14 @@ describe('_unmount', () => {
     const childCleanup = vi.fn();
     const child = {
       isMounted: true,
+      _domNodeCount: 1,
       cleanups: [childCleanup],
       children: [],
       watchStates: [],
     };
     const parent = {
       isMounted: true,
+      _domNodeCount: 2,
       cleanups: [],
       children: [child],
       watchStates: [],
@@ -233,6 +240,7 @@ describe('_unmount', () => {
     AEUI._unmount(parent);
 
     expect(child.isMounted).toBe(false);
+    expect(child._domNodeCount).toBe(0);
     expect(childCleanup).toHaveBeenCalledTimes(1);
   });
 });
@@ -290,9 +298,9 @@ describe('스케줄러 프레임 백오프', () => {
 
   it('변화가 없으면 1 -> 2 -> 4 프레임으로 간격이 늘어남', () => {
     const tickSpy = vi.spyOn(AEUI, '_tick').mockReturnValue(false);
-    const startSpy = vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => {});
+    const startSpy = vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => { });
 
-    AEUI._RootComponent = () => {};
+    AEUI._RootComponent = () => { };
     AEUI._containerElement = document.createElement('div');
     AEUI._frameDelay = 1;
     AEUI._framesUntilNextTick = 0;
@@ -315,10 +323,10 @@ describe('스케줄러 프레임 백오프', () => {
   });
 
   it('변화가 생기면 프레임 간격이 1로 즉시 리셋됨', () => {
-    vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => {});
+    vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => { });
     vi.spyOn(AEUI, '_tick').mockReturnValue(true);
 
-    AEUI._RootComponent = () => {};
+    AEUI._RootComponent = () => { };
     AEUI._containerElement = document.createElement('div');
     AEUI._frameDelay = 16;
     AEUI._framesUntilNextTick = 0;
@@ -330,10 +338,10 @@ describe('스케줄러 프레임 백오프', () => {
   });
 
   it('프레임 간격은 최대 60까지 증가함', () => {
-    vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => {});
+    vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => { });
     vi.spyOn(AEUI, '_tick').mockReturnValue(false);
 
-    AEUI._RootComponent = () => {};
+    AEUI._RootComponent = () => { };
     AEUI._containerElement = document.createElement('div');
     AEUI._frameDelay = 48;
     AEUI._framesUntilNextTick = 0;
@@ -402,7 +410,7 @@ describe('에러 처리', () => {
     expect(AEUI._currentInstance).toBeNull();
 
     // setup 밖 watch 호출은 등록되지 않아야 함
-    watch(() => {}, []);
+    watch(() => { }, []);
     expect(leakedInstance.watchStates.length).toBe(0);
   });
 
@@ -422,7 +430,7 @@ describe('에러 처리', () => {
 
   it('watcher 에러가 다른 watcher를 차단하지 않음', () => {
     const watcherResults = [];
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
     const instance = {
       watchStates: [

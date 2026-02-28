@@ -191,7 +191,7 @@ Vite의 JSX 설정에서 `jsxFactory`를 `'AEUI.createElement'` 또는 `'AEUI.cr
 ## `Fragment`
 
 ```javascript
-AEUI.Fragment = ({ children }) => children;
+AEUI.Fragment = (initialProps) => (props) => props.children;
 ```
 
 Fragment는 **래핑 DOM 요소 없이** 여러 자식을 반환할 수 있게 하는 특수 컴포넌트이다.
@@ -224,7 +224,7 @@ function List() {
 
 ### 작동 원리
 
-Fragment 함수는 `props.children`을 그대로 반환한다. 즉, VNode 배열이 그대로 부모에게 전달되고, `_reconcile`이 이 배열을 1단계(Array 처리)에서 순회한다.
+Fragment은 AEUI의 컴포넌트와 동일한 **2단계 구조**(setup → render)를 따른다. `AEUI.Fragment = (initialProps) => (props) => props.children` 형태로, 첫 번째 호출(setup)이 렌더 함수를 반환하고, 렌더 함수가 매 tick마다 최신 `props.children`을 반환한다.
 
 ```jsx
 // JSX
@@ -239,11 +239,10 @@ AEUI.createVNode(AEUI.Fragment, null,
   AEUI.createVNode("p", null, "B")
 )
 
-// Fragment 함수 실행 결과: children 배열 그대로 반환
-[
-  { tag: "p", ... },
-  { tag: "p", ... }
-]
+// Fragment는 컴포넌트로 처리됨:
+// 1. setup: AEUI.Fragment(initialProps) → render 함수 반환
+// 2. render: (props) => props.children → children 배열 반환
+// 결과: [{ tag: "p", ... }, { tag: "p", ... }]
 ```
 
 ### 주의사항: Babel 플러그인과의 관계
@@ -254,6 +253,6 @@ Fragment는 함수이지만, Babel 플러그인이 이를 일반 컴포넌트로
 
 ## 관련 코드 위치
 
-- `createVNode`: `packages/core/src/core.js` L82-L87
-- `createElement` alias: `packages/core/src/core.js` L458
-- `Fragment`: `packages/core/src/core.js` L459
+- `createVNode`: `packages/core/src/core.js` L128-L133
+- `createElement` alias: `packages/core/src/core.js` L628
+- `Fragment`: `packages/core/src/core.js` L629

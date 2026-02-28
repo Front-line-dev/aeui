@@ -112,8 +112,13 @@ if (this._deepEqual(newValue, oldValue)) continue;
 if (key.startsWith("on")) {
   const eventName = key.substring(2).toLowerCase();
 
-  domNode._aeuiHandlers ||= {};
-  domNode._aeuiProxyListeners ||= {};
+  // 1. 프록시 저장소 초기화
+  if (!domNode._aeuiHandlers) {
+    domNode._aeuiHandlers = {};
+  }
+  if (!domNode._aeuiProxyListeners) {
+    domNode._aeuiProxyListeners = {};
+  }
 
   if (typeof newValue !== "function") {
     // 함수가 아니면 리스너를 제거한다.
@@ -278,6 +283,6 @@ delete로 모든 key를 먼저 삭제하므로, 이전에 `{ name: "A", count: 1
 
 ## 관련 코드 위치
 
-- `_createDomNode`: `packages/core/src/core.js` L236-L249
-- `_updateDomProps`: `packages/core/src/core.js` L256-L289
-- `updateProps`: `packages/core/src/core.js` L251-L254
+- `_createDomNode`: `packages/core/src/core.js` L335-L348
+- `_updateDomProps`: `packages/core/src/core.js` L355-L426
+- `updateProps`: `packages/core/src/core.js` L350-L353

@@ -250,5 +250,5 @@ AEUI._deepClone(obj);       // ❌ Maximum call stack size exceeded
 
 ## 관련 코드 위치
 
-- `_deepEqual`: `packages/core/src/core.js` L139-L192
-- `_deepClone`: `packages/core/src/core.js` L194-L215
+- `_deepEqual`: `packages/core/src/core.js` L238-L291
+- `_deepClone`: `packages/core/src/core.js` L293-L314

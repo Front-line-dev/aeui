@@ -66,6 +66,12 @@ export const AEUI = {
         );
 
         this.prevRenderedVNode = newVNode;
+
+        // Cleanup extra children (mirrors _reconcile step 4)
+        if (this._childCursor < this.children.length) {
+          const removed = this.children.splice(this._childCursor);
+          removed.forEach(child => AEUI._unmount(child));
+        }
       }
     };
 

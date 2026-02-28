@@ -51,14 +51,22 @@ newVNode 타입 판별 (순서대로):
 if (Array.isArray(newVNode)) {
   const prevArr = Array.isArray(prevVNode) ? prevVNode : [];
   const maxLen = Math.max(newVNode.length, prevArr.length);
+  let currentIndex = index;
+  const childCursor = parentInstance ? { value: parentInstance._childCursor || 0 } : null;
+
   for (let i = 0; i < maxLen; i++) {
+    const nextChild = i < newVNode.length ? newVNode[i] : null;
+    const prevChild = i < prevArr.length ? prevArr[i] : null;
+
     this._reconcile(
       parentElement,
-      i < newVNode.length ? newVNode[i] : null,
-      i < prevArr.length ? prevArr[i] : null,
-      index + i,
+      nextChild,
+      prevChild,
+      currentIndex,
       parentInstance
     );
+
+    currentIndex += this._getDomNodeCount(nextChild, parentInstance, childCursor);
   }
   return;
 }
@@ -86,6 +94,7 @@ if (newVNode == null) {
   if (prevVNode) {
     if (parentElement.childNodes[index]) {
       parentElement.removeChild(parentElement.childNodes[index]);
+      this._didMutate = true;
     }
   }
   return;
@@ -109,6 +118,7 @@ if (typeof newVNode !== "object") {
     // 같은 위치에 이미 텍스트 노드가 있는 경우: 값만 변경
     if (domNode.nodeValue !== String(newVNode)) {
       domNode.nodeValue = String(newVNode);
+      this._didMutate = true;
     }
   } else {
     // 텍스트 노드가 아닌 다른 노드가 있거나, 아무것도 없는 경우
@@ -118,6 +128,7 @@ if (typeof newVNode !== "object") {
     } else {
       parentElement.appendChild(newDomNode);
     }
+    this._didMutate = true;
   }
   return;
 }
@@ -183,10 +194,14 @@ if (this._rootInstance && this._rootInstance.vnode.tag === newVNode.tag) {
 instance.parentElement = parentElement;
 instance._childCursor = 0;
 
+let componentRenderedVNode;
 AEUI._currentInstance = instance;
-AEUI._runComponentWatchers(instance);    // watcher 먼저 실행
-const componentRenderedVNode = instance.render(newVNode.props);  // 렌더 함수 호출
-AEUI._currentInstance = null;
+try {
+  AEUI._runComponentWatchers(instance);    // watcher 먼저 실행
+  componentRenderedVNode = instance.render(newVNode.props);  // 렌더 함수 호출
+} finally {
+  AEUI._currentInstance = null;
+}
 ```
 
 **watcher가 render보다 먼저 실행되는 이유**: watch callback이 상태를 변경할 수 있고, 그 변경이 render 결과(JSX)에 반영되어야 하기 때문이다. render를 먼저 실행하면 watch에 의한 상태 변경이 이번 tick에 반영되지 않는다.
@@ -271,7 +286,7 @@ if (domNode && prevVNode && prevVNode.tag === newVNode.tag) {
 
 ---
 
-## `_getDomNodeCount(vnode)`
+## `_getDomNodeCount(vnode, ownerInstance, cursor)`
 
 인스턴스의 `update()` 메서드에서 **DOM 시작 인덱스를 계산**할 때 사용된다.
 
@@ -302,7 +317,17 @@ _getDomNodeCount(vnode, ownerInstance = null, cursor = null) {
     if (!ownerInstance || !cursor) return 1;
     const childInstance = ownerInstance.children[cursor.value++];
     if (!childInstance) return 0;
-    return childInstance._domNodeCount;
+
+    if (typeof childInstance._domNodeCount === 'number') {
+      return childInstance._domNodeCount;  // 캐시 사용
+    }
+
+    // fallback: 아직 _domNodeCount가 설정 안 된 경우 재귀 순회
+    return this._getDomNodeCount(
+      childInstance.prevRenderedVNode,
+      childInstance,
+      { value: 0 }
+    );
   }
 
   // DOM 노드 자체는 1개로 계산하지만,
@@ -338,5 +363,5 @@ key 기반 비교가 도입되면 노드를 key로 식별하여 이동/삽입/�
 
 ## 관련 코드 위치
 
-- `_reconcile`: `packages/core/src/core.js` L435-L619
-- `_getDomNodeCount`: `packages/core/src/core.js` L82-L120
+- `_reconcile`: `packages/core/src/core.js` L441-L625
+- `_getDomNodeCount`: `packages/core/src/core.js` L93-L126

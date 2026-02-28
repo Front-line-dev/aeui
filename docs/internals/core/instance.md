@@ -30,6 +30,7 @@ React의 Fiber Node가 이에 해당한다.
   props,             // 현재 props
   parent,            // 부모 인스턴스
   children,          // 자식 컴포넌트 인스턴스 배열
+  _domNodeCount,     // 이 인스턴스가 차지하는 DOM 노드 수 캐시
   parentElement,     // 이 컴포넌트가 렌더링되는 DOM 부모 요소
   isMounted,         // 마운트 상태
   _childCursor       // reconcile 시 자식 인스턴스 재사용 커서
@@ -46,6 +47,7 @@ React의 Fiber Node가 이에 해당한다.
 | `props` | `Object` | 현재 이 컴포넌트에 전달된 props. 부모가 새 props를 전달하면 갱신된다 |
 | `parent` | `Instance \| null` | 이 인스턴스를 포함하는 부모 컴포넌트의 인스턴스. 루트 컴포넌트는 `null`. 인스턴스 트리의 부모-자식 관계를 형성한다 |
 | `children` | `Instance[]` | 이 컴포넌트의 렌더 결과에 포함된 **자식 컴포넌트 인스턴스**들의 배열. DOM 요소 자식이 아닌, 컴포넌트 자식만 포함한다 |
+| `_domNodeCount` | `number` | 이 인스턴스의 렌더 결과가 차지하는 DOM 노드 수의 캐시. `_reconcile` 4단계에서 컴포넌트 처리 후 갱신된다. 형제 컴포넌트의 DOM 시작 인덱스 계산(`_getDomNodeCount`)에 사용된다 |
 | `parentElement` | `HTMLElement` | 이 컴포넌트의 렌더 결과가 삽입되는 실제 DOM 부모 요소. `_reconcile`에 전달되어 DOM 조작의 기준점이 된다 |
 | `isMounted` | `boolean` | `true`면 현재 화면에 마운트되어 있는 상태. `_unmount` 시 `false`로 설정되며, `instance.update()`에서 첫 줄에 이 값을 체크하여 이미 언마운트된 인스턴스의 불필요한 업데이트를 방지한다 |
 | `_childCursor` | `number` | `_reconcile`에서 자식 컴포넌트 인스턴스를 순서대로 재사용할 때 사용하는 인덱스 커서. 렌더링 시작 시 `0`으로 초기화되고, 자식 컴포넌트를 만날 때마다 증가한다. 상세 동작은 아래 "자식 인스턴스 재사용" 섹션 참조 |
@@ -252,7 +254,7 @@ if (instance._childCursor < instance.children.length) {
 
 ## 관련 코드 위치
 
-- `createInstance`: `packages/core/src/core.js` L11-L67
-- `instance.update()`: `packages/core/src/core.js` L24-L59
-- `_currentInstance` 선언: `packages/core/src/core.js` L8
+- `createInstance`: `packages/core/src/core.js` L17-L86
+- `instance.update()`: `packages/core/src/core.js` L31-L75
+- `_currentInstance` 선언: `packages/core/src/core.js` L10
 - `_currentInstance` 참조 (hooks): `packages/core/src/hooks.js` L4

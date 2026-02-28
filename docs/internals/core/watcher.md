@@ -152,9 +152,9 @@ watch(() => console.log("changed"), [items]);
 
 | 호출 위치 | 코드 위치 | 시점 |
 |-----------|-----------|------|
-| `_reconcile` 내부 (4단계: Component Node) | `packages/core/src/core.js` L397 | 컴포넌트 render 호출 직전 |
+| `_reconcile` 내부 (4단계: Component Node) | `packages/core/src/core.js` L547 | 컴포넌트 render 호출 직전 |
 | Babel 플러그인이 렌더 함수에 주입 | (변환된 코드) | render 함수 시작부에서 props 업데이트 직후 |
-| `instance.update()` 메서드 내부 | `packages/core/src/core.js` L43 | 루트 인스턴스의 tick에서 render 호출 직전 |
+| `instance.update()` 메서드 내부 | `packages/core/src/core.js` L51 | 루트 인스턴스의 tick에서 render 호출 직전 |
 
 ### 왜 render 전에 실행하는가
 
@@ -207,5 +207,5 @@ try {
 
 ## 관련 코드 위치
 
-- `_runComponentWatchers`: `packages/core/src/core.js` L217-L234
+- `_runComponentWatchers`: `packages/core/src/core.js` L316-L333
 - `watch` 훅 (watcher 등록): `packages/core/src/hooks.js` L3-L15

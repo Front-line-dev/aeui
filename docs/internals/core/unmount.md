@@ -30,15 +30,18 @@ _unmount(instance):
      → instance.update()에서 첫 줄의 if (!this.isMounted) return;에 의해
        이후 tick에서 이 인스턴스가 업데이트되지 않도록 함
 
-  2. cleanups 배열 순서대로 실행
+  2. instance._domNodeCount = 0
+     → 이 인스턴스의 DOM 노드 수 캐시를 초기화
+
+  3. cleanups 배열 순서대로 실행
      각 cleanup 함수를 try-catch로 감싸서 실행
      → 에러가 발생해도 다음 cleanup으로 계속 진행
 
-  3. children 배열 순회 → 각 자식에 대해 _unmount 재귀 호출
+  4. children 배열 순회 → 각 자식에 대해 _unmount 재귀 호출
      → 자식의 cleanup, 자식의 자식 cleanup... 순서대로 정리
 
-  4. watchStates = []  (watcher 전부 해제)
-  5. cleanups = []     (cleanup 참조 해제)
+  5. watchStates = []  (watcher 전부 해제)
+  6. cleanups = []     (cleanup 참조 해제)
 ```
 
 ### 코드
@@ -47,6 +50,7 @@ _unmount(instance):
 _unmount(instance) {
   if (instance) {
     instance.isMounted = false;
+    instance._domNodeCount = 0;
     instance.cleanups.forEach((cleanup) => {
       try { cleanup(); } catch (e) { console.error('[AEUI] Cleanup error:', e); }
     });
@@ -150,5 +154,5 @@ instance.cleanups = [];
 
 ## 관련 코드 위치
 
-- `_unmount`: `packages/core/src/core.js` L291-L301
+- `_unmount`: `packages/core/src/core.js` L428-L439
 - `clean` 훅 (cleanup 등록): `packages/core/src/hooks.js` L17-L21

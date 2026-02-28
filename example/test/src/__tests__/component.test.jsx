@@ -224,6 +224,34 @@ describe('clean 훅', () => {
     expect(cleanupCalls).toEqual(['cleaned']);
     expect(container.textContent).toContain('other');
   });
+
+  it('조건부 렌더링으로 자식 컴포넌트가 제거되면 clean callback 실행', () => {
+    const childCleanups = [];
+
+    function CleanChild() {
+      clean(() => { childCleanups.push('child-cleaned'); });
+      return <p>child</p>;
+    }
+
+    function ParentApp() {
+      let show = true;
+      return (
+        <div>
+          {show && <CleanChild />}
+          <button id="hide-btn" onClick={() => { show = false; }}>hide</button>
+        </div>
+      );
+    }
+
+    AEUI.init(ParentApp, container);
+    expect(container.querySelector('p').textContent).toBe('child');
+    expect(childCleanups).toEqual([]);
+
+    container.querySelector('#hide-btn').click();
+    AEUI._tick();
+
+    expect(childCleanups).toEqual(['child-cleaned']);
+  });
 });
 
 // ─── 조건부 렌더링 ───
