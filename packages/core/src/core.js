@@ -235,14 +235,18 @@ export const AEUI = {
     return this._didMutate;
   },
 
-  _deepEqual(a, b) {
+  _deepEqual(a, b, seen = new Map()) {
     if (Object.is(a, b)) return true;
     if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
+
+    // 순환 참조 방어: 이미 비교 중인 (a, b) 쌍이면 동일한 순환 구조로 간주
+    if (seen.has(a)) return seen.get(a) === b;
+    seen.set(a, b);
 
     if (Array.isArray(a)) {
       if (!Array.isArray(b) || a.length !== b.length) return false;
       for (let i = 0; i < a.length; i++) {
-        if (!this._deepEqual(a[i], b[i])) return false;
+        if (!this._deepEqual(a[i], b[i], seen)) return false;
       }
       return true;
     }
@@ -258,22 +262,38 @@ export const AEUI = {
     if (a instanceof Map) {
       if (!(b instanceof Map) || a.size !== b.size) return false;
       for (const [key, val] of a) {
-        if (!b.has(key) || !this._deepEqual(val, b.get(key))) return false;
+        if (!b.has(key) || !this._deepEqual(val, b.get(key), seen)) return false;
       }
       return true;
     }
 
     if (a instanceof Set) {
       if (!(b instanceof Set) || a.size !== b.size) return false;
+
+      const bValues = [...b];
+      const used = new Array(bValues.length).fill(false);
+      let activeSeen = seen;
+
       for (const val of a) {
-        let hasMatch = false;
-        for (const bVal of b) {
-          if (this._deepEqual(val, bVal)) {
-            hasMatch = true;
+        let matchedIndex = -1;
+        let matchedSeen = null;
+
+        for (let i = 0; i < bValues.length; i++) {
+          if (used[i]) continue;
+
+          // Set 후보 매칭은 백트래킹이 필요하므로 seen 상태를 분리한다.
+          const trialSeen = new Map(activeSeen);
+          if (this._deepEqual(val, bValues[i], trialSeen)) {
+            matchedIndex = i;
+            matchedSeen = trialSeen;
             break;
           }
         }
-        if (!hasMatch) return false;
+
+        if (matchedIndex === -1) return false;
+
+        used[matchedIndex] = true;
+        activeSeen = matchedSeen;
       }
       return true;
     }
@@ -284,33 +304,48 @@ export const AEUI = {
     if (keysA.length !== keysB.length) return false;
 
     for (const key of keysA) {
-      if (!keysB.includes(key) || !this._deepEqual(a[key], b[key])) return false;
+      if (!keysB.includes(key) || !this._deepEqual(a[key], b[key], seen)) return false;
     }
 
     return true;
   },
 
-  _deepClone(v) {
+  _deepClone(v, seen = new WeakMap()) {
     if (v === null || typeof v !== 'object') return v;
 
+    // 순환 참조 방어: 이미 복제한 객체면 그 복제본을 반환
+    if (seen.has(v)) return seen.get(v);
+
     if (Array.isArray(v)) {
-      return v.map(item => this._deepClone(item));
+      const cloned = [];
+      seen.set(v, cloned);
+      v.forEach(item => cloned.push(this._deepClone(item, seen)));
+      return cloned;
     }
 
     if (v instanceof Date) return new Date(v.getTime());
     if (v instanceof RegExp) return new RegExp(v.source, v.flags);
 
     if (v instanceof Map) {
-      return new Map([...v].map(([k, val]) => [k, this._deepClone(val)]));
+      const cloned = new Map();
+      seen.set(v, cloned);
+      v.forEach((val, k) => cloned.set(k, this._deepClone(val, seen)));
+      return cloned;
     }
 
     if (v instanceof Set) {
-      return new Set([...v].map(item => this._deepClone(item)));
+      const cloned = new Set();
+      seen.set(v, cloned);
+      v.forEach(item => cloned.add(this._deepClone(item, seen)));
+      return cloned;
     }
 
-    return Object.fromEntries(
-      Object.entries(v).map(([k, val]) => [k, this._deepClone(val)])
-    );
+    const cloned = {};
+    seen.set(v, cloned);
+    for (const [k, val] of Object.entries(v)) {
+      cloned[k] = this._deepClone(val, seen);
+    }
+    return cloned;
   },
 
   _runComponentWatchers(instance) {
@@ -438,6 +473,73 @@ export const AEUI = {
     }
   },
 
+  _countComponentNodes(vnode) {
+    if (vnode == null || typeof vnode !== 'object') return 0;
+
+    if (Array.isArray(vnode)) {
+      return vnode.reduce((count, child) => count + this._countComponentNodes(child), 0);
+    }
+
+    // parentInstance.children 에는 해당 위치의 컴포넌트 "루트" 인스턴스만 저장된다.
+    if (typeof vnode.tag === 'function') return 1;
+
+    const children = vnode.children || [];
+    return children.reduce((count, child) => count + this._countComponentNodes(child), 0);
+  },
+
+  _removeComponentInstances(parentInstance, start, count) {
+    if (!parentInstance || count <= 0) return;
+    if (start >= parentInstance.children.length) return;
+
+    const removed = parentInstance.children.splice(start, count);
+    removed.forEach(child => this._unmount(child));
+  },
+
+  /**
+   * DOM 타입 교체 전에 old/new 컴포넌트 개수 차이를 맞춰
+   * 뒤 형제 인스턴스가 잘못 소비되지 않도록 정렬한다.
+   */
+  _alignComponentInstances(prevVNode, newVNode, parentInstance) {
+    if (!parentInstance) return;
+
+    const prevCount = this._countComponentNodes(prevVNode);
+    const nextCount = this._countComponentNodes(newVNode);
+    if (prevCount === nextCount) return;
+
+    const cursor = typeof parentInstance._childCursor === 'number'
+      ? parentInstance._childCursor
+      : 0;
+
+    if (prevCount > nextCount) {
+      this._removeComponentInstances(
+        parentInstance,
+        cursor + nextCount,
+        prevCount - nextCount
+      );
+      return;
+    }
+
+    const insertCount = nextCount - prevCount;
+    const placeholders = new Array(insertCount).fill(null);
+    parentInstance.children.splice(cursor + prevCount, 0, ...placeholders);
+  },
+
+  /**
+   * prevVNode 서브트리에 대응하는 component instance들을 parent cursor 기준으로 unmount한다.
+   */
+  _unmountVNode(vnode, parentInstance) {
+    if (!parentInstance) return;
+
+    const removeCount = this._countComponentNodes(vnode);
+    if (removeCount <= 0) return;
+
+    const start = typeof parentInstance._childCursor === 'number'
+      ? parentInstance._childCursor
+      : 0;
+
+    this._removeComponentInstances(parentInstance, start, removeCount);
+  },
+
   _reconcile(
     parentElement,
     newVNode,
@@ -472,6 +574,9 @@ export const AEUI = {
     // 2. Remove
     if (newVNode == null) {
       if (prevVNode) {
+        // 이전 VNode에 컴포넌트 인스턴스가 있으면 unmount (cleanup 실행)
+        this._unmountVNode(prevVNode, parentInstance);
+
         if (parentElement.childNodes[index]) {
           parentElement.removeChild(parentElement.childNodes[index]);
           this._didMutate = true;
@@ -515,10 +620,12 @@ export const AEUI = {
           instance.props = newVNode.props || {};
         } else {
           // Create new instance
+          const slotIndex = parentInstance._childCursor;
           instance = this.createInstance(newVNode, parentInstance);
-          if (parentInstance.children[parentInstance._childCursor]) {
-            this._unmount(parentInstance.children[parentInstance._childCursor]);
-            parentInstance.children[parentInstance._childCursor] = instance;
+          if (slotIndex < parentInstance.children.length) {
+            const existing = parentInstance.children[slotIndex];
+            if (existing) this._unmount(existing);
+            parentInstance.children[slotIndex] = instance;
           } else {
             parentInstance.children.push(instance);
           }
@@ -604,6 +711,9 @@ export const AEUI = {
         childIndex += this._getDomNodeCount(newChild, parentInstance, childCursor);
       }
     } else {
+      // DOM 타입 교체 전에 old/new 컴포넌트 개수 차이를 먼저 정렬한다.
+      if (prevVNode) this._alignComponentInstances(prevVNode, newVNode, parentInstance);
+
       const newDomNode = this._createDomNode(newVNode);
       if (newVNode.children) {
         let childIndex = 0;

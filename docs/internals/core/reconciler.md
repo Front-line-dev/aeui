@@ -92,6 +92,9 @@ i=2: null vs "C" → 2단계로 가서 "C" DOM 노드 제거
 ```javascript
 if (newVNode == null) {
   if (prevVNode) {
+    // 이전 VNode에 컴포넌트 인스턴스가 있으면 unmount (cleanup 실행)
+    this._unmountVNode(prevVNode, parentInstance);
+
     if (parentElement.childNodes[index]) {
       parentElement.removeChild(parentElement.childNodes[index]);
       this._didMutate = true;
@@ -103,7 +106,7 @@ if (newVNode == null) {
 
 `newVNode`이 `null`이면 "이 위치에는 더 이상 아무것도 없어야 한다"는 뜻이다.
 
-**이전 VNode이 있고(`prevVNode`) 해당 위치에 DOM 노드가 존재할 때**: 그 DOM 노드를 제거한다.
+**이전 VNode이 있고(`prevVNode`) 해당 위치에 DOM 노드가 존재할 때**: `_unmountVNode`로 이전 VNode 서브트리에 대응하는 컴포넌트 인스턴스들을 먼저 정리(cleanup 실행)하고, 그 DOM 노드를 제거한다.
 
 **`prevVNode`이 없으면**: 이전에도 없었고 지금도 없으므로 아무 동작도 하지 않는다.
 
@@ -161,10 +164,12 @@ if (parentInstance) {
     instance.props = newVNode.props || {};
   } else {
     // 다른 컴포넌트 함수 → 이전 인스턴스 제거, 새로 생성
+    const slotIndex = parentInstance._childCursor;
     instance = this.createInstance(newVNode, parentInstance);
-    if (parentInstance.children[parentInstance._childCursor]) {
-      this._unmount(parentInstance.children[parentInstance._childCursor]);
-      parentInstance.children[parentInstance._childCursor] = instance;
+    if (slotIndex < parentInstance.children.length) {
+      const existing = parentInstance.children[slotIndex];
+      if (existing) this._unmount(existing);
+      parentInstance.children[slotIndex] = instance;
     } else {
       parentInstance.children.push(instance);
     }
@@ -174,6 +179,8 @@ if (parentInstance) {
 ```
 
 **재사용 조건**: `instance.vnode.tag === newVNode.tag`, 즉 **같은 함수 참조**인 경우에만 재사용한다. 다른 컴포넌트 함수가 같은 위치에 오면 이전 인스턴스의 모든 상태(let 변수, watcher, cleanup 등)가 파괴되고 새로 생성된다.
+
+**`slotIndex` 사전 캡처**: `createInstance` 내부에서 커서가 변경될 수 있으므로, `_childCursor`를 미리 `slotIndex`로 저장하여 올바른 위치에 접근한다.
 
 `parentInstance`가 없는 경우 (루트 컴포넌트):
 
@@ -260,6 +267,9 @@ if (domNode && prevVNode && prevVNode.tag === newVNode.tag) {
     childIndex += this._getDomNodeCount(newChild, parentInstance, childCursor);
   }
 } else {
+  // DOM 타입 교체 전에 old/new 컴포넌트 개수 차이를 먼저 정렬한다.
+  if (prevVNode) this._alignComponentInstances(prevVNode, newVNode, parentInstance);
+
   // 태그가 다르거나 새로 생성해야 함
   const newDomNode = this._createDomNode(newVNode);
   if (newVNode.children) {
@@ -282,7 +292,7 @@ if (domNode && prevVNode && prevVNode.tag === newVNode.tag) {
 
 **같은 태그일 때**: DOM 노드를 재사용한다. `_updateDomProps`로 변경된 속성만 업데이트하고, children을 순회하며 재귀적으로 `_reconcile`을 호출한다.
 
-**다른 태그이거나 새로운 위치일 때**: 새 DOM 노드를 `_createDomNode`로 생성하고, children을 재귀적으로 처리한 뒤, 기존 노드가 있으면 교체하고 없으면 추가한다.
+**다른 태그이거나 새로운 위치일 때**: 먼저 `_alignComponentInstances`로 이전/새 VNode 내부의 컴포넌트 수 차이를 보정한 뒤, 새 DOM 노드를 `_createDomNode`로 생성하고, children을 재귀적으로 처리한 뒤, 기존 노드가 있으면 교체하고 없으면 추가한다.
 
 ---
 
@@ -343,6 +353,83 @@ _getDomNodeCount(vnode, ownerInstance = null, cursor = null) {
 
 ---
 
+## 컴포넌트 인스턴스 정리 헬퍼 함수
+
+reconcile 과정에서 VNode이 제거되거나 DOM 타입이 교체될 때, 대응하는 컴포넌트 인스턴스들을 정리하기 위한 헬퍼 함수 4개이다.
+
+### `_countComponentNodes(vnode)`
+
+VNode 서브트리 내의 **컴포넌트 노드 수**를 계산한다. `parentInstance.children`에는 컴포넌트 루트 인스턴스만 저장되므로, `vnode.tag`가 함수인 노드를 1개로 카운트하고, DOM 노드는 자식을 재귀적으로 순회한다.
+
+```javascript
+_countComponentNodes(vnode) {
+  if (vnode == null || typeof vnode !== 'object') return 0;
+  if (Array.isArray(vnode)) {
+    return vnode.reduce((count, child) => count + this._countComponentNodes(child), 0);
+  }
+  if (typeof vnode.tag === 'function') return 1;
+  const children = vnode.children || [];
+  return children.reduce((count, child) => count + this._countComponentNodes(child), 0);
+}
+```
+
+### `_removeComponentInstances(parentInstance, start, count)`
+
+`parentInstance.children`에서 `start` 위치부터 `count`개의 인스턴스를 제거(`splice`)하고, 각각에 대해 `_unmount`를 호출한다.
+
+```javascript
+_removeComponentInstances(parentInstance, start, count) {
+  if (!parentInstance || count <= 0) return;
+  if (start >= parentInstance.children.length) return;
+  const removed = parentInstance.children.splice(start, count);
+  removed.forEach(child => this._unmount(child));
+}
+```
+
+### `_alignComponentInstances(prevVNode, newVNode, parentInstance)`
+
+DOM 타입 교체 전에 old/new VNode 내부의 컴포넌트 수 차이를 보정하여, 뒤 형제 인스턴스가 잘못 소비되지 않도록 정렬한다.
+
+- `prevCount > nextCount`: 초과 인스턴스를 `_removeComponentInstances`로 제거 + unmount
+- `prevCount < nextCount`: null placeholder를 삽입하여 커서 정렬
+- `prevCount === nextCount`: 아무 동작 없음
+
+```javascript
+_alignComponentInstances(prevVNode, newVNode, parentInstance) {
+  if (!parentInstance) return;
+  const prevCount = this._countComponentNodes(prevVNode);
+  const nextCount = this._countComponentNodes(newVNode);
+  if (prevCount === nextCount) return;
+
+  const cursor = typeof parentInstance._childCursor === 'number'
+    ? parentInstance._childCursor : 0;
+
+  if (prevCount > nextCount) {
+    this._removeComponentInstances(parentInstance, cursor + nextCount, prevCount - nextCount);
+    return;
+  }
+  const placeholders = new Array(nextCount - prevCount).fill(null);
+  parentInstance.children.splice(cursor + prevCount, 0, ...placeholders);
+}
+```
+
+### `_unmountVNode(vnode, parentInstance)`
+
+Remove 단계(2단계)에서 사용된다. `prevVNode` 서브트리에 대응하는 컴포넌트 인스턴스들을 `_childCursor` 기준으로 일괄 unmount한다.
+
+```javascript
+_unmountVNode(vnode, parentInstance) {
+  if (!parentInstance) return;
+  const removeCount = this._countComponentNodes(vnode);
+  if (removeCount <= 0) return;
+  const start = typeof parentInstance._childCursor === 'number'
+    ? parentInstance._childCursor : 0;
+  this._removeComponentInstances(parentInstance, start, removeCount);
+}
+```
+
+---
+
 ## 인덱스 기반 비교의 특성
 
 `_reconcile`은 `parentElement.childNodes[index]`로 DOM 노드에 직접 접근한다. 이는 O(1) 접근이지만, 리스트의 중간에 아이템을 삽입/삭제하면 이후 모든 인덱스가 밀려서 불필요한 업데이트가 발생한다.
@@ -363,5 +450,9 @@ key 기반 비교가 도입되면 노드를 key로 식별하여 이동/삽입/�
 
 ## 관련 코드 위치
 
-- `_reconcile`: `packages/core/src/core.js` L441-L625
+- `_reconcile`: `packages/core/src/core.js` L543-L735
 - `_getDomNodeCount`: `packages/core/src/core.js` L93-L126
+- `_countComponentNodes`: `packages/core/src/core.js` L476-L488
+- `_removeComponentInstances`: `packages/core/src/core.js` L490-L496
+- `_alignComponentInstances`: `packages/core/src/core.js` L502-L525
+- `_unmountVNode`: `packages/core/src/core.js` L530-L541

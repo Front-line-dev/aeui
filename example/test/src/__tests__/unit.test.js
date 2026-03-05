@@ -51,6 +51,41 @@ describe('AEUI._deepEqual', () => {
     expect(AEUI._deepEqual(s1, s2)).toBe(true);
     expect(AEUI._deepEqual(s1, s3)).toBe(false);
   });
+
+  it('Set 내부 객체를 순서와 무관하게 비교', () => {
+    const s1 = new Set([{ a: 1 }, { b: 2 }]);
+    const s2 = new Set([{ b: 2 }, { a: 1 }]);
+    expect(AEUI._deepEqual(s1, s2)).toBe(true);
+  });
+
+  it('Set 내부 deep-equal 중복 객체를 1:1로 매칭', () => {
+    const s1 = new Set([{ a: 1 }, { a: 1 }]);
+    const s2 = new Set([{ a: 1 }, { b: 2 }]);
+    expect(AEUI._deepEqual(s1, s2)).toBe(false);
+  });
+
+  it('순환 참조 객체 비교 시 크래시 없이 동작', () => {
+    const a = { value: 1 };
+    a.self = a;
+    const b = { value: 1 };
+    b.self = b;
+
+    // 자기 자신을 참조하는 동일 구조 → true
+    expect(AEUI._deepEqual(a, b)).toBe(true);
+
+    const c = { value: 2 };
+    c.self = c;
+    expect(AEUI._deepEqual(a, c)).toBe(false);
+  });
+
+  it('순환 참조 배열 비교 시 크래시 없이 동작', () => {
+    const a = [1, 2];
+    a.push(a);
+    const b = [1, 2];
+    b.push(b);
+
+    expect(AEUI._deepEqual(a, b)).toBe(true);
+  });
 });
 
 describe('AEUI._deepClone', () => {
@@ -81,6 +116,30 @@ describe('AEUI._deepClone', () => {
     const cloned = AEUI._deepClone(original);
     expect(cloned.getTime()).toBe(original.getTime());
     expect(cloned).not.toBe(original);
+  });
+
+  it('순환 참조 객체 복제 시 크래시 없이 동작', () => {
+    const original = { value: 1 };
+    original.self = original;
+
+    const cloned = AEUI._deepClone(original);
+
+    expect(cloned.value).toBe(1);
+    expect(cloned).not.toBe(original);
+    // 복제된 객체의 self도 자기 자신을 참조해야 함
+    expect(cloned.self).toBe(cloned);
+  });
+
+  it('순환 참조 배열 복제 시 크래시 없이 동작', () => {
+    const original = [1, 2];
+    original.push(original);
+
+    const cloned = AEUI._deepClone(original);
+
+    expect(cloned[0]).toBe(1);
+    expect(cloned[1]).toBe(2);
+    expect(cloned).not.toBe(original);
+    expect(cloned[2]).toBe(cloned);
   });
 });
 

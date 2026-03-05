@@ -142,6 +142,8 @@ instance.cleanups = [];
 | `init()` 재호출 | `init` 내부 | 이전 루트 인스턴스를 정리. 예: 테스트에서 매 테스트마다 `init` 호출 |
 | 컴포넌트 교체 | `_reconcile` 4단계 | 같은 위치에 다른 컴포넌트가 올 때 이전 인스턴스 제거 |
 | 초과 자식 정리 | `_reconcile` 4단계 | 이전보다 자식 컴포넌트 수가 줄었을 때, `_childCursor` 이후 남은 인스턴스 제거 |
+| VNode 제거 (Remove) | `_unmountVNode` → `_removeComponentInstances` | `_reconcile` 2단계에서 VNode이 null로 바뀠 때, 서브트리 내 컴포넌트 인스턴스 일괄 정리 |
+| DOM 타입 교체 | `_alignComponentInstances` → `_removeComponentInstances` | 5단계에서 DOM 태그가 바뀠 때, 이전 VNode의 초과 컴포넌트 인스턴스 제거 |
 
 ### DOM 노드 제거와의 관계
 
@@ -154,5 +156,5 @@ instance.cleanups = [];
 
 ## 관련 코드 위치
 
-- `_unmount`: `packages/core/src/core.js` L428-L439
+- `_unmount`: `packages/core/src/core.js` L463-L474
 - `clean` 훅 (cleanup 등록): `packages/core/src/hooks.js` L17-L21

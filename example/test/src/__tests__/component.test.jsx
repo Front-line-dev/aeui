@@ -439,3 +439,140 @@ describe('여러 컴포넌트 상태 독립성', () => {
     expect(container.querySelector('.count-b').textContent).toBe('0'); // B는 안 바뀜
   });
 });
+
+// ── Reconcile Remove 시 컴포넌트 unmount ───
+
+describe('Reconcile Remove 시 컴포넌트 cleanup 실행', () => {
+  it('배열에서 컴포넌트가 null로 바뀌면 cleanup이 실행됨', () => {
+    const cleanups = [];
+
+    function RemovableChild() {
+      clean(() => { cleanups.push('removed'); });
+      return <span>child</span>;
+    }
+
+    function RemoveApp() {
+      let show = true;
+      return (
+        <div>
+          {show ? <RemovableChild /> : null}
+          <button id="remove-btn" onClick={() => { show = false; }}>remove</button>
+        </div>
+      );
+    }
+
+    AEUI.init(RemoveApp, container);
+    expect(container.querySelector('span').textContent).toBe('child');
+    expect(cleanups).toEqual([]);
+
+    container.querySelector('#remove-btn').click();
+    AEUI._tick();
+
+    expect(cleanups).toEqual(['removed']);
+    expect(container.querySelector('span')).toBeNull();
+  });
+
+  it('동일 컴포넌트 형제 중 두 번째 제거 시 올바른 cleanup이 실행됨', () => {
+    const cleanups = [];
+
+    function SiblingChild({ id }) {
+      clean(() => { cleanups.push(id); });
+      return <span data-id={id}>{id}</span>;
+    }
+
+    function RemoveSecondSiblingApp() {
+      let showSecond = true;
+      return (
+        <div>
+          <SiblingChild id="first" />
+          {showSecond ? <SiblingChild id="second" /> : null}
+          <button id="remove-second" onClick={() => { showSecond = false; }}>remove second</button>
+        </div>
+      );
+    }
+
+    AEUI.init(RemoveSecondSiblingApp, container);
+    expect(cleanups).toEqual([]);
+
+    container.querySelector('#remove-second').click();
+    AEUI._tick();
+
+    expect(cleanups).toEqual(['second']);
+    expect(container.querySelector('span[data-id="first"]')).not.toBeNull();
+    expect(container.querySelector('span[data-id="second"]')).toBeNull();
+  });
+});
+
+// ── DOM 타입 교체 시 내부 컴포넌트 unmount ───
+
+describe('DOM 타입 교체 시 내부 컴포넌트 cleanup 실행', () => {
+  it('부모 DOM 태그가 바뀌면 내부 자식 컴포넌트의 cleanup이 실행됨', () => {
+    const cleanups = [];
+
+    function InnerChild() {
+      clean(() => { cleanups.push('inner-cleaned'); });
+      return <span>inner</span>;
+    }
+
+    function TypeSwitchApp() {
+      let useSection = false;
+      return (
+        <div>
+          {useSection
+            ? <section><p>replaced</p></section>
+            : <div id="old-wrapper"><InnerChild /></div>
+          }
+          <button id="switch-btn" onClick={() => { useSection = true; }}>switch</button>
+        </div>
+      );
+    }
+
+    AEUI.init(TypeSwitchApp, container);
+    expect(container.querySelector('span').textContent).toBe('inner');
+    expect(cleanups).toEqual([]);
+
+    container.querySelector('#switch-btn').click();
+    AEUI._tick();
+
+    expect(cleanups).toEqual(['inner-cleaned']);
+    expect(container.querySelector('span')).toBeNull();
+    expect(container.querySelector('section p').textContent).toBe('replaced');
+  });
+
+  it('DOM 타입 교체 시 뒤 형제 컴포넌트 상태는 유지됨', () => {
+    function Counter({ id }) {
+      let count = 0;
+      return (
+        <button className={id} onClick={() => { count++; }}>
+          {id}:{count}
+        </button>
+      );
+    }
+
+    function PreserveSiblingStateApp() {
+      let useSection = false;
+      return (
+        <div>
+          {useSection
+            ? <section><Counter id="B" /></section>
+            : <div><Counter id="A" /></div>
+          }
+          <Counter id="C" />
+          <button id="switch-preserve" onClick={() => { useSection = true; }}>switch</button>
+        </div>
+      );
+    }
+
+    AEUI.init(PreserveSiblingStateApp, container);
+
+    const cButton = () => container.querySelector('button.C');
+    cButton().click();
+    AEUI._tick();
+    expect(cButton().textContent).toBe('C:1');
+
+    container.querySelector('#switch-preserve').click();
+    AEUI._tick();
+
+    expect(cButton().textContent).toBe('C:1');
+  });
+});
