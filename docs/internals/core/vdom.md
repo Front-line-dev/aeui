@@ -253,6 +253,6 @@ Fragment는 함수이지만, Babel 플러그인이 이를 일반 컴포넌트로
 
 ## 관련 코드 위치
 
-- `createVNode`: `packages/core/src/core.js` L128-L133
-- `createElement` alias: `packages/core/src/core.js` L628
-- `Fragment`: `packages/core/src/core.js` L629
+- `createVNode`: `packages/core/src/core.js` L30-L35
+- `createElement` alias: `packages/core/src/core.js` L74
+- `Fragment`: `packages/core/src/core.js` L75

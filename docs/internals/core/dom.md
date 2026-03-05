@@ -283,6 +283,6 @@ delete로 모든 key를 먼저 삭제하므로, 이전에 `{ name: "A", count: 1
 
 ## 관련 코드 위치
 
-- `_createDomNode`: `packages/core/src/core.js` L335-L348
-- `_updateDomProps`: `packages/core/src/core.js` L355-L426
-- `updateProps`: `packages/core/src/core.js` L350-L353
+- `_createDomNode`: `packages/core/src/reconciler.js` L5-L18
+- `_updateDomProps`: `packages/core/src/reconciler.js` L25-L96
+- `updateProps`: `packages/core/src/reconciler.js` L20-L23

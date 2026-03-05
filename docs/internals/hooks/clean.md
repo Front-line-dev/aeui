@@ -105,13 +105,16 @@ function MultiResource() {
 
 ```javascript
 export function clean(callback) {
-  const instance = AEUI._currentInstance;  // 현재 처리 중인 컴포넌트 인스턴스
-  if (!instance) return;                   // setup 밖에서 호출되면 무시
-  instance.cleanups.push(callback);        // cleanups 배열에 추가
+  const runtime = getRuntimeContext();
+  if (!runtime) return;
+
+  const instance = runtime.getCurrentInstance();  // 현재 처리 중인 컴포넌트 인스턴스
+  if (!instance) return;                          // setup 밖에서 호출되면 무시
+  instance.cleanups.push(callback);               // cleanups 배열에 추가
 }
 ```
 
-`watch`와 동일하게, `_currentInstance`를 통해 "현재 어떤 컴포넌트의 setup에서 호출되고 있는지"를 판단한다.
+`watch`와 동일하게, `runtime.js`를 통해 "현재 어떤 컴포넌트의 setup에서 호출되고 있는지"를 판단한다.
 
 `instance.cleanups`는 단순한 함수 배열이다. 새 callback이 호출될 때마다 배열 끝에 추가된다.
 
@@ -187,5 +190,6 @@ AEUI에서는 컴포넌트 함수(setup)가 한 번만 실행되므로, clean도
 
 ## 관련 코드 위치
 
-- `clean` 함수: `packages/core/src/hooks.js` L17-L21
-- cleanup 실행: `packages/core/src/core.js` `_unmount`
+- `clean` 함수: `packages/core/src/hooks.js`
+- runtime bridge: `packages/core/src/runtime.js`
+- cleanup 실행: `packages/core/src/reconciler.js` `_unmount`

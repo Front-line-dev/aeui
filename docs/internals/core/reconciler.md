@@ -450,9 +450,9 @@ key 기반 비교가 도입되면 노드를 key로 식별하여 이동/삽입/�
 
 ## 관련 코드 위치
 
-- `_reconcile`: `packages/core/src/core.js` L543-L735
-- `_getDomNodeCount`: `packages/core/src/core.js` L93-L126
-- `_countComponentNodes`: `packages/core/src/core.js` L476-L488
-- `_removeComponentInstances`: `packages/core/src/core.js` L490-L496
-- `_alignComponentInstances`: `packages/core/src/core.js` L502-L525
-- `_unmountVNode`: `packages/core/src/core.js` L530-L541
+- `_reconcile`: `packages/core/src/reconciler.js` L178-L371
+- `_getDomNodeCount`: `packages/core/src/runtime.js`
+- `_countComponentNodes`: `packages/core/src/reconciler.js` L111-L123
+- `_removeComponentInstances`: `packages/core/src/reconciler.js` L125-L131
+- `_alignComponentInstances`: `packages/core/src/reconciler.js` L137-L160
+- `_unmountVNode`: `packages/core/src/reconciler.js` L165-L176

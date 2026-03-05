@@ -120,9 +120,12 @@ function Counter() {
 ```javascript
 // hooks.js
 export function watch(callback, depsGetter) {
-  const instance = AEUI._currentInstance;  // ← "지금 어떤 컴포넌트?"
+  const runtime = getRuntimeContext();
+  if (!runtime) return;
+
+  const instance = runtime.getCurrentInstance();  // ← "지금 어떤 컴포넌트?"
   if (instance) {
-    instance.watchStates.push({ ... });    // ← 그 컴포넌트의 watcher 목록에 등록
+    instance.watchStates.push({ ... });           // ← 그 컴포넌트의 watcher 목록에 등록
   }
 }
 ```
@@ -254,7 +257,8 @@ if (instance._childCursor < instance.children.length) {
 
 ## 관련 코드 위치
 
-- `createInstance`: `packages/core/src/core.js` L17-L86
-- `instance.update()`: `packages/core/src/core.js` L31-L75
-- `_currentInstance` 선언: `packages/core/src/core.js` L10
-- `_currentInstance` 참조 (hooks): `packages/core/src/hooks.js` L4
+- `createInstance`: `packages/core/src/runtime.js`
+- `instance.update()`: `packages/core/src/runtime.js`
+- `_currentInstance` 선언: `packages/core/src/core.js` L22
+- `_currentInstance` 참조 (hooks): `packages/core/src/hooks.js` (`runtime.js` 경유)
+- runtime bridge: `packages/core/src/runtime.js`

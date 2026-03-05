@@ -156,5 +156,5 @@ instance.cleanups = [];
 
 ## 관련 코드 위치
 
-- `_unmount`: `packages/core/src/core.js` L463-L474
-- `clean` 훅 (cleanup 등록): `packages/core/src/hooks.js` L17-L21
+- `_unmount`: `packages/core/src/reconciler.js` L98-L109
+- `clean` 훅 (cleanup 등록): `packages/core/src/hooks.js`

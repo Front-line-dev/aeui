@@ -72,7 +72,7 @@ seen.set(a, b);
 if (Array.isArray(a)) {
   if (!Array.isArray(b) || a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    if (!this._deepEqual(a[i], b[i], seen)) return false;  // 각 요소를 재귀 비교
+    if (!_deepEqual(a[i], b[i], seen)) return false;  // 각 요소를 재귀 비교
   }
   return true;
 }
@@ -106,7 +106,7 @@ if (a instanceof RegExp) {
 if (a instanceof Map) {
   if (!(b instanceof Map) || a.size !== b.size) return false;
   for (const [key, val] of a) {
-    if (!b.has(key) || !this._deepEqual(val, b.get(key), seen)) return false;
+    if (!b.has(key) || !_deepEqual(val, b.get(key), seen)) return false;
   }
   return true;
 }
@@ -133,7 +133,7 @@ if (a instanceof Set) {
 
       // Set 후보 매칭은 백트래킹이 필요하므로 seen 상태를 분리한다.
       const trialSeen = new Map(activeSeen);
-      if (this._deepEqual(val, bValues[i], trialSeen)) {
+      if (_deepEqual(val, bValues[i], trialSeen)) {
         matchedIndex = i;
         matchedSeen = trialSeen;
         break;
@@ -164,7 +164,7 @@ const keysB = Object.keys(b);
 if (keysA.length !== keysB.length) return false;
 
 for (const key of keysA) {
-  if (!keysB.includes(key) || !this._deepEqual(a[key], b[key], seen)) return false;
+  if (!keysB.includes(key) || !_deepEqual(a[key], b[key], seen)) return false;
 }
 return true;
 ```
@@ -208,7 +208,7 @@ watcher의 `oldDeps`에 이전 의존성 값을 저장할 때, 참조 복사(얕
 ### 코드
 
 ```javascript
-_deepClone(v, seen = new WeakMap()) {
+function _deepClone(v, seen = new WeakMap()) {
   if (v === null || typeof v !== 'object') return v;   // 원시값
 
   // 순환 참조 방어: 이미 복제한 객체면 그 복제본을 반환
@@ -217,7 +217,7 @@ _deepClone(v, seen = new WeakMap()) {
   if (Array.isArray(v)) {
     const cloned = [];
     seen.set(v, cloned);                              // 빈 배열을 먼저 등록
-    v.forEach(item => cloned.push(this._deepClone(item, seen)));
+    v.forEach(item => cloned.push(_deepClone(item, seen)));
     return cloned;
   }
 
@@ -227,14 +227,14 @@ _deepClone(v, seen = new WeakMap()) {
   if (v instanceof Map) {
     const cloned = new Map();
     seen.set(v, cloned);
-    v.forEach((val, k) => cloned.set(k, this._deepClone(val, seen)));
+    v.forEach((val, k) => cloned.set(k, _deepClone(val, seen)));
     return cloned;
   }
 
   if (v instanceof Set) {
     const cloned = new Set();
     seen.set(v, cloned);
-    v.forEach(item => cloned.add(this._deepClone(item, seen)));
+    v.forEach(item => cloned.add(_deepClone(item, seen)));
     return cloned;
   }
 
@@ -242,7 +242,7 @@ _deepClone(v, seen = new WeakMap()) {
   const cloned = {};
   seen.set(v, cloned);
   for (const [k, val] of Object.entries(v)) {
-    cloned[k] = this._deepClone(val, seen);
+    cloned[k] = _deepClone(val, seen);
   }
   return cloned;
 }
@@ -294,5 +294,5 @@ cloned.self === cloned;     // ✅ true — 복제본도 자기 자신을 참조
 
 ## 관련 코드 위치
 
-- `_deepEqual`: `packages/core/src/core.js` L238-L311
-- `_deepClone`: `packages/core/src/core.js` L313-L349
+- `_deepEqual`: `packages/core/src/deep-compare.js` L5-L78
+- `_deepClone`: `packages/core/src/deep-compare.js` L80-L116

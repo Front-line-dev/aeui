@@ -38,10 +38,6 @@
 
 비동기 렌더링 대비, 단일 전역 변수를 스택 구조로 변경.
 
-### `core.js` 파일 분할
-
-460줄 단일 파일을 책임별로 분리: `vdom.js`, `reconciler.js`, `dom.js`, `scheduler.js`, `util.js`, `instance.js`.
-
 ### 빌드 설정 개선
 
 - Rollup에 minification 플러그인 추가 (`@rollup/plugin-terser`)

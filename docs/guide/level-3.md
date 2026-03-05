@@ -10,24 +10,23 @@
 
 ```
 packages/core/src/
-├── core.js          모든 런타임 로직
-├── hooks.js         watch, clean 훅
-├── babel-plugin.js  Babel 변환 플러그인
-└── index.js         진입점 (re-export)
+├── core.js            진입점 (AEUI 객체 조립)
+├── deep-compare.js    깊은 비교/복사 유틸리티
+├── reconciler.js      DOM 조작, reconcile, unmount
+├── runtime.js         hooks 브릿지, watcher, 인스턴스, 스케줄러
+├── hooks.js           watch, clean 훅
+├── babel-plugin.js    Babel 변환 플러그인
+└── index.js           진입점 (re-export)
 ```
 
-### core.js 내부 모듈 (물리적으로는 하나의 파일)
+### 모듈 구성
 
-| 모듈 | 함수 | 역할 | 상세 문서 |
+| 파일 | 함수 | 역할 | 상세 문서 |
 |------|------|------|-----------|
-| VNode | `createVNode`, `createElement`, `Fragment` | 가상 DOM 객체 생성 | `internals/core/vdom.md` |
-| Instance | `createInstance`, `instance.update()` | 컴포넌트 런타임 상태 관리 | `internals/core/instance.md` |
-| Scheduler | `init`, `_tick` | 렌더링 루프 관리 | `internals/core/scheduler.md` |
-| Deep Compare | `_deepEqual`, `_deepClone` | 깊은 비교/복사 유틸리티 | `internals/core/deep-compare.md` |
-| Watcher | `_runComponentWatchers` | 의존성 변경 감지 → 콜백 실행 | `internals/core/watcher.md` |
-| DOM | `_createDomNode`, `_updateDomProps`, `updateProps` | 실제 DOM 조작 | `internals/core/dom.md` |
-| Reconciler | `_reconcile`, `_getDomNodeCount` | VNode 비교 → DOM 최소 갱신 | `internals/core/reconciler.md` |
-| Unmount | `_unmount` | 컴포넌트 정리 | `internals/core/unmount.md` |
+| `core.js` | `createVNode`, `createElement`, `Fragment` | 진입점 + VNode 생성 | `internals/core/vdom.md` |
+| `runtime.js` | `setRuntimeContext`, `getRuntimeContext`, `_runComponentWatchers`, `createInstance`, `instance.update()`, `init`, `_tick` | hooks 브릿지 + watcher 실행 + 인스턴스 관리 + 스케줄러 | `internals/core/instance.md`, `internals/core/watcher.md`, `internals/core/scheduler.md` |
+| `deep-compare.js` | `_deepEqual`, `_deepClone` | 깊은 비교/복사 유틸리티 | `internals/core/deep-compare.md` |
+| `reconciler.js` | `_reconcile`, `_createDomNode`, `_updateDomProps`, `_unmount` | DOM 조작 + VNode 비교 | `internals/core/reconciler.md`, `internals/core/dom.md`, `internals/core/unmount.md` |
 
 ---
 

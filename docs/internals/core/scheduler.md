@@ -100,7 +100,7 @@ AEUI = {
 
 ## 관련 코드
 
-- `packages/core/src/core.js`
+- `packages/core/src/runtime.js`
   - `init`
   - `render`
   - `_startScheduler`, `_stopScheduler`, `_onAnimationFrame`

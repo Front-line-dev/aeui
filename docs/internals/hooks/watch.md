@@ -95,7 +95,10 @@ watch(() => {
 
 ```javascript
 export function watch(callback, depsGetter) {
-  const instance = AEUI._currentInstance;  // 현재 처리 중인 컴포넌트 인스턴스
+  const runtime = getRuntimeContext();
+  if (!runtime) return;
+
+  const instance = runtime.getCurrentInstance();  // 현재 처리 중인 컴포넌트 인스턴스
   if (instance) {
     // depsGetter가 이미 함수이면 그대로, 배열이면 함수로 감싸기
     const initialDeps =
@@ -105,15 +108,15 @@ export function watch(callback, depsGetter) {
       callback,
       getDeps:
         typeof depsGetter === "function" ? depsGetter : () => depsGetter,
-      oldDeps: AEUI._deepClone(initialDeps),  // 초기 값의 깊은 복사 스냅샷
+      oldDeps: runtime.deepClone(initialDeps),  // 초기 값의 깊은 복사 스냅샷
     });
   }
 }
 ```
 
-#### `_currentInstance`는 어떻게 설정되나
+#### `runtime.js`를 통한 인스턴스 접근
 
-`watch()`가 호출되는 시점에는 `createInstance`가 실행 중이며, 그 안에서 `AEUI._currentInstance`가 현재 인스턴스로 설정되어 있다. 덕분에 `watch`가 어느 컴포넌트에 속하는지 알 수 있다.
+`watch()`가 호출되는 시점에는 `createInstance`가 실행 중이며, 그 안에서 `AEUI._currentInstance`가 현재 인스턴스로 설정되어 있다. `hooks.js`는 `runtime.js`를 통해 이 값에 간접 접근하므로, `core.js`를 직접 import하지 않아 순환 참조를 피한다.
 
 ```
 createInstance 시작
@@ -210,5 +213,6 @@ function Counter() {
 ## 관련 코드 위치
 
 - `watch` 함수: `packages/core/src/hooks.js` L3-L15
-- watcher 실행 로직: `packages/core/src/core.js` `_runComponentWatchers`
+- runtime bridge: `packages/core/src/runtime.js`
+- watcher 실행 로직: `packages/core/src/runtime.js` (`AEUI._runComponentWatchers` 통해 호출)
 - Babel 변환 (deps 함수 래핑): `packages/core/src/babel-plugin.js`
