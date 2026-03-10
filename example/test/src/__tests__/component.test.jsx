@@ -19,11 +19,11 @@ afterEach(() => {
   AEUI._rafId = null;
   AEUI._frameDelay = 1;
   AEUI._framesUntilNextTick = 0;
-  AEUI._rootInstance = null;
-  AEUI._previousVNode = null;
+  AEUI._rootNode = null;
   AEUI._RootComponent = null;
   AEUI._containerElement = null;
   AEUI._isRendering = false;
+  AEUI._currentComponentNode = null;
   container.remove();
 });
 
@@ -330,6 +330,82 @@ describe('리스트 렌더링', () => {
     expect(lis.length).toBe(2);
     expect(lis[0].textContent).toBe('A');
     expect(lis[1].textContent).toBe('B');
+  });
+});
+
+describe('key 기반 reconciliation', () => {
+  it('keyed 컴포넌트 재정렬 시 상태와 props.key를 함께 유지함', () => {
+    function KeyedCounter(props) {
+      let count = 0;
+      return (
+        <button className={`counter-${props.key}`} onClick={() => { count++; }}>
+          {props.key}:{count}
+        </button>
+      );
+    }
+
+    function KeyedComponentListApp() {
+      let items = ['a', 'b'];
+      return (
+        <div>
+          <div id="keyed-components">
+            {items.map((item) => <KeyedCounter key={item} />)}
+          </div>
+          <button id="reverse-components" onClick={() => { items = [...items].reverse(); }}>reverse</button>
+        </div>
+      );
+    }
+
+    AEUI.init(KeyedComponentListApp, container);
+
+    container.querySelector('.counter-b').click();
+    AEUI._tick();
+    expect(Array.from(container.querySelectorAll('#keyed-components button')).map(node => node.textContent)).toEqual(['a:0', 'b:1']);
+
+    container.querySelector('#reverse-components').click();
+    AEUI._tick();
+
+    expect(Array.from(container.querySelectorAll('#keyed-components button')).map(node => node.textContent)).toEqual(['b:1', 'a:0']);
+    expect(container.querySelector('.counter-b').textContent).toBe('b:1');
+  });
+
+  it('keyed DOM 래퍼 재정렬 시 내부 컴포넌트 상태를 유지함', () => {
+    function InnerCounter({ label }) {
+      let count = 0;
+      return (
+        <button className={`inner-${label}`} onClick={() => { count++; }}>
+          {label}:{count}
+        </button>
+      );
+    }
+
+    function KeyedWrapperApp() {
+      let items = ['a', 'b'];
+      return (
+        <div>
+          <ul id="wrapper-list">
+            {items.map((item) => (
+              <li key={item} data-key={item}>
+                <InnerCounter label={item} />
+              </li>
+            ))}
+          </ul>
+          <button id="reverse-wrappers" onClick={() => { items = [...items].reverse(); }}>reverse</button>
+        </div>
+      );
+    }
+
+    AEUI.init(KeyedWrapperApp, container);
+
+    container.querySelector('.inner-b').click();
+    AEUI._tick();
+    expect(Array.from(container.querySelectorAll('#wrapper-list button')).map(node => node.textContent)).toEqual(['a:0', 'b:1']);
+
+    container.querySelector('#reverse-wrappers').click();
+    AEUI._tick();
+
+    expect(Array.from(container.querySelectorAll('#wrapper-list li')).map(node => node.getAttribute('data-key'))).toEqual(['b', 'a']);
+    expect(Array.from(container.querySelectorAll('#wrapper-list button')).map(node => node.textContent)).toEqual(['b:1', 'a:0']);
   });
 });
 

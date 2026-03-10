@@ -135,52 +135,57 @@ return <p>{label}</p>;  // ← label이 최신이어야 정확한 렌더
 
 ---
 
-## 6. `_currentInstance` 전역 변수 방식
+## 6. 현재 컴포넌트 컨텍스트 전역 방식
 
 ### 결정
 
-훅(`watch`, `clean`)이 현재 컴포넌트를 알기 위해 **단일 전역 변수**를 사용한다.
+훅(`watch`, `clean`)이 현재 컴포넌트를 알기 위해 **단일 전역 컨텍스트**를 사용한다. 현재 런타임 모델에서 이 컨텍스트의 실제 대상은 "컴포넌트 인스턴스"가 아니라 **component RuntimeNode**다.
 
 ### 이유
 
-React도 동일한 패턴을 사용한다 (`ReactCurrentDispatcher`). 훅 함수에 인스턴스를 직접 전달하면 사용자 API가 복잡해진다:
+React도 동일한 패턴을 사용한다 (`ReactCurrentDispatcher`). 훅 함수에 현재 node를 직접 전달하면 사용자 API가 복잡해진다:
 
 ```javascript
-// ❌ 인스턴스를 명시적으로 전달하면
-watch(instance, () => { ... }, [count]);  // 사용자가 불편
+// ❌ 현재 node를 명시적으로 전달하면
+watch(node, () => { ... }, [count]);  // 사용자가 불편
 
 // ✅ 전역 변수로 암묵적 전달
 watch(() => { ... }, [count]);            // 깔끔한 API
 ```
 
-현재 AEUI의 모든 코드는 동기적으로 실행되므로, 전역 변수가 덮어씌워지는 문제는 발생하지 않는다.
+현재 AEUI의 모든 코드는 동기적으로 실행되므로, 전역 컨텍스트가 덮어씌워지는 문제는 발생하지 않는다.
 
 ### 향후 계획
 
-비동기 렌더링이나 Concurrent Mode를 도입하게 되면 **스택 구조**로 전환이 필요하다. 관련 항목은 `docs/roadmap.md`에서 관리한다.
+비동기 렌더링이나 Concurrent Mode를 도입하게 되면 **컨텍스트 스택 구조**로 전환이 필요하다. Babel 플러그인과의 내부 호환 때문에 `_currentInstance` alias가 남아 있을 수는 있지만, 개념적으로는 `_currentComponentNode`가 기준이다. 관련 항목은 `docs/roadmap.md`에서 관리한다.
 
 ---
 
-## 7. 인덱스 기반 Reconciliation (Key 미지원)
+## 7. RuntimeNode 기반 Reconciliation (선택적 key 지원)
 
 ### 결정
 
-`_reconcile`에서 `parentElement.childNodes[index]`로 DOM 노드에 직접 접근하는 **인덱스 기반 비교만** 사용한다.
+`_reconcile`은 `prevVNode + index` 비교가 아니라 **old RuntimeNode + new VNode** 비교를 사용한다. 형제 목록 diff는 RuntimeNode 배열 기준으로 처리하며, `key`가 있는 형제는 key로 우선 매칭하고 `key`가 없는 형제는 순서 기반으로 fallback 한다.
 
 ### 이유
 
-초기 구현의 단순성을 위한 선택이다. key 기반 reconciliation은 노드 매핑, 이동 감지, 삭제/삽입 분리 등의 로직이 필요하여 구현 복잡도가 높다.
+초기 인덱스 기반 모델은 구현은 단순했지만, DOM 재배치와 컴포넌트 상태 보존이 부모의 순서 배열에 과도하게 의존했다. RuntimeNode가 자기 subtree와 DOM 범위를 직접 소유하도록 바꾸면:
+
+- DOM 이동과 상태 이동을 같은 트리 연산으로 다룰 수 있고
+- Fragment/배열/DOM/컴포넌트를 같은 diff 모델에서 처리할 수 있으며
+- key 기반 재정렬에서도 상태 보존 규칙을 더 직접적으로 설명할 수 있다.
 
 ### 트레이드오프
 
 | 장점 | 단점 |
 |------|------|
-| 구현이 단순 | 리스트 중간 삽입/삭제 시 비효율적 |
-| 코드 이해가 쉬움 | 컴포넌트 상태가 예기치 않게 파괴될 수 있음 |
+| DOM ownership과 상태 ownership이 같은 트리 위에서 관리됨 | node 객체 수가 증가함 |
+| 선택적 key reorder에서 상태 보존 규칙이 자연스러움 | `firstDom/lastDom` 범위를 계속 유지해야 함 |
+| Fragment/배열을 같은 모델에서 처리 가능 | 런타임 구현 복잡도가 초기 모델보다 큼 |
 
 ### 향후 계획
 
-key 기반 reconciliation 도입 예정이며, 관련 항목은 `docs/roadmap.md`에서 관리한다.
+현 모델은 comment anchor 없이 `firstDom/lastDom`로 DOM 범위를 추적한다. 장기적으로는 비동기 렌더링 도입 시 이 범위 추적과 현재 컴포넌트 컨텍스트 관리가 함께 재검토될 수 있다.
 
 ---
 

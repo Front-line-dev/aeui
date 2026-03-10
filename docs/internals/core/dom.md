@@ -93,7 +93,7 @@ if (key === 'children' || key === 'key' || key === 'ref') continue;
 | key | 이유 |
 |-----|------|
 | `children` | `createVNode`이 children을 props에도 저장하지만, 이것은 DOM 속성이 아니다. 자식 요소 처리는 `_reconcile`이 담당한다 |
-| `key` | 향후 key 기반 reconciliation에 사용될 예정. DOM 속성으로 설정하면 안 된다 |
+| `key` | reconciliation에서 형제 노드를 식별하는 내부 힌트다. DOM 속성으로 설정하면 안 된다 |
 | `ref` | 향후 DOM 참조 기능에 사용될 예정. DOM 속성으로 설정하면 안 된다 |
 
 ### 변경 감지 (불필요한 DOM 조작 방지)

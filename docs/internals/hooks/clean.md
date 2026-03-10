@@ -108,28 +108,28 @@ export function clean(callback) {
   const runtime = getRuntimeContext();
   if (!runtime) return;
 
-  const instance = runtime.getCurrentInstance();  // 현재 처리 중인 컴포넌트 인스턴스
-  if (!instance) return;                          // setup 밖에서 호출되면 무시
-  instance.cleanups.push(callback);               // cleanups 배열에 추가
+  const node = runtime.getCurrentComponentNode(); // 현재 처리 중인 컴포넌트 node
+  if (!node) return;                              // setup 밖에서 호출되면 무시
+  node.cleanups.push(callback);                   // cleanups 배열에 추가
 }
 ```
 
-`watch`와 동일하게, `runtime.js`를 통해 "현재 어떤 컴포넌트의 setup에서 호출되고 있는지"를 판단한다.
+`watch`와 동일하게, `runtime.js`를 통해 "현재 어떤 component node의 setup에서 호출되고 있는지"를 판단한다.
 
-`instance.cleanups`는 단순한 함수 배열이다. 새 callback이 호출될 때마다 배열 끝에 추가된다.
+`node.cleanups`는 단순한 함수 배열이다. 새 callback이 호출될 때마다 배열 끝에 추가된다.
 
 ### 실행 과정 (unmount 시)
 
-`_unmount(instance)`가 호출될 때 cleanups가 실행된다:
+`_unmountNode(node)`가 호출될 때 cleanups가 실행된다:
 
 ```javascript
-_unmount(instance) {
-  instance.isMounted = false;
-  instance.cleanups.forEach((cleanup) => {
+_unmountNode(node) {
+  node.isMounted = false;
+  node.cleanups.forEach((cleanup) => {
     try { cleanup(); } catch (e) { console.error('[AEUI] Cleanup error:', e); }
   });
-  instance.children.forEach(child => this._unmount(child));
-  instance.cleanups = [];
+  node.children.forEach(child => this._unmountNode(child));
+  node.cleanups = [];
 }
 ```
 
@@ -153,7 +153,7 @@ clean(() => clearInterval(id));              // 정상 실행됨
 
 ### clean은 setup에서만 호출 가능
 
-`watch`와 마찬가지로, 컴포넌트의 setup 단계에서만 호출해야 한다. 이벤트 핸들러나 타이머 콜백 안에서 호출하면 `_currentInstance`가 `null`이므로 등록되지 않는다.
+`watch`와 마찬가지로, 컴포넌트의 setup 단계에서만 호출해야 한다. 이벤트 핸들러나 타이머 콜백 안에서 호출하면 `_currentComponentNode`가 `null`이므로 등록되지 않는다.
 
 ```jsx
 function Example() {

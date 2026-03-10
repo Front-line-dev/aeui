@@ -1,11 +1,21 @@
 /**
- * Stateful runtime internals: hooks bridge, watcher execution,
- * instance lifecycle, DOM node counting, and scheduler loop.
+ * Stateful runtime internals: hooks bridge, node creation,
+ * watcher execution, root reconciliation, and scheduler loop.
  */
 
 const MAX_FRAME_DELAY = 60;
 
 let runtimeContext = null;
+
+function getVNodeKey(vnode) {
+  if (vnode == null || typeof vnode !== 'object' || Array.isArray(vnode)) return null;
+  const key = vnode.props ? vnode.props.key : undefined;
+  return key == null ? null : key;
+}
+
+function isFragmentVNode(AEUI, vnode) {
+  return Array.isArray(vnode) || (vnode && typeof vnode === 'object' && vnode.tag === AEUI.Fragment);
+}
 
 export function setRuntimeContext(context) {
   runtimeContext = context;
@@ -15,10 +25,24 @@ export function getRuntimeContext() {
   return runtimeContext;
 }
 
-export function _runComponentWatchers(instance) {
-  if (!instance.watchStates) return;
+export function createRootNode(containerElement) {
+  return {
+    kind: 'root',
+    key: null,
+    vnode: null,
+    parent: null,
+    parentDom: containerElement,
+    children: [],
+    firstDom: null,
+    lastDom: null,
+    isMounted: true,
+  };
+}
 
-  instance.watchStates.forEach((watcher) => {
+export function _runComponentWatchers(node) {
+  if (!node || !node.watchStates) return;
+
+  node.watchStates.forEach((watcher) => {
     try {
       const newDeps = watcher.getDeps();
       const hasChanged =
@@ -37,122 +61,90 @@ export function _runComponentWatchers(instance) {
   });
 }
 
-export function createInstance(vnode, parentInstance = null) {
-  const AEUI = this;
-  const instance = {
+export function createNode(vnode, parentNode = null, parentDom = null) {
+  const node = {
+    kind: null,
+    key: getVNodeKey(vnode),
     vnode,
-    render: null,
-    prevRenderedVNode: null,
-    watchStates: [],
-    cleanups: [],
-    props: vnode.props || {},
-    parent: parentInstance,
+    parent: parentNode,
+    parentDom,
     children: [],
-    _domNodeCount: 0,
-    parentElement: null,
+    firstDom: null,
+    lastDom: null,
     isMounted: true,
-
-    update() {
-      if (!this.isMounted) return;
-
-      let startIndex = 0;
-      if (this.parent) {
-        const siblings = this.parent.children;
-        const instanceIndex = siblings.indexOf(this);
-
-        for (let i = 0; i < instanceIndex; i++) {
-          startIndex += AEUI._getDomNodeCountForInstance(siblings[i]);
-        }
-      }
-
-      this._childCursor = 0;
-
-      let newVNode;
-      AEUI._currentInstance = this;
-      try {
-        AEUI._runComponentWatchers(this);
-        newVNode = this.render(this.props);
-      } finally {
-        AEUI._currentInstance = null;
-      }
-
-      AEUI._reconcile(
-        this.parentElement,
-        newVNode,
-        this.prevRenderedVNode,
-        startIndex,
-        this
-      );
-
-      this.prevRenderedVNode = newVNode;
-
-      if (this._childCursor < this.children.length) {
-        const removed = this.children.splice(this._childCursor);
-        removed.forEach((child) => AEUI._unmount(child));
-      }
-    },
   };
 
-  AEUI._currentInstance = instance;
+  if (vnode == null || typeof vnode === 'boolean') {
+    return null;
+  }
+
+  if (typeof vnode !== 'object') {
+    node.kind = 'text';
+    node.value = String(vnode);
+    node.dom = null;
+    return node;
+  }
+
+  if (isFragmentVNode(this, vnode)) {
+    node.kind = 'fragment';
+    return node;
+  }
+
+  if (typeof vnode.tag === 'string') {
+    node.kind = 'host';
+    node.tag = vnode.tag;
+    node.dom = null;
+    node.props = vnode.props || {};
+    return node;
+  }
+
+  node.kind = 'component';
+  node.component = vnode.tag;
+  node.props = vnode.props || {};
+  node.watchStates = [];
+  node.cleanups = [];
+  node.renderedNode = null;
+  node.render = null;
+
+  this._currentComponentNode = node;
+  this._currentInstance = node;
   try {
-    instance.render = vnode.tag(vnode.props);
+    node.render = vnode.tag(vnode.props);
   } finally {
-    AEUI._currentInstance = null;
+    this._currentComponentNode = null;
+    this._currentInstance = null;
   }
 
-  return instance;
+  return node;
 }
 
-export function _getDomNodeCountForInstance(instance) {
-  if (!instance) return 0;
-  return this._getDomNodeCount(instance.prevRenderedVNode, instance, { value: 0 });
-}
+export function _reconcileRoot() {
+  if (!this._rootNode || !this._containerElement || !this._RootComponent) return;
 
-export function _getDomNodeCount(vnode, ownerInstance = null, cursor = null) {
-  if (vnode == null || typeof vnode === 'boolean') return 0;
-  if (typeof vnode !== 'object') return 1;
+  const rootVNode = this.createVNode(this._RootComponent);
+  const previousRootChild = this._rootNode.children[0] || null;
+  const nextRootChild = this._reconcile(
+    this._containerElement,
+    previousRootChild,
+    rootVNode,
+    null,
+    this._rootNode
+  );
 
-  if (Array.isArray(vnode)) {
-    return vnode.reduce((count, child) => (
-      count + this._getDomNodeCount(child, ownerInstance, cursor)
-    ), 0);
-  }
-
-  if (typeof vnode.tag === 'function') {
-    if (!ownerInstance || !cursor) return 1;
-
-    const childInstance = ownerInstance.children[cursor.value++];
-    if (!childInstance) return 0;
-
-    if (typeof childInstance._domNodeCount === 'number') {
-      return childInstance._domNodeCount;
-    }
-
-    return this._getDomNodeCount(
-      childInstance.prevRenderedVNode,
-      childInstance,
-      { value: 0 }
-    );
-  }
-
-  const children = vnode.children || [];
-  for (let i = 0; i < children.length; i++) {
-    this._getDomNodeCount(children[i], ownerInstance, cursor);
-  }
-
-  return 1;
+  this._rootNode.children = nextRootChild ? [nextRootChild] : [];
+  this._rootNode.firstDom = nextRootChild ? nextRootChild.firstDom : null;
+  this._rootNode.lastDom = nextRootChild ? nextRootChild.lastDom : null;
 }
 
 export function init(RootComponent, containerElement) {
   this._stopScheduler();
-  if (this._rootInstance) {
-    this._unmount(this._rootInstance);
+  if (this._rootNode && this._rootNode.children[0]) {
+    this._unmountNode(this._rootNode.children[0]);
   }
 
   this._RootComponent = RootComponent;
   this._containerElement = containerElement;
-  this._rootInstance = null;
-  this._previousVNode = null;
+  this._rootNode = createRootNode(containerElement);
   containerElement.innerHTML = '';
 
   const didMutate = this._tick();
@@ -218,26 +210,14 @@ export function _onAnimationFrame() {
 }
 
 export function _tick() {
-  if (!this._RootComponent || !this._containerElement) return false;
+  if (!this._RootComponent || !this._containerElement || !this._rootNode) return false;
   if (this._isRendering) return false;
 
   this._isRendering = true;
   this._didMutate = false;
 
   try {
-    if (this._rootInstance) {
-      this._rootInstance.update();
-    } else {
-      const newVNode = this.createVNode(this._RootComponent);
-      this._reconcile(
-        this._containerElement,
-        newVNode,
-        this._previousVNode || null,
-        0,
-        null
-      );
-      this._previousVNode = newVNode;
-    }
+    this._reconcileRoot();
   } catch (e) {
     console.error('[AEUI] Render error:', e);
   } finally {

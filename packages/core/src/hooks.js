@@ -4,11 +4,11 @@ export function watch(callback, depsGetter) {
   const runtime = getRuntimeContext();
   if (!runtime) return;
 
-  const instance = runtime.getCurrentInstance();
-  if (instance) {
+  const node = runtime.getCurrentComponentNode();
+  if (node) {
     const initialDeps =
       typeof depsGetter === "function" ? depsGetter() : depsGetter;
-    instance.watchStates.push({
+    node.watchStates.push({
       callback,
       getDeps:
         typeof depsGetter === "function" ? depsGetter : () => depsGetter,
@@ -21,7 +21,7 @@ export function clean(callback) {
   const runtime = getRuntimeContext();
   if (!runtime) return;
 
-  const instance = runtime.getCurrentInstance();
-  if (!instance) return;
-  instance.cleanups.push(callback);
+  const node = runtime.getCurrentComponentNode();
+  if (!node) return;
+  node.cleanups.push(callback);
 }

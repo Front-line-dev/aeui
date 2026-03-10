@@ -262,13 +262,13 @@ export default function aeuiTransform({ types: t }) {
               );
             }
             updateLogic.push(
-              t.expressionStatement(
-                t.callExpression(
-                  t.memberExpression(t.identifier("AEUI"), t.identifier("_runComponentWatchers")),
-                  [t.memberExpression(t.identifier("AEUI"), t.identifier("_currentInstance"))]
+                t.expressionStatement(
+                  t.callExpression(
+                    t.memberExpression(t.identifier("AEUI"), t.identifier("_runComponentWatchers")),
+                    [t.memberExpression(t.identifier("AEUI"), t.identifier("_currentComponentNode"))]
+                  )
                 )
-              )
-            );
+              );
 
             // Replace destructured usage in render body
             if (destructuredNames.size > 0) {

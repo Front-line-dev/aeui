@@ -91,20 +91,20 @@ watch(() => {
 
 ### 1단계: 등록 (setup 시 1회)
 
-`watch()`는 컴포넌트의 setup 단계에서 호출되어, 현재 인스턴스의 `watchStates` 배열에 watcher 객체를 등록한다.
+`watch()`는 컴포넌트의 setup 단계에서 호출되어, 현재 component node의 `watchStates` 배열에 watcher 객체를 등록한다.
 
 ```javascript
 export function watch(callback, depsGetter) {
   const runtime = getRuntimeContext();
   if (!runtime) return;
 
-  const instance = runtime.getCurrentInstance();  // 현재 처리 중인 컴포넌트 인스턴스
-  if (instance) {
+  const node = runtime.getCurrentComponentNode();  // 현재 처리 중인 컴포넌트 node
+  if (node) {
     // depsGetter가 이미 함수이면 그대로, 배열이면 함수로 감싸기
     const initialDeps =
       typeof depsGetter === "function" ? depsGetter() : depsGetter;
 
-    instance.watchStates.push({
+    node.watchStates.push({
       callback,
       getDeps:
         typeof depsGetter === "function" ? depsGetter : () => depsGetter,
@@ -114,17 +114,17 @@ export function watch(callback, depsGetter) {
 }
 ```
 
-#### `runtime.js`를 통한 인스턴스 접근
+#### `runtime.js`를 통한 component node 접근
 
-`watch()`가 호출되는 시점에는 `createInstance`가 실행 중이며, 그 안에서 `AEUI._currentInstance`가 현재 인스턴스로 설정되어 있다. `hooks.js`는 `runtime.js`를 통해 이 값에 간접 접근하므로, `core.js`를 직접 import하지 않아 순환 참조를 피한다.
+`watch()`가 호출되는 시점에는 `createNode()`가 component node를 생성하는 중이며, 그 안에서 `AEUI._currentComponentNode`가 현재 node로 설정되어 있다. `hooks.js`는 `runtime.js`를 통해 이 값에 간접 접근하므로, `core.js`를 직접 import하지 않아 순환 참조를 피한다.
 
 ```
-createInstance 시작
-  → _currentInstance = instance
+createNode(component) 시작
+  → _currentComponentNode = node
   → 컴포넌트 함수(setup) 실행
-    → watch() 호출 → instance.watchStates.push(...)  ← 여기
-    → clean() 호출 → instance.cleanups.push(...)
-  → _currentInstance = null
+    → watch() 호출 → node.watchStates.push(...)  ← 여기
+    → clean() 호출 → node.cleanups.push(...)
+  → _currentComponentNode = null
 ```
 
 #### `depsGetter`가 배열과 함수 양쪽을 처리하는 이유
@@ -179,7 +179,7 @@ tick 시작
 
 ### watch는 setup에서만 호출 가능
 
-`watch()`는 컴포넌트의 setup 단계(함수 본문의 최상위)에서만 호출해야 한다. 이벤트 핸들러나 조건문 안에서 호출하면 `_currentInstance`가 `null`이므로 등록되지 않는다.
+`watch()`는 컴포넌트의 setup 단계(함수 본문의 최상위)에서만 호출해야 한다. 이벤트 핸들러나 조건문 안에서 호출하면 `_currentComponentNode`가 `null`이므로 등록되지 않는다.
 
 ```jsx
 function Counter() {

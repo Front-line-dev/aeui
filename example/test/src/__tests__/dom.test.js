@@ -1,6 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AEUI, watch } from 'aeui';
 
+function createRoot(container) {
+  return AEUI.createRootNode(container);
+}
+
+function reconcileRoot(container, root, previousNode, nextVNode) {
+  const nextNode = AEUI._reconcile(container, previousNode, nextVNode, null, root);
+  root.children = nextNode ? [nextNode] : [];
+  root.firstDom = nextNode ? nextNode.firstDom : null;
+  root.lastDom = nextNode ? nextNode.lastDom : null;
+  return nextNode;
+}
+
 describe('_updateDomProps', () => {
   let div;
 
@@ -58,6 +70,18 @@ describe('_updateDomProps', () => {
     AEUI._updateDomProps(div, { id: 'test', 'data-value': '42' });
     expect(div.getAttribute('id')).toBe('test');
     expect(div.getAttribute('data-value')).toBe('42');
+  });
+
+  it('value prop은 DOM property와 attribute를 함께 갱신', () => {
+    const select = document.createElement('select');
+    select.innerHTML = '<option value="PAID">결제 완료</option><option value="DELIVERED">배송 완료</option>';
+
+    AEUI._updateDomProps(select, { value: 'PAID' });
+    expect(select.value).toBe('PAID');
+
+    AEUI._updateDomProps(select, { value: 'DELIVERED' }, { value: 'PAID' });
+    expect(select.value).toBe('DELIVERED');
+    expect(select.getAttribute('value')).toBe('DELIVERED');
   });
 
   it('attribute 제거 (undefined)', () => {
@@ -125,15 +149,10 @@ describe('_reconcile 배열 처리', () => {
   });
 
   it('배열 길이 감소 시 초과 노드 제거', () => {
-    // 초기: 3개 아이템
-    const prev = ['A', 'B', 'C'];
-    prev.forEach(text => {
-      container.appendChild(document.createTextNode(text));
-    });
-
-    // 업데이트: 2개로 줄어듦
+    const root = createRoot(container);
+    let node = reconcileRoot(container, root, null, ['A', 'B', 'C']);
     const next = ['A', 'B'];
-    AEUI._reconcile(container, next, prev, 0, null);
+    node = reconcileRoot(container, root, node, next);
 
     expect(container.childNodes.length).toBe(2);
     expect(container.childNodes[0].nodeValue).toBe('A');
@@ -141,61 +160,229 @@ describe('_reconcile 배열 처리', () => {
   });
 
   it('배열 길이 증가 시 새 노드 추가', () => {
-    // 초기: 2개
-    const prev = ['A', 'B'];
-    prev.forEach(text => {
-      container.appendChild(document.createTextNode(text));
-    });
-
+    const root = createRoot(container);
+    let node = reconcileRoot(container, root, null, ['A', 'B']);
     const next = ['A', 'B', 'C'];
-    AEUI._reconcile(container, next, prev, 0, null);
+    node = reconcileRoot(container, root, node, next);
 
     expect(container.childNodes.length).toBe(3);
     expect(container.childNodes[2].nodeValue).toBe('C');
   });
 });
 
-describe('_unmount', () => {
+describe('_reconcile host controlled props', () => {
+  let container;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+  });
+
+  it('select value는 option children mount 이후에도 올바르게 동기화됨', () => {
+    const root = createRoot(container);
+    const vnode = AEUI.createVNode(
+      'select',
+      { value: 'DELIVERED' },
+      AEUI.createVNode('option', { value: 'PAID' }, '결제 완료'),
+      AEUI.createVNode('option', { value: 'DELIVERED' }, '배송 완료')
+    );
+
+    reconcileRoot(container, root, null, vnode);
+
+    expect(container.querySelector('select').value).toBe('DELIVERED');
+  });
+});
+
+describe('_reconcile key 기반 child matching', () => {
+  let container;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+  });
+
+  function keyedList(items) {
+    return AEUI.createVNode(
+      'ul',
+      { id: 'list' },
+      ...items.map((item) => (
+        AEUI.createVNode('li', item.props || {}, item.text)
+      ))
+    );
+  }
+
+  it('keyed DOM 리스트 재정렬 시 기존 DOM 노드를 재사용함', () => {
+    const root = createRoot(container);
+    const prev = keyedList([
+      { text: 'A', props: { key: 'a', 'data-key': 'a' } },
+      { text: 'B', props: { key: 'b', 'data-key': 'b' } },
+      { text: 'C', props: { key: 'c', 'data-key': 'c' } },
+    ]);
+
+    let node = reconcileRoot(container, root, null, prev);
+    const beforeNodes = Array.from(container.querySelectorAll('li'));
+    const bNode = container.querySelector('[data-key="b"]');
+
+    const next = keyedList([
+      { text: 'B', props: { key: 'b', 'data-key': 'b' } },
+      { text: 'A', props: { key: 'a', 'data-key': 'a' } },
+      { text: 'C', props: { key: 'c', 'data-key': 'c' } },
+    ]);
+
+    node = reconcileRoot(container, root, node, next);
+
+    expect(Array.from(container.querySelectorAll('li')).map(node => node.textContent)).toEqual(['B', 'A', 'C']);
+    expect(container.querySelector('[data-key="b"]')).toBe(bNode);
+    expect(Array.from(container.querySelectorAll('li'))[1]).toBe(beforeNodes[0]);
+  });
+
+  it('keyed DOM 리스트 중간 삽입 시 기존 형제 노드를 유지함', () => {
+    const root = createRoot(container);
+    const prev = keyedList([
+      { text: 'A', props: { key: 'a', 'data-key': 'a' } },
+      { text: 'B', props: { key: 'b', 'data-key': 'b' } },
+      { text: 'C', props: { key: 'c', 'data-key': 'c' } },
+    ]);
+
+    let node = reconcileRoot(container, root, null, prev);
+    const bNode = container.querySelector('[data-key="b"]');
+    const cNode = container.querySelector('[data-key="c"]');
+
+    const next = keyedList([
+      { text: 'A', props: { key: 'a', 'data-key': 'a' } },
+      { text: 'X', props: { key: 'x', 'data-key': 'x' } },
+      { text: 'B', props: { key: 'b', 'data-key': 'b' } },
+      { text: 'C', props: { key: 'c', 'data-key': 'c' } },
+    ]);
+
+    node = reconcileRoot(container, root, node, next);
+
+    expect(Array.from(container.querySelectorAll('li')).map(node => node.textContent)).toEqual(['A', 'X', 'B', 'C']);
+    expect(container.querySelector('[data-key="b"]')).toBe(bNode);
+    expect(container.querySelector('[data-key="c"]')).toBe(cNode);
+  });
+
+  it('mixed keyed/unkeyed 형제는 key 우선, 나머지는 순차 fallback으로 매칭함', () => {
+    const root = createRoot(container);
+    const prev = keyedList([
+      { text: 'A', props: { key: 'a', 'data-key': 'a' } },
+      { text: 'X', props: { className: 'free first' } },
+      { text: 'Y', props: { className: 'free second' } },
+      { text: 'C', props: { key: 'c', 'data-key': 'c' } },
+    ]);
+
+    let node = reconcileRoot(container, root, null, prev);
+    const keyedA = container.querySelector('[data-key="a"]');
+    const firstFree = container.querySelector('.free.first');
+    const secondFree = container.querySelector('.free.second');
+
+    const next = keyedList([
+      { text: 'C', props: { key: 'c', 'data-key': 'c' } },
+      { text: 'Y', props: { className: 'free first' } },
+      { text: 'X', props: { className: 'free second' } },
+      { text: 'A', props: { key: 'a', 'data-key': 'a' } },
+    ]);
+
+    node = reconcileRoot(container, root, node, next);
+
+    expect(Array.from(container.querySelectorAll('li')).map(node => node.textContent)).toEqual(['C', 'Y', 'X', 'A']);
+    expect(container.querySelector('[data-key="a"]')).toBe(keyedA);
+    expect(container.querySelector('.free.first')).toBe(firstFree);
+    expect(container.querySelector('.free.second')).toBe(secondFree);
+  });
+
+  it('duplicate key가 있으면 경고하고 렌더는 계속함', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const root = createRoot(container);
+
+    const prev = keyedList([
+      { text: 'A', props: { key: 'a', 'data-key': 'a' } },
+    ]);
+
+    const next = keyedList([
+      { text: 'A1', props: { key: 'dup', 'data-key': 'dup-1' } },
+      { text: 'A2', props: { key: 'dup', 'data-key': 'dup-2' } },
+    ]);
+
+    let node = reconcileRoot(container, root, null, prev);
+    node = reconcileRoot(container, root, node, next);
+
+    expect(warnSpy).toHaveBeenCalled();
+    expect(Array.from(container.querySelectorAll('li')).map(node => node.textContent)).toEqual(['A1', 'A2']);
+
+    warnSpy.mockRestore();
+  });
+
+  it('같은 children으로 다시 렌더링해도 insertBefore로 DOM을 재배치하지 않음', () => {
+    const insertBeforeSpy = vi.spyOn(Element.prototype, 'insertBefore');
+    const root = createRoot(container);
+    const vnode = AEUI.createVNode(
+      'div',
+      null,
+      AEUI.createVNode('span', null, 'A'),
+      AEUI.createVNode('span', null, 'B')
+    );
+
+    const mounted = reconcileRoot(container, root, null, vnode);
+    insertBeforeSpy.mockClear();
+
+    reconcileRoot(container, root, mounted, vnode);
+
+    expect(insertBeforeSpy).not.toHaveBeenCalled();
+    insertBeforeSpy.mockRestore();
+  });
+});
+
+describe('_unmountNode', () => {
   it('isMounted를 false로 설정하고 _domNodeCount를 0으로 초기화', () => {
-    const instance = {
+    const node = {
+      kind: 'component',
       isMounted: true,
       _domNodeCount: 3,
       cleanups: [],
       children: [],
       watchStates: [{ callback: () => { }, getDeps: () => [], oldDeps: [] }],
+      parentDom: null,
+      firstDom: null,
+      lastDom: null,
     };
 
-    AEUI._unmount(instance);
+    AEUI._unmountNode(node);
 
-    expect(instance.isMounted).toBe(false);
-    expect(instance._domNodeCount).toBe(0);
+    expect(node.isMounted).toBe(false);
+    expect(node.firstDom).toBeNull();
+    expect(node.lastDom).toBeNull();
   });
 
   it('watchStates를 비움', () => {
-    const instance = {
+    const node = {
+      kind: 'component',
       isMounted: true,
-      _domNodeCount: 1,
       cleanups: [],
       children: [],
       watchStates: [{ callback: () => { }, getDeps: () => [], oldDeps: [] }],
+      parentDom: null,
+      firstDom: null,
+      lastDom: null,
     };
 
-    AEUI._unmount(instance);
+    AEUI._unmountNode(node);
 
-    expect(instance.watchStates).toEqual([]);
+    expect(node.watchStates).toEqual([]);
   });
 
   it('cleanup 함수 실행', () => {
     const cleanup = vi.fn();
-    const instance = {
+    const node = {
+      kind: 'component',
       isMounted: true,
-      _domNodeCount: 1,
       cleanups: [cleanup],
       children: [],
       watchStates: [],
+      parentDom: null,
+      firstDom: null,
+      lastDom: null,
     };
 
-    AEUI._unmount(instance);
+    AEUI._unmountNode(node);
 
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
@@ -205,15 +392,18 @@ describe('_unmount', () => {
     const goodCleanup = vi.fn();
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
-    const instance = {
+    const node = {
+      kind: 'component',
       isMounted: true,
-      _domNodeCount: 1,
       cleanups: [errorCleanup, goodCleanup],
       children: [],
       watchStates: [],
+      parentDom: null,
+      firstDom: null,
+      lastDom: null,
     };
 
-    AEUI._unmount(instance);
+    AEUI._unmountNode(node);
 
     expect(goodCleanup).toHaveBeenCalledTimes(1);
     expect(consoleSpy).toHaveBeenCalled();
@@ -223,24 +413,29 @@ describe('_unmount', () => {
   it('자식 인스턴스도 재귀적으로 unmount', () => {
     const childCleanup = vi.fn();
     const child = {
+      kind: 'component',
       isMounted: true,
-      _domNodeCount: 1,
       cleanups: [childCleanup],
       children: [],
       watchStates: [],
+      parentDom: null,
+      firstDom: null,
+      lastDom: null,
     };
     const parent = {
+      kind: 'component',
       isMounted: true,
-      _domNodeCount: 2,
       cleanups: [],
       children: [child],
       watchStates: [],
+      parentDom: null,
+      firstDom: null,
+      lastDom: null,
     };
 
-    AEUI._unmount(parent);
+    AEUI._unmountNode(parent);
 
     expect(child.isMounted).toBe(false);
-    expect(child._domNodeCount).toBe(0);
     expect(childCleanup).toHaveBeenCalledTimes(1);
   });
 });
@@ -258,10 +453,10 @@ describe('init 중복 호출 방어', () => {
     AEUI._rafId = null;
     AEUI._frameDelay = 1;
     AEUI._framesUntilNextTick = 0;
-    AEUI._rootInstance = null;
-    AEUI._previousVNode = null;
+    AEUI._rootNode = null;
     AEUI._RootComponent = null;
     AEUI._containerElement = null;
+    AEUI._currentComponentNode = null;
     container.remove();
   });
 
@@ -290,10 +485,10 @@ describe('스케줄러 프레임 백오프', () => {
     AEUI._rafId = null;
     AEUI._frameDelay = 1;
     AEUI._framesUntilNextTick = 0;
-    AEUI._rootInstance = null;
-    AEUI._previousVNode = null;
+    AEUI._rootNode = null;
     AEUI._RootComponent = null;
     AEUI._containerElement = null;
+    AEUI._currentComponentNode = null;
   });
 
   it('변화가 없으면 1 -> 2 -> 4 프레임으로 간격이 늘어남', () => {
@@ -367,10 +562,10 @@ describe('수동 렌더 API', () => {
     AEUI._rafId = null;
     AEUI._frameDelay = 1;
     AEUI._framesUntilNextTick = 0;
-    AEUI._rootInstance = null;
-    AEUI._previousVNode = null;
+    AEUI._rootNode = null;
     AEUI._RootComponent = null;
     AEUI._containerElement = null;
+    AEUI._currentComponentNode = null;
     container.remove();
   });
 
@@ -396,36 +591,37 @@ describe('수동 렌더 API', () => {
 });
 
 describe('에러 처리', () => {
-  it('createInstance setup 에러가 발생해도 _currentInstance가 복구됨', () => {
-    let leakedInstance = null;
+  it('createNode setup 에러가 발생해도 현재 컴포넌트 컨텍스트가 복구됨', () => {
+    let leakedNode = null;
     const BrokenComponent = () => {
-      leakedInstance = AEUI._currentInstance;
+      leakedNode = AEUI._currentComponentNode;
       throw new Error('setup boom');
     };
 
     expect(() => {
-      AEUI.createInstance({ tag: BrokenComponent, props: {} }, null);
+      AEUI.createNode({ tag: BrokenComponent, props: {} }, null, null);
     }).toThrow('setup boom');
 
-    expect(AEUI._currentInstance).toBeNull();
+    expect(AEUI._currentComponentNode).toBeNull();
 
     // setup 밖 watch 호출은 등록되지 않아야 함
     watch(() => { }, []);
-    expect(leakedInstance.watchStates.length).toBe(0);
+    expect(leakedNode.watchStates.length).toBe(0);
   });
 
-  it('reconcile 중 render 에러가 발생해도 _currentInstance가 복구됨', () => {
+  it('reconcile 중 render 에러가 발생해도 현재 컴포넌트 컨텍스트가 복구됨', () => {
     const parent = document.createElement('div');
+    const root = createRoot(parent);
     const vnode = {
       tag: () => () => { throw new Error('render boom'); },
       props: {}
     };
 
     expect(() => {
-      AEUI._reconcile(parent, vnode, null, 0, null);
+      AEUI._reconcile(parent, null, vnode, null, root);
     }).toThrow('render boom');
 
-    expect(AEUI._currentInstance).toBeNull();
+    expect(AEUI._currentComponentNode).toBeNull();
   });
 
   it('watcher 에러가 다른 watcher를 차단하지 않음', () => {

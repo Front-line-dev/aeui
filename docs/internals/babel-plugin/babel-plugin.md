@@ -38,7 +38,7 @@ function Counter(_initialProps) {
 
   return (_newProps) => {
     AEUI.updateProps(__props, _newProps);
-    AEUI._runComponentWatchers(AEUI._currentInstance);
+    AEUI._runComponentWatchers(AEUI._currentComponentNode);
     return AEUI.createVNode("div", null, __props.name, ": ", count);
   };
 }
@@ -326,7 +326,7 @@ function UserCard(_initialProps) {
 
   return (_newProps) => {
     AEUI.updateProps(__props, _newProps);
-    AEUI._runComponentWatchers(AEUI._currentInstance);
+    AEUI._runComponentWatchers(AEUI._currentComponentNode);
     return <p>{__props.name}</p>;          // name → __props.name
   };
 }
@@ -383,7 +383,7 @@ return () => <div>{count}</div>;
 // 다음과 같이 변환:
 return (_newProps) => {
   AEUI.updateProps(__props, _newProps);                            // 1. props 갱신
-  AEUI._runComponentWatchers(AEUI._currentInstance);               // 2. watcher 실행
+  AEUI._runComponentWatchers(AEUI._currentComponentNode);          // 2. watcher 실행
   return <div>{count}</div>;                                       // 3. JSX 반환
 };
 ```
@@ -438,7 +438,7 @@ export function TodoItem(_initialProps) {
 
   return (_newProps) => {
     AEUI.updateProps(__props, _newProps);
-    AEUI._runComponentWatchers(AEUI._currentInstance);
+    AEUI._runComponentWatchers(AEUI._currentComponentNode);
     return AEUI.createVNode("li", { className: __props.done ? "done" : "" },
       editing
         ? AEUI.createVNode("input", { value: __props.text })
