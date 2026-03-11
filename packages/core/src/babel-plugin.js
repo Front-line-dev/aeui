@@ -14,7 +14,7 @@ export default function aeuiTransform({ types: t }) {
         t.isMemberExpression(callee) &&
         t.isIdentifier(callee.object, { name: 'AEUI' }) &&
         (t.isIdentifier(callee.property, { name: 'createVNode' }) ||
-         t.isIdentifier(callee.property, { name: 'createElement' }))
+          t.isIdentifier(callee.property, { name: 'createElement' }))
       );
     }
     return false;
@@ -262,13 +262,13 @@ export default function aeuiTransform({ types: t }) {
               );
             }
             updateLogic.push(
-                t.expressionStatement(
-                  t.callExpression(
-                    t.memberExpression(t.identifier("AEUI"), t.identifier("_runComponentWatchers")),
-                    [t.memberExpression(t.identifier("AEUI"), t.identifier("_currentComponentNode"))]
-                  )
+              t.expressionStatement(
+                t.callExpression(
+                  t.memberExpression(t.identifier("AEUI"), t.identifier("_runComponentWatchers")),
+                  [t.memberExpression(t.identifier("AEUI"), t.identifier("_currentComponentNode"))]
                 )
-              );
+              )
+            );
 
             // Replace destructured usage in render body
             if (destructuredNames.size > 0) {
