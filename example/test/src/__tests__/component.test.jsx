@@ -127,9 +127,9 @@ let watchLog = [];
 
 // watch는 props 기반 deps를 감지하는 데 설계됨
 function WatchChild({ value }) {
-  watch(() => {
+  watch([value], () => {
     watchLog.push(value);
-  }, [value]);
+  });
 
   return <span id="watch-value">{value}</span>;
 }
@@ -172,7 +172,7 @@ describe('watch 훅', () => {
   it('local let 변수 변경도 watch deps getter가 감지함', () => {
     function LocalWatch() {
       let count = 0;
-      watch(() => { watchLog.push(count); }, [count]);
+      watch([count], () => { watchLog.push(count); });
       return (
         <div>
           <span id="lcount">{count}</span>
@@ -189,6 +189,225 @@ describe('watch 훅', () => {
 
     expect(watchLog).toEqual([1]);
     expect(container.querySelector('#lcount').textContent).toBe('1');
+  });
+
+  it('named callback을 사용하는 watch(deps, callback)도 deps를 함수화해 감지한다', () => {
+    function NamedCallbackWatch() {
+      let count = 0;
+      const syncCount = () => {
+        watchLog.push(count);
+      };
+
+      watch([count], syncCount);
+
+      return (
+        <div>
+          <span id="named-count">{count}</span>
+          <button id="named-btn" onClick={() => count++}>+</button>
+        </div>
+      );
+    }
+
+    AEUI.init(NamedCallbackWatch, container);
+    expect(watchLog).toEqual([]);
+
+    container.querySelector('#named-btn').click();
+    AEUI._tick();
+
+    expect(watchLog).toEqual([1]);
+    expect(container.querySelector('#named-count').textContent).toBe('1');
+  });
+
+  it('local state와 props deps가 같은 tick에 바뀌어도 watch callback은 한 번만 실행된다', () => {
+    let updateChildLocal = () => { };
+
+    function MixedDepsChild({ value }) {
+      let localCount = 0;
+
+      updateChildLocal = () => {
+        localCount += 1;
+      };
+
+      watch([value, localCount], () => {
+        watchLog.push([value, localCount]);
+      });
+
+      return <span id="mixed-value">{value}:{localCount}</span>;
+    }
+
+    function MixedDepsApp() {
+      let parentCount = 0;
+
+      return (
+        <div>
+          <MixedDepsChild value={parentCount} />
+          <button
+            id="mixed-btn"
+            onClick={() => {
+              parentCount = 1;
+              updateChildLocal();
+            }}
+          >
+            change
+          </button>
+        </div>
+      );
+    }
+
+    AEUI.init(MixedDepsApp, container);
+    expect(watchLog).toEqual([]);
+
+    container.querySelector('#mixed-btn').click();
+    AEUI._tick();
+
+    expect(watchLog).toEqual([[1, 1]]);
+    expect(container.querySelector('#mixed-value').textContent).toBe('1:1');
+  });
+
+  it('watch callback이 deps를 다시 바꾸면 callback 이후 최종 deps를 snapshot으로 저장한다', () => {
+    function ClampWatch() {
+      let count = 0;
+
+      watch([count], () => {
+        if (count > 1) count = 1;
+        watchLog.push(count);
+      });
+
+      return (
+        <div>
+          <span id="clamp-count">{count}</span>
+          <button id="clamp-btn" onClick={() => { count = 2; }}>set</button>
+        </div>
+      );
+    }
+
+    AEUI.init(ClampWatch, container);
+    expect(watchLog).toEqual([]);
+
+    container.querySelector('#clamp-btn').click();
+    AEUI._tick();
+
+    expect(watchLog).toEqual([1]);
+    expect(container.querySelector('#clamp-count').textContent).toBe('1');
+
+    AEUI._tick();
+
+    expect(watchLog).toEqual([1]);
+    expect(container.querySelector('#clamp-count').textContent).toBe('1');
+  });
+});
+
+describe('props 구조분해 반응성', () => {
+  it('alias 구조분해된 props가 render와 watch에서 최신값을 본다', () => {
+    const aliasWatchLog = [];
+
+    function AliasChild({ title: label }) {
+      watch([label], () => {
+        aliasWatchLog.push(label);
+      });
+
+      return <span id="alias-label">{label}</span>;
+    }
+
+    function AliasApp() {
+      let title = 'first';
+
+      return (
+        <div>
+          <AliasChild title={title} />
+          <button id="alias-change" onClick={() => { title = 'second'; }}>change</button>
+        </div>
+      );
+    }
+
+    AEUI.init(AliasApp, container);
+    expect(container.querySelector('#alias-label').textContent).toBe('first');
+    expect(aliasWatchLog).toEqual([]);
+
+    container.querySelector('#alias-change').click();
+    AEUI._tick();
+
+    expect(container.querySelector('#alias-label').textContent).toBe('second');
+    expect(aliasWatchLog).toEqual(['second']);
+  });
+
+  it('default 값이 있는 props는 새 값이 전달되면 render에 반영된다', () => {
+    function DefaultChild({ count = 0 }) {
+      return <span id="default-count">{count}</span>;
+    }
+
+    function DefaultApp() {
+      let count;
+
+      return (
+        <div>
+          <DefaultChild count={count} />
+          <button id="default-change" onClick={() => { count = 5; }}>change</button>
+        </div>
+      );
+    }
+
+    AEUI.init(DefaultApp, container);
+    expect(container.querySelector('#default-count').textContent).toBe('0');
+
+    container.querySelector('#default-change').click();
+    AEUI._tick();
+
+    expect(container.querySelector('#default-count').textContent).toBe('5');
+  });
+
+  it('nested 구조분해된 props가 최신값으로 갱신된다', () => {
+    function NestedChild({ user: { name } }) {
+      return <span id="nested-name">{name}</span>;
+    }
+
+    function NestedApp() {
+      let user = { name: 'Kim' };
+
+      return (
+        <div>
+          <NestedChild user={user} />
+          <button id="nested-change" onClick={() => { user = { name: 'Lee' }; }}>change</button>
+        </div>
+      );
+    }
+
+    AEUI.init(NestedApp, container);
+    expect(container.querySelector('#nested-name').textContent).toBe('Kim');
+
+    container.querySelector('#nested-change').click();
+    AEUI._tick();
+
+    expect(container.querySelector('#nested-name').textContent).toBe('Lee');
+  });
+
+  it('rest 구조분해된 props가 최신 객체를 본다', () => {
+    function RestChild({ title, ...rest }) {
+      return (
+        <span id="rest-id">
+          {title}:{rest.id}
+        </span>
+      );
+    }
+
+    function RestApp() {
+      let meta = { title: 'Item', id: 'A' };
+
+      return (
+        <div>
+          <RestChild title={meta.title} id={meta.id} />
+          <button id="rest-change" onClick={() => { meta = { title: 'Item', id: 'B' }; }}>change</button>
+        </div>
+      );
+    }
+
+    AEUI.init(RestApp, container);
+    expect(container.querySelector('#rest-id').textContent).toBe('Item:A');
+
+    container.querySelector('#rest-change').click();
+    AEUI._tick();
+
+    expect(container.querySelector('#rest-id').textContent).toBe('Item:B');
   });
 });
 

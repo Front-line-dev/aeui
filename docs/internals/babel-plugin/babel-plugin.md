@@ -12,7 +12,7 @@ AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 마법은
 |------|------|------|------|
 | **Return 래핑** | `return <div />` | `return () => <div />` | setup 1회 실행 + 렌더 함수 반복 실행 구조 생성 |
 | **Props 반응화** | `function Comp(props)` | `function Comp(_initialProps)` + `__props` 객체 | props 변경 시 클로저 참조가 자동 갱신되도록 |
-| **Watch deps 래핑** | `watch(cb, [count])` | `watch(cb, () => [count])` | 매 호출 시 현재 값을 읽도록 함수화 |
+| **Watch deps 래핑** | `watch([count], cb)` | `watch(() => [count], cb)` | 매 호출 시 현재 값을 읽도록 함수화 |
 
 ### 전체 변환 흐름
 
@@ -20,7 +20,7 @@ AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 마법은
 사용자 코드:
 function Counter({ name }) {
   let count = 0;
-  watch(() => console.log(name, count), [name, count]);
+  watch([name, count], () => console.log(name, count));
   return <div>{name}: {count}</div>;
 }
 
@@ -29,17 +29,28 @@ function Counter({ name }) {
 function Counter(_initialProps) {
   const __props = { ..._initialProps };
   let { name } = _initialProps;
+  const _resolveProps = () => {
+    const { name } = __props;
+    return { name };
+  };
 
   let count = 0;
   watch(
-    () => console.log(__props.name, count),
-    () => [__props.name, count]
+    () => {
+      const _resolvedProps = _resolveProps();
+      return [_resolvedProps.name, count];
+    },
+    () => {
+      const _resolvedProps2 = _resolveProps();
+      return console.log(_resolvedProps2.name, count);
+    }
   );
 
   return (_newProps) => {
     AEUI.updateProps(__props, _newProps);
     AEUI._runComponentWatchers(AEUI._currentComponentNode);
-    return AEUI.createVNode("div", null, __props.name, ": ", count);
+    const _resolvedProps3 = _resolveProps();
+    return AEUI.createVNode("div", null, _resolvedProps3.name, ": ", count);
   };
 }
 ```
@@ -271,106 +282,89 @@ function UserCard({ name }) {
   return <p>{name}</p>;
 }
 
-// 해결: __props 객체를 통해 최신값 참조
+// 해결: __props를 현재 시점 구조 분해로 다시 해석
 function UserCard(_initialProps) {
   const __props = { ..._initialProps };
   let { name } = _initialProps;
+  const _resolveProps = () => {
+    const { name } = __props;
+    return { name };
+  };
 
   return (_newProps) => {
     AEUI.updateProps(__props, _newProps);  // __props 내용을 최신으로 교체
-    return <p>{__props.name}</p>;          // __props.name으로 최신값 참조
+    const _resolvedProps = _resolveProps();
+    return <p>{_resolvedProps.name}</p>;   // 현재 props 기준으로 다시 해석
   };
 }
 ```
 
-`__props`는 같은 객체 참조를 유지하면서 내용만 교체되므로 (`updateProps` → delete all + assign), 클로저에서 `__props.name`으로 접근하면 항상 최신값을 읽을 수 있다.
+`__props`는 같은 객체 참조를 유지하면서 내용만 교체된다. render/watch가 실행될 때마다 `_resolveProps()`가 이 현재 `__props`를 다시 구조 분해하므로, alias/default/nested/rest를 포함한 패턴도 최신값 기준으로 평가할 수 있다.
 
-### 3-2. Watch deps 래핑
+### 3-2. Watch deps 래핑 및 시그니처 정규화
 
 ```javascript
 // 입력
-watch(() => console.log(count), [count]);
+watch([count], () => console.log(count));
 
 // 출력
-watch(() => console.log(count), () => [count]);
+watch(() => [count], () => console.log(count));
 ```
 
 ```javascript
-if (t.isArrayExpression(args[1])) {
-  depsPath.replaceWith(t.arrowFunctionExpression([], t.cloneNode(args[1], true)));
+if (!isFunctionLike(depsArg)) {
+  depsArg = t.arrowFunctionExpression([], t.cloneNode(depsArg, true));
 }
 ```
 
-배열 리터럴을 화살표 함수로 감싸서, 매 호출 시 클로저에서 현재 값을 읽도록 한다. `watch.md`에서 설명한 것과 같은 이유이다.
+새 API는 `watch(deps, callback)`이다. 플러그인은 이 순서를 기준으로 정규화하며, 구버전 `watch(callback, deps)`도 만나면 내부적으로 같은 형태로 바꾼다. 그 뒤 deps 표현식을 화살표 함수로 감싸서, 매 호출 시 클로저에서 현재 값을 읽도록 한다.
 
-### 3-3. 구조 분해된 props의 참조 교체
+### 3-3. 구조 분해된 props의 재해석
 
-구조 분해로 `{ name, age }`를 사용한 경우, watch callback과 deps, 그리고 렌더 함수 내부에서 `name`을 `__props.name`으로 교체한다.
+초기 구현은 구조 분해된 이름을 `__props.name`처럼 직접 치환했지만, alias/default/nested/rest 패턴을 정확히 처리할 수 없었다. 현재 구현은 **원래 구조 분해 패턴 자체를 `_resolveProps()` 안에 보존**하고, watch/render가 실행될 때마다 현재 `__props`를 다시 해석한다.
 
 ```javascript
 // 입력
-function UserCard({ name }) {
-  watch(() => console.log(name), [name]);
-  return <p>{name}</p>;
+function UserCard({ title: label, count = 0 }) {
+  watch([label, count], () => console.log(label, count));
+  return <p>{label}: {count}</p>;
 }
 
-// 출력 (중요: name → __props.name 교체)
+// 출력 (중요: 원래 구조 분해 패턴을 _resolveProps 안에 유지)
 function UserCard(_initialProps) {
   const __props = { ..._initialProps };
-  let { name } = _initialProps;
+  let { title: label, count = 0 } = _initialProps;
+  const _resolveProps = () => {
+    const { title: label, count = 0 } = __props;
+    return { label, count };
+  };
 
   watch(
-    () => console.log(__props.name),      // name → __props.name
-    () => [__props.name]                   // name → __props.name
+    () => {
+      const _resolvedProps = _resolveProps();
+      return [_resolvedProps.label, _resolvedProps.count];
+    },
+    () => {
+      const _resolvedProps2 = _resolveProps();
+      return console.log(_resolvedProps2.label, _resolvedProps2.count);
+    }
   );
 
   return (_newProps) => {
     AEUI.updateProps(__props, _newProps);
     AEUI._runComponentWatchers(AEUI._currentComponentNode);
-    return <p>{__props.name}</p>;          // name → __props.name
+    const _resolvedProps3 = _resolveProps();
+    return <p>{_resolvedProps3.label}: {_resolvedProps3.count}</p>;
   };
 }
 ```
 
-### 교체 로직의 안전 장치
+이 방식의 장점:
 
-```javascript
-const replaceIdentifiers = (targetPath) => {
-  targetPath.traverse({
-    Identifier(idPath) {
-      const name = idPath.node.name;
-
-      // 참조(사용)인 경우만 (선언, 프로퍼티 키 등은 제외)
-      if (!idPath.isReferencedIdentifier()) return;
-
-      // 구조 분해된 prop 이름만
-      if (!destructuredNames.has(name)) return;
-
-      // 쉐도잉 체크: 내부 스코프에서 같은 이름의 변수가 선언되었으면 건너뜀
-      if (idPath.scope.hasBinding(name) &&
-          idPath.scope.getBinding(name).scope !== path.scope) return;
-
-      // 교체: name → __props.name
-      idPath.replaceWith(t.memberExpression(propsId, t.identifier(name)));
-    }
-  });
-};
-```
-
-**`isReferencedIdentifier`**: 변수 **참조**(사용)인 경우만 교체한다. 변수 **선언**(`let name = ...`의 `name`), 객체 **프로퍼티 키**(`{ name: value }`의 `name`) 등은 교체하지 않는다.
-
-**`destructuredNames`**: props에서 구조 분해된 이름만 교체한다. 컴포넌트 내부의 `let count = 0`의 `count`는 교체하지 않는다.
-
-**쉐도잉(shadowing) 체크**: 내부 함수에서 같은 이름의 지역 변수가 선언되었으면 그 범위에서는 교체하지 않는다.
-
-```jsx
-function UserCard({ name }) {           // ← 이 name은 교체 대상
-  const process = (name) => {           // ← 이 name은 쉐도잉 (내부 스코프)
-    return name.toUpperCase();          // ← 이 name은 교체하면 안 됨
-  };
-  return <p>{name}</p>;                 // ← 이 name은 __props.name으로 교체
-}
-```
+- `title: label` 같은 alias가 정확히 유지된다
+- `count = 0` 같은 default 값이 최신 props 기준으로 다시 계산된다
+- `{ user: { name } }`, `{ ...rest }` 같은 nested/rest 패턴도 JS 본래 semantics를 그대로 사용한다
+- render/watch 안에서는 치환 대상이 단순히 `_resolvedProps.<name>`가 되므로 shadowing 처리도 단순해진다
 
 ### 3-4. 렌더 함수에 업데이트 로직 주입
 
@@ -383,7 +377,7 @@ return () => <div>{count}</div>;
 // 다음과 같이 변환:
 return (_newProps) => {
   AEUI.updateProps(__props, _newProps);                            // 1. props 갱신
-  AEUI._runComponentWatchers(AEUI._currentComponentNode);          // 2. watcher 실행
+  AEUI._runComponentWatchers(AEUI._currentComponentNode);          // 2. watcher 실행 (유일한 실행 지점)
   return <div>{count}</div>;                                       // 3. JSX 반환
 };
 ```
@@ -395,6 +389,7 @@ if (renderFn.params.length > 0 && renderFn.params[0].name.startsWith("_newProps"
 ```
 
 **props가 없는 컴포넌트**: `updateProps` 호출은 생략하고 `_runComponentWatchers`만 주입한다.
+즉, watcher 실행 책임은 reconciler가 아니라 **렌더 함수 wrapper 시작부**에 집중된다.
 
 ---
 
@@ -406,9 +401,9 @@ if (renderFn.params.length > 0 && renderFn.params[0].name.startsWith("_newProps"
 export function TodoItem({ text, done }) {
   let editing = false;
 
-  watch(() => {
+  watch([done], () => {
     if (done) editing = false;
-  }, [done]);
+  });
 
   clean(() => console.log("TodoItem 제거됨"));
 
@@ -426,12 +421,22 @@ export function TodoItem({ text, done }) {
 export function TodoItem(_initialProps) {
   const __props = { ..._initialProps };
   let { text, done } = _initialProps;
+  const _resolveProps = () => {
+    const { text, done } = __props;
+    return { text, done };
+  };
 
   let editing = false;
 
   watch(
-    () => { if (__props.done) editing = false; },    // done → __props.done
-    () => [__props.done]                              // 배열 → 함수, done → __props.done
+    () => {
+      const _resolvedProps = _resolveProps();
+      return [_resolvedProps.done];
+    },
+    () => {
+      const _resolvedProps2 = _resolveProps();
+      if (_resolvedProps2.done) editing = false;
+    }
   );
 
   clean(() => console.log("TodoItem 제거됨"));        // 변환 없음
@@ -439,10 +444,11 @@ export function TodoItem(_initialProps) {
   return (_newProps) => {
     AEUI.updateProps(__props, _newProps);
     AEUI._runComponentWatchers(AEUI._currentComponentNode);
-    return AEUI.createVNode("li", { className: __props.done ? "done" : "" },
+    const _resolvedProps3 = _resolveProps();
+    return AEUI.createVNode("li", { className: _resolvedProps3.done ? "done" : "" },
       editing
-        ? AEUI.createVNode("input", { value: __props.text })
-        : AEUI.createVNode("span", null, __props.text)
+        ? AEUI.createVNode("input", { value: _resolvedProps3.text })
+        : AEUI.createVNode("span", null, _resolvedProps3.text)
     );
   };
 }
@@ -450,10 +456,10 @@ export function TodoItem(_initialProps) {
 
 변환 요약:
 - `{ text, done }` → `_initialProps` + `__props` 생성
+- `_resolveProps()`가 현재 `__props`를 원래 구조 분해 패턴으로 다시 해석
 - `return (JSX)` → `return (_newProps) => { 업데이트 로직; return JSX; }`
-- watch deps `[done]` → `() => [__props.done]`
-- watch callback 내 `done` → `__props.done`
-- 렌더 함수 내 `text`, `done` → `__props.text`, `__props.done`
+- `watch([done], cb)` → `watch(() => [done], cb)` 형태로 정규화
+- watch/render 내부의 구조 분해 props 참조는 `_resolveProps()` 결과를 통해 최신값 사용
 - `editing`은 props가 아닌 로컬 상태이므로 변환하지 않음
 - `clean()`은 변환 대상이 아님
 

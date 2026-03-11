@@ -9,9 +9,9 @@ watcher는 `watch()` 훅으로 등록되며, "특정 값이 변경되면 이 코
 ```javascript
 // 사용자 코드
 let count = 0;
-watch(() => {
+watch([count], () => {
   console.log("count가 변경됨:", count);
-}, [count]);
+});
 
 // count가 변경되면 다음 tick에서 console.log가 실행됨
 ```
@@ -45,8 +45,9 @@ instance.watchStates 배열을 순회:
 
     3. 변경된 경우:
        ├── callback() 실행 (사용자가 등록한 함수)
-       └── oldDeps = _deepClone(newDeps)
-           (현재 값의 깊은 복사본을 저장하여 다음 비교에 사용)
+       ├── getDeps()를 다시 호출해 callback 이후 최종 deps 획득
+       └── oldDeps = _deepClone(finalDeps)
+           (최종 값의 깊은 복사본을 저장하여 다음 비교에 사용)
 
     4. try-catch로 감싸 에러 발생 시:
        console.error로 로깅, 다음 watcher로 계속 진행
@@ -68,7 +69,8 @@ runComponentWatchers(instance, deepEqual, deepClone) {
 
       if (hasChanged) {
         watcher.callback();                       // 콜백 실행
-        watcher.oldDeps = deepClone(newDeps);     // 스냅샷 저장
+        const finalDeps = watcher.getDeps();      // callback 이후 최종 deps 재확인
+        watcher.oldDeps = deepClone(finalDeps);   // 스냅샷 저장
       }
     } catch (e) {
       console.error('[AEUI] Watcher error:', e);
@@ -101,21 +103,21 @@ runComponentWatchers(instance, deepEqual, deepClone) {
 
 ### getDeps가 함수인 이유
 
-사용자는 `watch(cb, [count])`처럼 배열을 직접 전달하지만, Babel 플러그인이 이를 `watch(cb, () => [count])`로 변환한다.
+사용자는 `watch([count], cb)`처럼 배열을 직접 전달하지만, Babel 플러그인이 이를 `watch(() => [count], cb)`로 변환한다.
 
 왜 함수로 변환해야 하는가:
 
 ```javascript
 // ❌ 배열을 직접 전달하면
 let count = 0;
-watch(cb, [count]);
+watch([count], cb);
 // 이 시점에 [count]는 [0]으로 평가되어 고정된다
 // 이후 count가 3이 되어도 getDeps()는 항상 [0]을 반환
 // → 변경을 영원히 감지하지 못함
 
 // ✅ 함수로 감싸면
 let count = 0;
-watch(cb, () => [count]);
+watch(() => [count], cb);
 // getDeps 호출마다 클로저에서 현재 count 값을 읽어 새 배열을 생성
 // count가 3이면 getDeps()는 [3]을 반환
 // → [0] vs [3] 비교로 변경 감지 성공
@@ -127,7 +129,7 @@ watch(cb, () => [count]);
 
 ```javascript
 let items = [1, 2, 3];
-watch(() => console.log("changed"), [items]);
+watch([items], () => console.log("changed"));
 
 // items.push(4) 실행 후:
 
@@ -148,13 +150,11 @@ watch(() => console.log("changed"), [items]);
 
 ## 호출 시점
 
-`_runComponentWatchers`는 의도적으로 **여러 곳에서 호출**된다:
+`_runComponentWatchers`는 컴포넌트의 **렌더 함수 시작부**에서 호출된다. 이 호출은 Babel 플러그인이 렌더 함수에 주입한다.
 
 | 호출 위치 | 코드 위치 | 시점 |
 |-----------|-----------|------|
-| `_reconcile` 내부 (4단계: Component Node) | `packages/core/src/reconciler.js` | 컴포넌트 render 호출 직전 |
 | Babel 플러그인이 렌더 함수에 주입 | `packages/core/src/babel-plugin.js` (변환된 코드) | render 함수 시작부에서 props 업데이트 직후 |
-| `instance.update()` 메서드 내부 | `packages/core/src/runtime.js` | 루트 인스턴스의 tick에서 render 호출 직전 |
 
 ### 왜 render 전에 실행하는가
 
@@ -164,30 +164,28 @@ watch callback이 **상태를 변경**할 수 있기 때문이다. 예를 들어
 let count = 0;
 let displayText = "";
 
-watch(() => {
+watch([count], () => {
   displayText = `카운트: ${count}`;  // ← watch가 상태를 변경
-}, [count]);
+});
 
 return <p>{displayText}</p>;
 ```
 
 watcher를 render보다 먼저 실행하면, `displayText`가 먼저 갱신된 후 JSX에서 최신 값으로 렌더링된다. 만약 render를 먼저 실행하면 `displayText`가 이전 값인 채로 렌더링되고, watch에 의한 변경은 다음 tick(최대 1초)까지 반영되지 않는다.
 
-### 다중 호출에도 callback이 1번만 실행되는 이유
+### callback 이후 최종 deps를 다시 저장하는 이유
 
-`_runComponentWatchers`가 한 tick에서 2~3번 호출되더라도, callback은 실제로 **1번만 실행**된다. 첫 호출에서 변경이 감지되면:
-1. callback 실행
-2. `oldDeps = _deepClone(newDeps)` → oldDeps이 현재 값으로 갱신
+watch callback이 deps를 다시 변경할 수 있기 때문이다. 예를 들어:
 
-이후 같은 tick에서 두 번째 호출이 오면:
-- `getDeps()` 결과와 방금 갱신된 `oldDeps`가 같음
-- `_deepEqual` → 변경 없음
-- callback 미실행
+```javascript
+let count = 0;
 
-### `_reconcile` 내 호출과 Babel 주입 호출의 역할 분담
+watch([count], () => {
+  if (count > 10) count = 10;
+});
+```
 
-이 두 호출의 정확한 역할 분담에 대해서는 추가 분석이 필요하다.
-<!-- TODO: 추후 분석을 통해 각 호출 시점의 정확한 역할 규명 필요 -->
+`count`가 11로 바뀐 상태에서 watcher가 실행되면, callback 이후 실제 최종 상태는 10이다. 이때 `oldDeps`를 callback 전 값 `[11]`로 저장하면 다음 tick에서 불필요한 재실행이 발생할 수 있다. 따라서 watcher는 callback 종료 후 deps를 다시 읽어 **최종 상태**를 스냅샷으로 저장한다.
 
 ---
 

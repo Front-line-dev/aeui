@@ -39,9 +39,9 @@ export default function App() {
     if (document?.body?.classList) document.body.classList.toggle("mode--admin", admin);
   };
   syncAdminMode();
-  watch(syncAdminMode, [state.route]);
+  watch([state.route], syncAdminMode);
 
-  watch(() => {
+  watch([state.products, state.cart, state.orders, state.activity], () => {
     try {
       savePersistedState({ products: state.products, cart: state.cart, orders: state.orders, activity: state.activity });
       state.lastSavedAt = Date.now();
@@ -49,7 +49,7 @@ export default function App() {
     } catch (e) {
       state.lastSaveError = e?.message || "localStorage 저장에 실패했습니다.";
     }
-  }, [state.products, state.cart, state.orders, state.activity]);
+  });
 
   const layoutClass = () => `layout ${select.isAdmin() ? "layout--admin" : ""}`;
   const sidebarStyle = () => (select.isAdmin() ? "" : "display:none;");

@@ -209,7 +209,6 @@ function mountComponentNode(parentDom, node, beforeDom) {
   this._currentComponentNode = node;
   this._currentInstance = node;
   try {
-    this._runComponentWatchers(node);
     renderedVNode = node.render(node.props);
   } finally {
     this._currentComponentNode = null;
@@ -286,7 +285,6 @@ function updateComponentNode(parentDom, node, newVNode, beforeDom) {
   this._currentComponentNode = node;
   this._currentInstance = node;
   try {
-    this._runComponentWatchers(node);
     renderedVNode = node.render(node.props);
   } finally {
     this._currentComponentNode = null;

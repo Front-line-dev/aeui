@@ -605,7 +605,7 @@ describe('에러 처리', () => {
     expect(AEUI._currentComponentNode).toBeNull();
 
     // setup 밖 watch 호출은 등록되지 않아야 함
-    watch(() => { }, []);
+    watch([], () => { });
     expect(leakedNode.watchStates.length).toBe(0);
   });
 
@@ -648,5 +648,24 @@ describe('에러 처리', () => {
     expect(watcherResults).toEqual(['ok']); // 두 번째 watcher 정상 실행
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
+  });
+
+  it('watch callback 이후 최종 deps를 oldDeps로 저장함', () => {
+    const state = { count: 2 };
+    const instance = {
+      watchStates: [
+        {
+          callback: () => {
+            state.count = 1;
+          },
+          getDeps: () => [state.count],
+          oldDeps: [0],
+        },
+      ],
+    };
+
+    AEUI._runComponentWatchers(instance);
+
+    expect(instance.watchStates[0].oldDeps).toEqual([1]);
   });
 });

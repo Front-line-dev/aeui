@@ -225,10 +225,10 @@ function SearchBox() {
   let query = "";
   let results = [];
 
-  watch(() => {
+  watch([query], () => {
     // query가 변경될 때마다 실행
     results = performSearch(query);
-  }, [query]);
+  });
 
   return (
     <div>
@@ -244,7 +244,7 @@ function SearchBox() {
 ### 사용법
 
 ```javascript
-watch(callback, deps)
+watch(deps, callback)
 ```
 
 - `callback`: 의존성이 변경되었을 때 실행할 함수
@@ -253,9 +253,9 @@ watch(callback, deps)
 ### 여러 의존성
 
 ```jsx
-watch(() => {
+watch([name, age], () => {
   console.log("이름 또는 나이가 변경됨");
-}, [name, age]);
+});
 ```
 
 배열 내 **하나라도** 변경되면 callback이 실행된다.

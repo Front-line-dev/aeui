@@ -172,7 +172,6 @@ function mountComponentNode(parentDom, node, beforeDom) {
   this._currentComponentNode = node;
   this._currentInstance = node;
   try {
-    this._runComponentWatchers(node);           // watcher 실행 (render 전)
     renderedVNode = node.render(node.props);     // 렌더 함수 호출
   } finally {
     this._currentComponentNode = null;
@@ -188,6 +187,8 @@ function mountComponentNode(parentDom, node, beforeDom) {
   return node;
 }
 ```
+
+watcher 실행은 `reconciler`가 직접 하지 않는다. render 함수 시작부에서 Babel 플러그인이 주입한 wrapper가 `updateProps()`와 `_runComponentWatchers()`를 처리한 뒤 JSX를 반환한다.
 
 ### updateXxxNode — 기존 node 갱신
 
@@ -245,7 +246,6 @@ function updateComponentNode(parentDom, node, newVNode, beforeDom) {
   this._currentComponentNode = node;
   this._currentInstance = node;
   try {
-    this._runComponentWatchers(node);           // watcher 실행 (render 전)
     renderedVNode = node.render(node.props);     // 렌더 함수 호출
   } finally {
     this._currentComponentNode = null;

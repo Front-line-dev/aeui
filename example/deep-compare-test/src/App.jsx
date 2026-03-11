@@ -15,10 +15,10 @@ const WatchDedupeTest = () => {
   let triggers = 0;
   let status = "Waiting...";
 
-  watch(() => {
+  watch([state], () => {
     triggers++;
     console.log(`[WatchDedupe] Triggered! Total: ${triggers}`);
-  }, [state]);
+  });
 
   // Periodic update with SAME content (new ref)
   // This interval runs outside of component render scope but modifies captured variables
@@ -72,10 +72,10 @@ const InPlaceSetTest = () => {
   let triggers = 0;
   let status = "Waiting...";
 
-  watch(() => {
+  watch([mySet], () => {
     triggers++;
     console.log(`[InPlaceSet] Triggered! Total: ${triggers}`);
-  }, [mySet]);
+  });
 
   let tick = 0;
   setInterval(() => {
@@ -108,10 +108,10 @@ const InPlaceObjectTest = () => {
   let triggers = 0;
   let status = "Waiting...";
 
-  watch(() => {
+  watch([myObj], () => {
     triggers++;
     console.log(`[InPlaceObj] Triggered! Total: ${triggers}`);
-  }, [myObj]);
+  });
 
   let tick = 0;
   setInterval(() => {

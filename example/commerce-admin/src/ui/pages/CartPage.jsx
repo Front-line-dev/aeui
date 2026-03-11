@@ -9,9 +9,9 @@ import CartSummary from "../components/cart/CartSummary.jsx";
 export default function CartPage() {
   let couponDraft = state.cart.couponCode;
 
-  watch(() => {
+  watch([state.cart.couponCode], () => {
     couponDraft = state.cart.couponCode;
-  }, [state.cart.couponCode]);
+  });
 
   const onCouponInput = (e) => {
     couponDraft = e.target.value;

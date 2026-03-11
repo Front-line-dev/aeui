@@ -33,7 +33,7 @@ export default function ProductPage() {
     actions.addToCart(p.id, qty);
   };
 
-  watch(() => {
+  watch([state.route, state.selectedProductId, getProduct()?.stock], () => {
     const p = getProduct();
     maxQty = maxQtyFor(p);
     const currentProductId = p?.id || null;
@@ -43,7 +43,7 @@ export default function ProductPage() {
       qty = 1;
     }
     if (qty > maxQty) qty = maxQty;
-  }, [state.route, state.selectedProductId, getProduct()?.stock]);
+  });
 
   const product = () => getProduct();
 

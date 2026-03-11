@@ -6,9 +6,9 @@ import ComplexExample from './ComplexExample.jsx';
 function Counter({ title }) {
   let count = 0;
 
-  watch(() => {
+  watch([count], () => {
     console.log(`Counter ${title} changed to:`, count);
-  }, [count]);
+  });
 
   return (
     <div style="border: 1px solid #ccc; padding: 10px; margin: 10px;">
@@ -23,9 +23,9 @@ function Counter({ title }) {
 
 // 1. Destructuring Test
 function DestructuredCounter({ count }) {
-  watch(() => {
+  watch([count], () => {
     console.log("Destructured Watch:", count);
-  }, [count]);
+  });
   
   return (
     <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
@@ -37,9 +37,9 @@ function DestructuredCounter({ count }) {
 
 // 2. Aliased Props Test (p)
 function AliasedCounter(p) {
-  watch(() => {
+  watch([p.count], () => {
     console.log("Aliased Watch:", p.count);
-  }, [p.count]);
+  });
 
   return (
     <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
@@ -51,9 +51,9 @@ function AliasedCounter(p) {
 
 // 3. Direct Props Usage
 function DirectCounter(props) {
-  watch(() => {
+  watch([props.count], () => {
     console.log("Direct Watch:", props.count);
-  }, [props.count]);
+  });
 
   return (
     <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">

@@ -260,7 +260,7 @@ function Counter() {
 
 ```javascript
 // hooks.js
-export function watch(callback, depsGetter) {
+export function watch(deps, callback) {
   const runtime = getRuntimeContext();
   if (!runtime) return;
 

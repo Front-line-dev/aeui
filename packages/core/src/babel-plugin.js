@@ -140,6 +140,68 @@ export default function aeuiTransform({ types: t }) {
 
     let propsId = null;
     let destructuredNames = new Set();
+    let resolvePropsId = null;
+
+    const isFunctionLike = (node) => (
+      t.isArrowFunctionExpression(node) || t.isFunctionExpression(node)
+    );
+
+    const looksLikeDepsGetter = (node) => {
+      if (!isFunctionLike(node)) return false;
+      if (t.isArrayExpression(node.body)) return true;
+      if (!t.isBlockStatement(node.body)) return false;
+
+      const bodyStatements = node.body.body.filter((statement) => !t.isDirective(statement));
+      if (bodyStatements.length !== 1) return false;
+
+      return t.isReturnStatement(bodyStatements[0]) && t.isArrayExpression(bodyStatements[0].argument);
+    };
+
+    const ensureBlockBody = (functionPath) => {
+      if (!isFunctionLike(functionPath.node)) return null;
+      if (t.isBlockStatement(functionPath.node.body)) {
+        return functionPath.get('body');
+      }
+
+      functionPath.node.body = t.blockStatement([
+        t.returnStatement(functionPath.node.body)
+      ]);
+      return functionPath.get('body');
+    };
+
+    const injectResolvedProps = (functionPath) => {
+      if (!resolvePropsId || destructuredNames.size === 0 || !isFunctionLike(functionPath.node)) {
+        return;
+      }
+
+      const bodyPath = ensureBlockBody(functionPath);
+      const resolvedPropsId = functionPath.scope.generateUidIdentifier('resolvedProps');
+
+      bodyPath.unshiftContainer('body', t.variableDeclaration('const', [
+        t.variableDeclarator(
+          resolvedPropsId,
+          t.callExpression(t.cloneNode(resolvePropsId), [])
+        )
+      ]));
+
+      functionPath.traverse({
+        Identifier(idPath) {
+          const name = idPath.node.name;
+
+          if (!idPath.isReferencedIdentifier() || !destructuredNames.has(name)) {
+            return;
+          }
+
+          if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) {
+            return;
+          }
+
+          idPath.replaceWith(
+            t.memberExpression(t.cloneNode(resolvedPropsId), t.identifier(name))
+          );
+        }
+      });
+    };
 
     // --- Props-specific setup (only when params exist) ---
     if (params.length > 0 && (t.isIdentifier(params[0]) || t.isObjectPattern(params[0]))) {
@@ -166,15 +228,40 @@ export default function aeuiTransform({ types: t }) {
           t.variableDeclarator(originalParam, propsId)
         ]);
       } else if (t.isObjectPattern(originalParam)) {
-        originalParam.properties.forEach(prop => {
-          if (t.isObjectProperty(prop) && t.isIdentifier(prop.value)) {
-            destructuredNames.add(prop.value.name);
-          }
+        const bindingIdentifiers = t.getBindingIdentifiers(originalParam);
+        Object.keys(bindingIdentifiers).forEach((name) => {
+          destructuredNames.add(name);
         });
+
+        resolvePropsId = path.scope.generateUidIdentifier('resolveProps');
+        const resolvePropsSetup = t.variableDeclaration('const', [
+          t.variableDeclarator(
+            resolvePropsId,
+            t.arrowFunctionExpression([], t.blockStatement([
+              t.variableDeclaration('const', [
+                t.variableDeclarator(
+                  t.cloneNode(originalParam, true),
+                  t.cloneNode(propsId)
+                )
+              ]),
+              t.returnStatement(
+                t.objectExpression(
+                  Object.keys(bindingIdentifiers).map((name) => (
+                    t.objectProperty(t.identifier(name), t.identifier(name), false, true)
+                  ))
+                )
+              )
+            ]))
+          )
+        ]);
 
         restoreVars = t.variableDeclaration("let", [
           t.variableDeclarator(originalParam, initialPropsId)
         ]);
+
+        if (t.isBlockStatement(path.node.body)) {
+          path.node.body.body.unshift(resolvePropsSetup);
+        }
       }
 
       // Insert setup code
@@ -192,50 +279,49 @@ export default function aeuiTransform({ types: t }) {
         const args = callPath.node.arguments;
         if (args.length < 2) return;
 
-        // Transform deps: [] -> () => []
-        if (t.isArrayExpression(args[1])) {
-          const depsPath = callPath.get('arguments.1');
-          depsPath.replaceWith(t.arrowFunctionExpression([], t.cloneNode(args[1], true)));
+        const [firstArg, secondArg] = args;
+        let depsArg = null;
+        let callbackArg = null;
+
+        const firstLooksLikeDeps = t.isArrayExpression(firstArg) || looksLikeDepsGetter(firstArg);
+        const secondLooksLikeDeps = t.isArrayExpression(secondArg) || looksLikeDepsGetter(secondArg);
+
+        if (firstLooksLikeDeps && !secondLooksLikeDeps) {
+          depsArg = firstArg;
+          callbackArg = secondArg;
+        } else if (!firstLooksLikeDeps && secondLooksLikeDeps) {
+          callbackArg = firstArg;
+          depsArg = secondArg;
+        } else if (isFunctionLike(firstArg) && !isFunctionLike(secondArg)) {
+          callbackArg = firstArg;
+          depsArg = secondArg;
+        } else if (!isFunctionLike(firstArg) && isFunctionLike(secondArg)) {
+          depsArg = firstArg;
+          callbackArg = secondArg;
+        } else if (isFunctionLike(firstArg) && isFunctionLike(secondArg)) {
+          if (firstLooksLikeDeps && !secondLooksLikeDeps) {
+            depsArg = firstArg;
+            callbackArg = secondArg;
+          } else {
+            callbackArg = firstArg;
+            depsArg = secondArg;
+          }
+        } else {
+          return;
         }
 
-        // Helper to replace identifiers in a path (callback or deps)
-        const replaceIdentifiers = (targetPath) => {
-          targetPath.traverse({
-            Identifier(idPath) {
-              const name = idPath.node.name;
-              // Only replace usage, not declarations or property keys
-              // Use idPath.isReferencedIdentifier() which works in Babel 7
-              if (
-                !idPath.isReferencedIdentifier() ||
-                !destructuredNames.has(name)
-              ) {
-                return;
-              }
-
-              // Shadowing Check
-              // If the identifier is bound in a scope *inside* the component but *outside* the current usage
-              // it means it's shadowed.
-              if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) {
-                return;
-              }
-
-              idPath.replaceWith(
-                t.memberExpression(propsId, t.identifier(name))
-              );
-            }
-          });
-        };
-
-        // Replace in Callback (only if has destructured prop names)
-        if (args[0] && destructuredNames.size > 0 && propsId) {
-          const callbackPath = callPath.get('arguments.0');
-          replaceIdentifiers(callbackPath);
+        if (!isFunctionLike(depsArg)) {
+          depsArg = t.arrowFunctionExpression([], t.cloneNode(depsArg, true));
         }
 
-        // Replace in Deps (if it's a function now and has destructured prop names)
-        if (args[1] && destructuredNames.size > 0 && propsId && (t.isArrowFunctionExpression(args[1]) || t.isFunctionExpression(args[1]))) {
-          const depsPath = callPath.get('arguments.1');
-          replaceIdentifiers(depsPath);
+        callPath.node.arguments = [depsArg, callbackArg];
+
+        if (destructuredNames.size > 0 && propsId) {
+          const depsPath = callPath.get('arguments.0');
+          const callbackPath = callPath.get('arguments.1');
+
+          injectResolvedProps(depsPath);
+          injectResolvedProps(callbackPath);
         }
       },
 
@@ -270,33 +356,7 @@ export default function aeuiTransform({ types: t }) {
               )
             );
 
-            // Replace destructured usage in render body
-            if (destructuredNames.size > 0) {
-              const renderBodyPath = returnPath.get("argument").get("body");
-
-              // Helper to traverse and replace
-              const replaceInRender = (bodyPath) => {
-                bodyPath.traverse({
-                  Identifier(idPath) {
-                    const name = idPath.node.name;
-                    if (!idPath.isReferencedIdentifier() || !destructuredNames.has(name)) return;
-
-                    // Shadowing check
-                    if (idPath.scope.hasBinding(name) && idPath.scope.getBinding(name).scope !== path.scope) return;
-
-                    // Replace with __props.name
-                    idPath.replaceWith(t.memberExpression(propsId, t.identifier(name)));
-                  }
-                });
-              }
-
-              // Apply replacement to the render function body (whether block or expression)
-              // We traverse the function itself to cover parameters and body, but we filter by scope/shadowing
-              const fnPath = returnPath.get("argument");
-              replaceInRender(fnPath);
-            }
-
-
+            injectResolvedProps(returnPath.get("argument"));
 
             if (t.isBlockStatement(renderFn.body)) {
               renderFn.body.body.unshift(...updateLogic);

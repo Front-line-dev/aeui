@@ -53,7 +53,8 @@ export function _runComponentWatchers(node) {
 
       if (hasChanged) {
         watcher.callback();
-        watcher.oldDeps = this._deepClone(newDeps);
+        const finalDeps = watcher.getDeps();
+        watcher.oldDeps = this._deepClone(finalDeps);
       }
     } catch (e) {
       console.error('[AEUI] Watcher error:', e);

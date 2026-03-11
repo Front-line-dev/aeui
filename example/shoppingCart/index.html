@@ -58,9 +58,9 @@
         console.log(`[CartItem:${item.id}] Setup`);
 
         // Watch for quantity changes
-        watch(() => {
+        watch([item.quantity], () => {
            console.log(`[CartItem:${item.id}] Quantity changed to: ${item.quantity}`);
-        }, [item.quantity]);
+        });
 
         // Render
         return (
@@ -99,9 +99,9 @@
           items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
         // Watch
-        watch(() => {
+        watch([getTotal()], () => {
           console.log(`[ShoppingCart] Total Price: ${getTotal()}원`);
-        }, [getTotal()]);
+        });
 
         return (
           <div style="padding: 20px; font-family: sans-serif;">

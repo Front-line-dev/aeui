@@ -70,10 +70,10 @@ function Counter() {
 
 ```jsx
 // 사용자 코드
-watch(() => console.log(count), [count]);
+watch([count], () => console.log(count));
 
 // 변환 후
-watch(() => console.log(count), () => [count]);
+watch(() => [count], () => console.log(count));
 ```
 
 배열 `[count]`는 작성 시점에 한 번 평가되면 고정되지만, 함수 `() => [count]`는 호출될 때마다 **현재** `count` 값을 읽어 새 배열을 생성한다.
@@ -160,22 +160,21 @@ AEUI가 `let` 변수의 직접 수정을 감지하기 위해 Polling을 사용�
    └→ count가 0에서 1로 변경됨 (메모리상 변수만 변경, 화면은 아직 그대로)
 
 2. 다음 tick 시작 (상황에 따라 프레임 간격이 달라짐)
-   └→ _runComponentWatchers: count를 감시하는 watcher 의존성 체크
-   └→ [count]의 현재값 [1]과 이전 스냅샷 [0] 비교 → 변경 감지
-   └→ watcher callback 실행 (있는 경우)
-   └→ oldDeps를 [1]로 갱신
+   └→ 렌더 함수 시작
+      └→ _runComponentWatchers: count를 감시하는 watcher 의존성 체크
+      └→ [count]의 현재값 [1]과 이전 스냅샷 [0] 비교 → 변경 감지
+      └→ watcher callback 실행 (있는 경우)
+      └→ callback 이후 최종 deps를 oldDeps로 저장
+      └→ AEUI.createVNode("p", null, count)
+      └→ count가 1이므로 VNode = { tag: "p", children: [1] }
 
-3. 렌더 함수 실행
-   └→ AEUI.createVNode("p", null, count)
-   └→ count가 1이므로 VNode = { tag: "p", children: [1] }
-
-4. reconcile (diffing)
+3. reconcile (diffing)
    └→ 이전 VNode: { tag: "p", children: [0] }
    └→ 새 VNode:   { tag: "p", children: [1] }
    └→ children[0]이 다름: 0 → 1
    └→ 텍스트 노드의 nodeValue를 "1"로 변경
 
-5. 화면에 "카운트: 1"이 표시됨
+4. 화면에 "카운트: 1"이 표시됨
 ```
 
 ---

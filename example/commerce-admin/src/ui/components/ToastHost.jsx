@@ -34,7 +34,7 @@ export default function ToastHost() {
   };
 
   syncTimers();
-  watch(syncTimers, [state.toasts]);
+  watch([state.toasts], syncTimers);
   clean(() => {
     for (const timerId of timers.values()) clearTimeout(timerId);
     timers.clear();
