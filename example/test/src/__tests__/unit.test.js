@@ -182,3 +182,12 @@ describe('AEUI.Fragment', () => {
     expect(result).toEqual(nextItems);
   });
 });
+
+describe('AEUI facade runtime proxies', () => {
+  it('exposes mutable runtime fields through accessors instead of owning the state directly', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(AEUI, '_didMutate');
+
+    expect(typeof descriptor.get).toBe('function');
+    expect(typeof descriptor.set).toBe('function');
+  });
+});

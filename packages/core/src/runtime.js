@@ -30,7 +30,7 @@ export function createRootNode(containerElement) {
   };
 }
 
-export function _runComponentWatchers(node) {
+export function _runComponentWatchers(state, node) {
   if (!node || !node.watchStates) return;
 
   node.watchStates.forEach((watcher) => {
@@ -38,12 +38,12 @@ export function _runComponentWatchers(node) {
       const newDeps = watcher.getDeps();
       const hasChanged =
         !watcher.oldDeps ||
-        !this._deepEqual(newDeps, watcher.oldDeps);
+        !state.deepEqual(newDeps, watcher.oldDeps);
 
       if (hasChanged) {
         watcher.callback();
         const finalDeps = watcher.getDeps();
-        watcher.oldDeps = this._deepClone(finalDeps);
+        watcher.oldDeps = state.deepClone(finalDeps);
       }
     } catch (e) {
       console.error('[AEUI] Watcher error:', e);
@@ -51,7 +51,7 @@ export function _runComponentWatchers(node) {
   });
 }
 
-export function createNode(vnode, parentNode = null, parentDom = null) {
+export function createNode(state, vnode, parentNode = null, parentDom = null) {
   const node = {
     kind: null,
     key: getVNodeKey(vnode),
@@ -75,7 +75,7 @@ export function createNode(vnode, parentNode = null, parentDom = null) {
     return node;
   }
 
-  if (isFragmentVNode(this, vnode)) {
+  if (isFragmentVNode(state.Fragment, vnode)) {
     node.kind = 'fragment';
     return node;
   }
@@ -96,123 +96,123 @@ export function createNode(vnode, parentNode = null, parentDom = null) {
   node.renderedNode = null;
   node.render = null;
 
-  this._currentComponentNode = node;
-  this._currentInstance = node;
+  state.currentComponentNode = node;
+  state.currentInstance = node;
   try {
     node.render = vnode.tag(vnode.props);
   } finally {
-    this._currentComponentNode = null;
-    this._currentInstance = null;
+    state.currentComponentNode = null;
+    state.currentInstance = null;
   }
 
   return node;
 }
 
-export function _reconcileRoot() {
-  if (!this._rootNode || !this._containerElement || !this._RootComponent) return;
+export function _reconcileRoot(state) {
+  if (!state.rootNode || !state.containerElement || !state.RootComponent) return;
 
-  const rootVNode = this.createVNode(this._RootComponent);
-  const previousRootChild = this._rootNode.children[0] || null;
-  const nextRootChild = this._reconcile(
-    this._containerElement,
+  const rootVNode = state.createVNode(state.RootComponent);
+  const previousRootChild = state.rootNode.children[0] || null;
+  const nextRootChild = state._reconcile(
+    state.containerElement,
     previousRootChild,
     rootVNode,
     null,
-    this._rootNode
+    state.rootNode
   );
 
-  this._rootNode.children = nextRootChild ? [nextRootChild] : [];
-  this._rootNode.firstDom = nextRootChild ? nextRootChild.firstDom : null;
-  this._rootNode.lastDom = nextRootChild ? nextRootChild.lastDom : null;
+  state.rootNode.children = nextRootChild ? [nextRootChild] : [];
+  state.rootNode.firstDom = nextRootChild ? nextRootChild.firstDom : null;
+  state.rootNode.lastDom = nextRootChild ? nextRootChild.lastDom : null;
 }
 
-export function init(RootComponent, containerElement) {
-  this._stopScheduler();
-  if (this._rootNode && this._rootNode.children[0]) {
-    this._unmountNode(this._rootNode.children[0]);
+export function init(state, RootComponent, containerElement) {
+  state._stopScheduler();
+  if (state.rootNode && state.rootNode.children[0]) {
+    state._unmountNode(state.rootNode.children[0]);
   }
 
-  this._RootComponent = RootComponent;
-  this._containerElement = containerElement;
-  this._rootNode = createRootNode(containerElement);
+  state.RootComponent = RootComponent;
+  state.containerElement = containerElement;
+  state.rootNode = createRootNode(containerElement);
   containerElement.innerHTML = '';
 
-  const didMutate = this._tick();
-  this._frameDelay = didMutate ? 1 : 2;
-  this._framesUntilNextTick = this._frameDelay - 1;
+  const didMutate = state._tick();
+  state.frameDelay = didMutate ? 1 : 2;
+  state.framesUntilNextTick = state.frameDelay - 1;
 
-  this._startScheduler();
+  state._startScheduler();
 }
 
-export function render() {
-  if (!this._RootComponent || !this._containerElement) return false;
+export function render(state) {
+  if (!state.RootComponent || !state.containerElement) return false;
 
-  const didMutate = this._tick();
-  this._frameDelay = didMutate ? 1 : Math.min(this._frameDelay * 2, MAX_FRAME_DELAY);
-  this._framesUntilNextTick = this._frameDelay - 1;
-  this._startScheduler();
+  const didMutate = state._tick();
+  state.frameDelay = didMutate ? 1 : Math.min(state.frameDelay * 2, MAX_FRAME_DELAY);
+  state.framesUntilNextTick = state.frameDelay - 1;
+  state._startScheduler();
   return didMutate;
 }
 
-export function _stopScheduler() {
-  if (this._rafId != null) {
+export function _stopScheduler(state) {
+  if (state.rafId != null) {
     if (typeof cancelAnimationFrame === 'function') {
-      cancelAnimationFrame(this._rafId);
+      cancelAnimationFrame(state.rafId);
     } else {
-      clearTimeout(this._rafId);
+      clearTimeout(state.rafId);
     }
   }
 
-  this._rafId = null;
+  state.rafId = null;
 }
 
-export function _startScheduler() {
-  if (this._rafId != null) return;
+export function _startScheduler(state) {
+  if (state.rafId != null) return;
 
   if (typeof requestAnimationFrame === 'function') {
-    this._rafId = requestAnimationFrame(() => this._onAnimationFrame());
+    state.rafId = requestAnimationFrame(() => _onAnimationFrame(state));
   } else {
-    this._rafId = setTimeout(() => this._onAnimationFrame(), 16);
+    state.rafId = setTimeout(() => _onAnimationFrame(state), 16);
   }
 }
 
-export function _onAnimationFrame() {
-  this._rafId = null;
-  if (!this._RootComponent || !this._containerElement) return;
+export function _onAnimationFrame(state) {
+  state.rafId = null;
+  if (!state.RootComponent || !state.containerElement) return;
 
-  if (this._framesUntilNextTick <= 0) {
-    const didMutate = this._tick();
-    const hasManualRequestDuringTick = this._rafId != null;
+  if (state.framesUntilNextTick <= 0) {
+    const didMutate = state._tick();
+    const hasManualRequestDuringTick = state.rafId != null;
 
     if (hasManualRequestDuringTick) {
-      this._framesUntilNextTick = 0;
+      state.framesUntilNextTick = 0;
     } else {
-      this._frameDelay = didMutate
+      state.frameDelay = didMutate
         ? 1
-        : Math.min(this._frameDelay * 2, MAX_FRAME_DELAY);
-      this._framesUntilNextTick = this._frameDelay - 1;
+        : Math.min(state.frameDelay * 2, MAX_FRAME_DELAY);
+      state.framesUntilNextTick = state.frameDelay - 1;
     }
   } else {
-    this._framesUntilNextTick -= 1;
+    state.framesUntilNextTick -= 1;
   }
 
-  this._startScheduler();
+  state._startScheduler();
 }
 
-export function _tick() {
-  if (!this._RootComponent || !this._containerElement || !this._rootNode) return false;
-  if (this._isRendering) return false;
+export function _tick(state) {
+  if (!state.RootComponent || !state.containerElement || !state.rootNode) return false;
+  if (state.isRendering) return false;
 
-  this._isRendering = true;
-  this._didMutate = false;
+  state.isRendering = true;
+  state.didMutate = false;
 
   try {
-    this._reconcileRoot();
+    _reconcileRoot(state);
   } catch (e) {
     console.error('[AEUI] Render error:', e);
   } finally {
-    this._isRendering = false;
+    state.isRendering = false;
   }
 
-  return this._didMutate;
+  return state.didMutate;
 }
