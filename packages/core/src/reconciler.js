@@ -1,22 +1,11 @@
 /**
  * DOM operations, runtime node reconciliation, and unmounting
  */
-
-function getVNodeKey(vnode) {
-  if (vnode == null || typeof vnode !== 'object' || Array.isArray(vnode)) return null;
-  const key = vnode.props ? vnode.props.key : undefined;
-  return key == null ? null : key;
-}
-
-function isFragmentVNode(AEUI, vnode) {
-  return Array.isArray(vnode) || (vnode && typeof vnode === 'object' && vnode.tag === AEUI.Fragment);
-}
-
-function getFragmentChildren(AEUI, vnode) {
-  if (Array.isArray(vnode)) return vnode;
-  if (isFragmentVNode(AEUI, vnode)) return vnode.children || [];
-  return [];
-}
+import {
+  getFragmentChildren,
+  getVNodeKey,
+  isFragmentVNode,
+} from './vnode-helpers.js';
 
 function cloneHostPropsSnapshot(AEUI, props = {}) {
   const snapshot = {};

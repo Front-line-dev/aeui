@@ -2,20 +2,11 @@
  * Stateful runtime internals: hooks bridge, node creation,
  * watcher execution, root reconciliation, and scheduler loop.
  */
+import { getVNodeKey, isFragmentVNode } from './vnode-helpers.js';
 
 const MAX_FRAME_DELAY = 60;
 
 let runtimeContext = null;
-
-function getVNodeKey(vnode) {
-  if (vnode == null || typeof vnode !== 'object' || Array.isArray(vnode)) return null;
-  const key = vnode.props ? vnode.props.key : undefined;
-  return key == null ? null : key;
-}
-
-function isFragmentVNode(AEUI, vnode) {
-  return Array.isArray(vnode) || (vnode && typeof vnode === 'object' && vnode.tag === AEUI.Fragment);
-}
 
 export function setRuntimeContext(context) {
   runtimeContext = context;
