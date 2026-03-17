@@ -95,6 +95,17 @@ describe('_updateDomProps', () => {
     expect(select.getAttribute('value')).toBe('DELIVERED');
   });
 
+  it('file input에는 value property를 강제로 쓰지 않음', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+
+    expect(() => {
+      AEUI._updateDomProps(input, { type: 'file', value: 'fake-path' });
+    }).not.toThrow();
+
+    expect(input.getAttribute('value')).toBeNull();
+  });
+
   it('attribute 제거 (undefined)', () => {
     AEUI._updateDomProps(div, { id: 'test' });
     AEUI._updateDomProps(div, { id: undefined }, { id: 'test' });

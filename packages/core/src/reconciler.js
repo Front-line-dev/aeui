@@ -386,6 +386,13 @@ export function _updateDomProps(domNode, props, oldProps = {}) {
       domNode.style.cssText = newValue;
       this._didMutate = true;
     } else if (key === 'value') {
+      const isFileInput = domNode.tagName === 'INPUT' && domNode.type === 'file';
+      if (isFileInput) {
+        domNode.removeAttribute('value');
+        this._didMutate = true;
+        continue;
+      }
+
       const normalizedValue = newValue == null ? '' : String(newValue);
       domNode.value = normalizedValue;
       if (newValue === undefined || newValue === null) {
