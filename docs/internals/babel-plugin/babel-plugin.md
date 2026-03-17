@@ -1,438 +1,143 @@
-# Babel 플러그인 — `aeuiTransform`
+# Babel 플러그인 — 단일 Render Phase 계약
 
 ## 개요
 
-AEUI Babel 플러그인은 사용자가 작성한 컴포넌트 코드를 **AEUI 런타임이 이해할 수 있는 형태로 변환**하는 컴파일 타임 도구이다.
+현재 AEUI Babel 플러그인의 목적은 여전히 같다.
 
-AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 마법은 이 Babel 플러그인이 코드를 변환해주기 때문에 가능하다. 플러그인 없이는 AEUI 컴포넌트가 정상 동작하지 않는다.
+- setup은 한 번만 실행
+- render 함수는 반복 실행
+- props와 watcher는 매 render phase마다 최신 값 기준으로 다시 계산
 
-### 플러그인이 수행하는 3가지 변환
-
-| 변환 | 입력 | 출력 | 목적 |
-|------|------|------|------|
-| **Return 래핑** | `return <div />` | `return () => <div />` | setup 1회 실행 + 렌더 함수 반복 실행 구조 생성 |
-| **Props 반응화** | `function Comp(props)` | `function Comp(_initialProps)` + `__props` 객체 | props 변경 시 클로저 참조가 자동 갱신되도록 |
-| **Watch deps 래핑** | `watch([count], cb)` | `watch(() => [count], cb)` | 매 호출 시 현재 값을 읽도록 함수화 |
-
-### 전체 변환 흐름
-
-```
-사용자 코드:
-function Counter({ name }) {
-  let count = 0;
-  watch([name, count], () => console.log(name, count));
-  return <div>{name}: {count}</div>;
-}
-
-↓ Babel 플러그인 적용 후:
-
-function Counter(_initialProps) {
-  const __props = { ..._initialProps };
-  let { name } = _initialProps;
-  const _resolveProps = () => {
-    const { name } = __props;
-    return { name };
-  };
-
-  let count = 0;
-  watch(
-    () => {
-      const _resolvedProps = _resolveProps();
-      return [_resolvedProps.name, count];
-    },
-    () => {
-      const _resolvedProps2 = _resolveProps();
-      return console.log(_resolvedProps2.name, count);
-    }
-  );
-
-  return (_newProps) => {
-    AEUI.updateProps(__props, _newProps);
-    AEUI._runComponentWatchers(AEUI._currentComponentNode);
-    const _resolvedProps3 = _resolveProps();
-    return AEUI.createVNode("div", null, _resolvedProps3.name, ": ", count);
-  };
-}
-```
+다만 이번 코어 단순화 이후, 플러그인이 런타임에 기대는 계약은 더 작아졌다. 예전에는 `updateProps()`와 `_runComponentWatchers()`를 별도로 호출했지만, 지금은 **`AEUI._runRenderPhase()` 하나만 호출**한다.
 
 ---
 
-## 플러그인 진입점
+## 주요 변환
+
+### 1. 컴포넌트 판별
+
+다음 함수들을 AEUI 컴포넌트로 판단한다.
+
+- JSX tag로 사용되는 함수
+- PascalCase 함수
+- renderable expression을 반환하는 anonymous default export
+
+이 기준은 기존과 같지만, anonymous default export 처리와 renderable expression 탐지가 조금 더 명시적이다.
+
+### 2. `return JSX`를 render factory로 변환
 
 ```javascript
-export default function aeuiTransform({ types: t }) {
-  return {
-    visitor: {
-      "ArrowFunctionExpression|FunctionDeclaration|FunctionExpression"(path) {
-        if (!shouldTransformComponent(path)) return;
-        transformToFactory(path);
-        injectReactiveProps(path);
-      }
-    }
-  };
-}
-```
-
-Babel은 코드를 AST(Abstract Syntax Tree, 추상 구문 트리)로 파싱한 후, visitor 패턴으로 각 노드를 순회한다. 이 플러그인은 모든 함수 선언/표현식을 방문하여:
-
-1. **`shouldTransformComponent`**: 이 함수가 AEUI 컴포넌트인지 판별
-2. **`transformToFactory`**: `return JSX`를 `return () => JSX`로 변환
-3. **`injectReactiveProps`**: props 반응화, watch deps 래핑, 렌더 함수에 업데이트 로직 주입
-
-`types: t`는 Babel이 제공하는 AST 노드 생성/검사 유틸리티이다. `t.isIdentifier()`, `t.arrowFunctionExpression()` 등의 함수를 포함한다.
-
----
-
-## 1단계: `shouldTransformComponent` — 컴포넌트 판별
-
-모든 함수가 AEUI 컴포넌트인 것은 아니다. 이벤트 핸들러, 유틸리티 함수 등은 변환하면 안 된다. 이 함수는 **해당 함수가 AEUI 컴포넌트인지 판별**한다.
-
-### 판별 기준 (우선순위 순)
-
-```
-1. JSX 태그로 사용되는 함수 → 컴포넌트 (최우선)
-   예: <Counter /> 에서 Counter가 사용됨
-
-2. PascalCase(대문자로 시작)인 함수 → 컴포넌트
-   예: function Counter() { ... }
-   예: const MyApp = () => { ... }
-
-3. 그 외 → 컴포넌트가 아님
-   예: function handleClick() { ... }
-   예: const formatDate = (date) => { ... }
-```
-
-### JSX 태그 사용 감지 (Strategy 1)
-
-```javascript
-binding.referencePaths.forEach(refPath => {
-  // <Counter /> 형태로 사용되는지
-  if (t.isJSXOpeningElement(refPath.parent) && refPath.parent.name === refPath.node) {
-    isUsedAsComponent = true;
-  }
-
-  // AEUI.createElement(Counter, ...) 형태로 사용되는지 (이미 변환된 JSX)
-  else if (
-    t.isCallExpression(refPath.parent) &&
-    refPath.parent.arguments[0] === refPath.node
-  ) {
-    isUsedAsComponent = true;
-  }
-});
-```
-
-Babel의 `scope.getBinding()`을 사용하여 해당 함수가 코드 내에서 어떻게 참조되는지 확인한다. JSX 태그(`<Counter />`)의 이름으로 사용되거나, 이미 변환된 `createElement`의 첫 번째 인자로 사용되면 컴포넌트로 판별한다.
-
-### PascalCase 검사 (Strategy 2)
-
-```javascript
-if (varName && /^[A-Z]/.test(varName)) {
-  return true;
-}
-```
-
-함수 이름이 대문자로 시작하면 컴포넌트로 판별한다. React의 관례와 동일하게, AEUI에서도 컴포넌트는 PascalCase, 일반 함수는 camelCase로 명명한다.
-
-### 지원되는 함수 형태
-
-| 형태 | 예시 | 이름 추출 위치 |
-|------|------|-------------|
-| 함수 선언 | `function Counter() {}` | `path.node.id.name` |
-| 변수에 할당된 화살표 함수 | `const Counter = () => {}` | `path.parent.id.name` |
-| 변수에 할당된 함수 표현식 | `const Counter = function() {}` | `path.parent.id.name` |
-| 객체 프로퍼티 | `{ Counter: () => {} }` | `path.parent.key.name` |
-| 멤버 할당 | `exports.Counter = () => {}` | `path.parent.left.property.name` |
-
----
-
-## 2단계: `transformToFactory` — Return 래핑
-
-컴포넌트의 `return JSX`를 `return () => JSX`로 변환한다.
-
-### 왜 필요한가
-
-AEUI의 핵심 원리: **컴포넌트 함수(setup)는 한 번만 실행**되고, **렌더 함수(factory)는 매 tick마다 반복 실행**된다. 사용자가 `return <div>{count}</div>`를 작성하면, 이것은 setup의 일부이므로 한 번만 평가된다. 매 tick마다 최신 count를 반영하려면 `return () => <div>{count}</div>`로 변환해야 한다.
-
-### 두 가지 함수 형태 처리
-
-**1. Expression Body (화살표 함수 단축형)**
-```javascript
-// 입력
-const Counter = () => <div>{count}</div>;
-
-// 출력
-const Counter = () => () => <div>{count}</div>;
-```
-
-```javascript
-if (isJSX(path.node.body)) {
-  path.node.body = t.arrowFunctionExpression([], path.node.body);
-}
-```
-
-**2. Block Statement Body (중괄호 본문)**
-```javascript
-// 입력
 function Counter() {
   let count = 0;
   return <div>{count}</div>;
 }
+```
 
-// 출력
+는 다음 개념으로 변환된다.
+
+```javascript
 function Counter() {
   let count = 0;
   return () => <div>{count}</div>;
 }
 ```
 
+expression body, conditional expression, logical expression, array return도 renderable value로 인식한다.
+
+### 3. props 반응화
+
+props 파라미터가 있으면 `_initialProps`와 `__props`를 도입한다.
+
 ```javascript
-path.traverse({
-  ReturnStatement(returnPath) {
-    // 이 컴포넌트의 직접 return인지 확인 (중첩 함수의 return이 아닌지)
-    if (returnPath.getFunctionParent().node === path.node) {
-      if (isJSX(returnPath.node.argument)) {
-        // 이미 함수로 감싸져 있으면 건너뜀 (이중 래핑 방지)
-        if (t.isArrowFunctionExpression(returnPath.node.argument)) return;
-        returnPath.node.argument = t.arrowFunctionExpression([], returnPath.node.argument);
-      }
-    }
-  }
-});
+function Card({ title }) { ... }
 ```
 
-실제 구현은 위 두 형태를 내부적으로 모두 block body로 정규화한 뒤 처리한다. 따라서 다음처럼 **JSX를 포함하는 조건식/논리식/배열 반환**도 같은 규칙으로 `() => ...` render factory로 감싸진다.
+는 개념적으로 다음 구조가 된다.
 
 ```javascript
-function Status({ ok }) {
-  return ok ? <strong>OK</strong> : <em>NO</em>;
-}
-
-function MaybeBanner({ show }) {
-  return show && <div>Visible</div>;
+function Card(_initialProps) {
+  const __props = { ..._initialProps };
+  let { title } = _initialProps;
+  const _resolveProps = () => {
+    const { title } = __props;
+    return { title };
+  };
 }
 ```
 
-또한 이름이 없는 `export default` 함수/화살표 함수만, top-level return이 JSX 또는 render 함수라면 컴포넌트로 인식해 동일한 변환을 적용한다. 이름이 있는 `export default function helper() { ... }` 형태는 이 예외 규칙에 포함되지 않고, 기존 heuristic(PascalCase 이름 또는 JSX 사용 여부)로만 판별한다.
+구조 분해 props는 `_resolveProps()`를 통해 render/watch 시점에 다시 해석되므로 alias, default, nested pattern을 유지할 수 있다.
 
-### `isJSX` 헬퍼 함수
-
-return 값이 JSX인지 판별한다. 여러 형태를 지원한다:
+### 4. `watch()` deps 정규화
 
 ```javascript
-const isJSX = (node) => {
-  if (t.isJSXElement(node) || t.isJSXFragment(node)) return true;   // <div />, <>...</>
-  if (t.isParenthesizedExpression(node)) return isJSX(node.expression); // (<div />)
-  if (t.isCallExpression(node)) {
-    // AEUI.createVNode(...) 또는 AEUI.createElement(...)
-    // → 이미 JSX가 변환된 경우
-  }
-  return false;
-};
+watch([count], callback);
 ```
 
-괄호로 감싸진 JSX (`return (<div />)`)도 재귀적으로 감지한다.
-
-### 중첩 함수의 return은 건너뛰기
+는 다음처럼 바뀐다.
 
 ```javascript
-if (returnPath.getFunctionParent().node === path.node) { ... }
+watch(() => [count], callback);
 ```
 
-컴포넌트 내부에 다른 함수가 있고 그 함수도 JSX를 반환하는 경우:
+구버전 순서인 `watch(callback, deps)`를 만나도 내부적으로 `watch(deps, callback)` 형태로 맞춘 뒤 deps getter를 생성한다.
 
-```jsx
-function ParentApp() {
-  const renderItem = (item) => <span>{item}</span>;  // ← 이 return은 변환하면 안 됨
-  return <div>{renderItem("hello")}</div>;            // ← 이 return만 변환
-}
+### 5. 단일 render phase helper 호출
+
+가장 중요한 변화다. 최종 render wrapper는 이제 다음 구조를 만든다.
+
+```javascript
+return (_newProps) => AEUI._runRenderPhase(_newProps, __props, innerRenderFn);
 ```
 
-`getFunctionParent()`로 return문이 속한 함수가 현재 변환 대상 컴포넌트인지 확인한다.
+예전처럼 wrapper 내부에:
+
+- `AEUI.updateProps(__props, _newProps)`
+- `AEUI._runComponentWatchers(AEUI._currentComponentNode)`
+
+를 직접 주입하지 않는다. 이 두 단계는 `_runRenderPhase()` 안으로 이동했다.
 
 ---
 
-## 3단계: `injectReactiveProps` — Props 반응화
+## Render 파라미터 보존
 
-가장 복잡한 변환이다. props가 변경될 때 컴포넌트 내부의 코드가 **자동으로 최신 props를 참조**하도록 변환한다.
-
-### 3-1. 파라미터 변환과 `__props` 생성
-
-**전체 props 객체를 받는 경우:**
+render 함수가 직접 파라미터를 받는 경우도 지원해야 한다.
 
 ```javascript
-// 입력
-function UserCard(props) { ... }
-
-// 출력
-function UserCard(_initialProps) {
-  const __props = { ..._initialProps };   // 반응형 props 객체
-  const props = __props;                  // 사용자 변수에 참조 연결
-  ...
-}
+return ({ size = 'm' }) => <div>{size}</div>;
 ```
 
-**구조 분해(destructuring)를 사용하는 경우:**
+현재 플러그인은 내부적으로 별도 render param id를 만들고, 원래 파라미터 패턴을 다시 바인딩한다. 이 작업은 `createRenderParamBindings()`가 담당한다.
 
-```javascript
-// 입력
-function UserCard({ name, age }) { ... }
+이 덕분에 다음 패턴들이 유지된다.
 
-// 출력
-function UserCard(_initialProps) {
-  const __props = { ..._initialProps };   // 반응형 props 객체
-  let { name, age } = _initialProps;      // 초기값으로 변수 생성
-  ...
-}
-```
+- 단순 identifier 파라미터
+- object / array destructuring
+- default assignment pattern
 
-### `__props`가 필요한 이유
-
-setup은 한 번만 실행되므로, `const { name } = props`도 한 번만 실행된다. 부모가 새 props를 전달해도 `name` 변수는 초기값으로 고정된다.
-
-```javascript
-// 문제: setup에서 한 번만 실행됨
-function UserCard({ name }) {
-  // name = "홍길동" (초기값, 이후 변경 불가)
-  return <p>{name}</p>;
-}
-
-// 해결: __props를 현재 시점 구조 분해로 다시 해석
-function UserCard(_initialProps) {
-  const __props = { ..._initialProps };
-  let { name } = _initialProps;
-  const _resolveProps = () => {
-    const { name } = __props;
-    return { name };
-  };
-
-  return (_newProps) => {
-    AEUI.updateProps(__props, _newProps);  // __props 내용을 최신으로 교체
-    const _resolvedProps = _resolveProps();
-    return <p>{_resolvedProps.name}</p>;   // 현재 props 기준으로 다시 해석
-  };
-}
-```
-
-`__props`는 같은 객체 참조를 유지하면서 내용만 교체된다. render/watch가 실행될 때마다 `_resolveProps()`가 이 현재 `__props`를 다시 구조 분해하므로, alias/default/nested/rest를 포함한 패턴도 최신값 기준으로 평가할 수 있다.
-
-### 3-2. Watch deps 래핑 및 시그니처 정규화
-
-```javascript
-// 입력
-watch([count], () => console.log(count));
-
-// 출력
-watch(() => [count], () => console.log(count));
-```
-
-```javascript
-if (!isFunctionLike(depsArg)) {
-  depsArg = t.arrowFunctionExpression([], t.cloneNode(depsArg, true));
-}
-```
-
-새 API는 `watch(deps, callback)`이다. 플러그인은 이 순서를 기준으로 정규화하며, 구버전 `watch(callback, deps)`도 만나면 내부적으로 같은 형태로 바꾼다. 그 뒤 deps 표현식을 화살표 함수로 감싸서, 매 호출 시 클로저에서 현재 값을 읽도록 한다.
-
-### 3-3. 구조 분해된 props의 재해석
-
-초기 구현은 구조 분해된 이름을 `__props.name`처럼 직접 치환했지만, alias/default/nested/rest 패턴을 정확히 처리할 수 없었다. 현재 구현은 **원래 구조 분해 패턴 자체를 `_resolveProps()` 안에 보존**하고, watch/render가 실행될 때마다 현재 `__props`를 다시 해석한다.
-
-```javascript
-// 입력
-function UserCard({ title: label, count = 0 }) {
-  watch([label, count], () => console.log(label, count));
-  return <p>{label}: {count}</p>;
-}
-
-// 출력 (중요: 원래 구조 분해 패턴을 _resolveProps 안에 유지)
-function UserCard(_initialProps) {
-  const __props = { ..._initialProps };
-  let { title: label, count = 0 } = _initialProps;
-  const _resolveProps = () => {
-    const { title: label, count = 0 } = __props;
-    return { label, count };
-  };
-
-  watch(
-    () => {
-      const _resolvedProps = _resolveProps();
-      return [_resolvedProps.label, _resolvedProps.count];
-    },
-    () => {
-      const _resolvedProps2 = _resolveProps();
-      return console.log(_resolvedProps2.label, _resolvedProps2.count);
-    }
-  );
-
-  return (_newProps) => {
-    AEUI.updateProps(__props, _newProps);
-    AEUI._runComponentWatchers(AEUI._currentComponentNode);
-    const _resolvedProps3 = _resolveProps();
-    return <p>{_resolvedProps3.label}: {_resolvedProps3.count}</p>;
-  };
-}
-```
-
-이 방식의 장점:
-
-- `title: label` 같은 alias가 정확히 유지된다
-- `count = 0` 같은 default 값이 최신 props 기준으로 다시 계산된다
-- `{ user: { name } }`, `{ ...rest }` 같은 nested/rest 패턴도 JS 본래 semantics를 그대로 사용한다
-- render/watch 안에서는 치환 대상이 단순히 `_resolvedProps.<name>`가 되므로 shadowing 처리도 단순해진다
-
-### 3-4. 렌더 함수에 업데이트 로직 주입
-
-return에서 래핑된 화살표 함수(렌더 함수)를 찾아, **시작부에 업데이트 코드를 삽입**한다.
-
-```javascript
-// 래핑된 렌더 함수를 찾으면:
-return () => <div>{count}</div>;
-
-// 다음과 같이 변환:
-return (_newProps) => {
-  AEUI.updateProps(__props, _newProps);                            // 1. props 갱신
-  AEUI._runComponentWatchers(AEUI._currentComponentNode);          // 2. watcher 실행 (유일한 실행 지점)
-  return <div>{count}</div>;                                       // 3. JSX 반환
-};
-```
-
-**이중 변환 방지**: 이미 `_newProps` 파라미터가 있으면 건너뛴다.
-
-```javascript
-if (renderFn.params.length > 0 && renderFn.params[0].name.startsWith("_newProps")) return;
-```
-
-**props가 없는 컴포넌트**: `updateProps` 호출은 생략하고 `_runComponentWatchers`만 주입한다.
-즉, watcher 실행 책임은 reconciler가 아니라 **렌더 함수 wrapper 시작부**에 집중된다.
+즉, render wrapper를 단일 helper 호출로 줄이면서도 기존 사용자 코드 의미를 깨지 않는다.
 
 ---
 
-## 변환 전후 전체 비교
+## 변환 후 개념 예시
 
-### 입력 (사용자 코드)
+입력:
 
 ```jsx
-export function TodoItem({ text, done }) {
+function TodoItem({ text, done }) {
   let editing = false;
 
   watch([done], () => {
     if (done) editing = false;
   });
 
-  clean(() => console.log("TodoItem 제거됨"));
-
-  return (
-    <li className={done ? "done" : ""}>
-      {editing ? <input value={text} /> : <span>{text}</span>}
-    </li>
-  );
+  return <li>{editing ? text : 'idle'}</li>;
 }
 ```
 
-### 출력 (Babel 변환 후)
+출력 개념:
 
 ```jsx
-export function TodoItem(_initialProps) {
+function TodoItem(_initialProps) {
   const __props = { ..._initialProps };
   let { text, done } = _initialProps;
   const _resolveProps = () => {
@@ -448,53 +153,38 @@ export function TodoItem(_initialProps) {
       return [_resolvedProps.done];
     },
     () => {
-      const _resolvedProps2 = _resolveProps();
-      if (_resolvedProps2.done) editing = false;
+      const _resolvedProps = _resolveProps();
+      if (_resolvedProps.done) editing = false;
     }
   );
 
-  clean(() => console.log("TodoItem 제거됨"));        // 변환 없음
-
-  return (_newProps) => {
-    AEUI.updateProps(__props, _newProps);
-    AEUI._runComponentWatchers(AEUI._currentComponentNode);
-    const _resolvedProps3 = _resolveProps();
-    return AEUI.createVNode("li", { className: _resolvedProps3.done ? "done" : "" },
-      editing
-        ? AEUI.createVNode("input", { value: _resolvedProps3.text })
-        : AEUI.createVNode("span", null, _resolvedProps3.text)
-    );
-  };
+  return (_newProps) => AEUI._runRenderPhase(
+    _newProps,
+    __props,
+    (_renderProps) => {
+      const _resolvedProps = _resolveProps();
+      return <li>{editing ? _resolvedProps.text : 'idle'}</li>;
+    }
+  );
 }
 ```
 
-변환 요약:
-- `{ text, done }` → `_initialProps` + `__props` 생성
-- `_resolveProps()`가 현재 `__props`를 원래 구조 분해 패턴으로 다시 해석
-- `return (JSX)` → `return (_newProps) => { 업데이트 로직; return JSX; }`
-- `watch([done], cb)` → `watch(() => [done], cb)` 형태로 정규화
-- watch/render 내부의 구조 분해 props 참조는 `_resolveProps()` 결과를 통해 최신값 사용
-- `editing`은 props가 아닌 로컬 상태이므로 변환하지 않음
-- `clean()`은 변환 대상이 아님
+핵심은 Babel이 "props 동기화 + watcher 실행 + render context 설정"의 세부 단계를 직접 조합하지 않고, render phase 계약 하나에만 의존한다는 점이다.
 
 ---
 
-## 변환되지 않는 것들
+## 왜 더 단순한가
 
-| 항목 | 이유 |
-|------|------|
-| `clean()` 호출 | 단순히 콜백을 등록하는 것이므로 변환 불필요 |
-| 로컬 `let` 변수 | 클로저에 의해 자동으로 최신 값이 참조됨 |
-| 이벤트 핸들러 내부 코드 | 이미 클로저로 최신 상태를 참조함 |
-| PascalCase가 아닌 함수 | 컴포넌트로 인식되지 않음 |
-| JSX를 반환하지 않는 함수 | `isJSX` 검사에서 false, return 래핑 건너뜀 |
+- Babel plugin이 runtime 내부 helper 조합을 덜 안다
+- `_runRenderPhase()` 하나만 테스트하면 watcher ordering을 검증할 수 있다
+- runtime 내부에서 props sync와 watcher 실행 순서를 바꿔도 Babel contract는 유지된다
+
+즉, compile-time 코드와 runtime 코드가 더 느슨하게 결합된다.
 
 ---
 
 ## 관련 코드 위치
 
-- `aeuiTransform`: `packages/core/src/babel-plugin.js` L1-L331
-- `isJSX`: `packages/core/src/babel-plugin.js` L5-L21
-- `shouldTransformComponent`: `packages/core/src/babel-plugin.js` L29-L99
-- `transformToFactory`: `packages/core/src/babel-plugin.js` L105-L127
-- `injectReactiveProps`: `packages/core/src/babel-plugin.js` L138-L313
+- `packages/core/src/babel-plugin.js`
+- `packages/core/src/core.js`
+- `packages/core/src/component-lifecycle.js`
