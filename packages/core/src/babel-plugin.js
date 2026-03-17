@@ -20,6 +20,102 @@ export default function aeuiTransform({ types: t }) {
     return false;
   };
 
+  const isFunctionLike = (node) => (
+    t.isArrowFunctionExpression(node) || t.isFunctionExpression(node)
+  );
+
+  const ensureBlockBody = (functionPath) => {
+    if (!t.isBlockStatement(functionPath.node.body)) {
+      functionPath.node.body = t.blockStatement([
+        t.returnStatement(functionPath.node.body)
+      ]);
+    }
+
+    return functionPath.get('body');
+  };
+
+  const containsRenderableExpression = (node) => {
+    if (!node) return false;
+    if (isJSX(node)) return true;
+    if (t.isParenthesizedExpression(node)) return containsRenderableExpression(node.expression);
+    if (t.isConditionalExpression(node)) {
+      return (
+        containsRenderableExpression(node.consequent) ||
+        containsRenderableExpression(node.alternate)
+      );
+    }
+    if (t.isLogicalExpression(node)) {
+      return (
+        containsRenderableExpression(node.left) ||
+        containsRenderableExpression(node.right)
+      );
+    }
+    if (t.isSequenceExpression(node)) {
+      return node.expressions.some((expression) => containsRenderableExpression(expression));
+    }
+    if (t.isArrayExpression(node)) {
+      return node.elements.some((element) => {
+        if (!element) return false;
+        if (t.isSpreadElement(element)) {
+          return containsRenderableExpression(element.argument);
+        }
+        return containsRenderableExpression(element);
+      });
+    }
+    return false;
+  };
+
+  const functionReturnsRenderableExpression = (functionPath) => {
+    if (!functionPath || !isFunctionLike(functionPath.node)) return false;
+
+    if (t.isArrowFunctionExpression(functionPath.node) && !t.isBlockStatement(functionPath.node.body)) {
+      return containsRenderableExpression(functionPath.node.body);
+    }
+
+    let found = false;
+    functionPath.traverse({
+      ReturnStatement(returnPath) {
+        if (returnPath.getFunctionParent().node !== functionPath.node) return;
+
+        if (containsRenderableExpression(returnPath.node.argument)) {
+          found = true;
+          returnPath.stop();
+        }
+      }
+    });
+
+    return found;
+  };
+
+  const returnsRenderableValue = (path) => {
+    if (t.isArrowFunctionExpression(path.node) && !t.isBlockStatement(path.node.body)) {
+      const bodyPath = path.get('body');
+      return (
+        containsRenderableExpression(path.node.body) ||
+        functionReturnsRenderableExpression(bodyPath)
+      );
+    }
+
+    let found = false;
+    path.traverse({
+      ReturnStatement(returnPath) {
+        if (returnPath.getFunctionParent().node !== path.node) return;
+
+        const arg = returnPath.node.argument;
+        const argPath = returnPath.get('argument');
+        if (
+          containsRenderableExpression(arg) ||
+          functionReturnsRenderableExpression(argPath)
+        ) {
+          found = true;
+          returnPath.stop();
+        }
+      }
+    });
+
+    return found;
+  };
+
   /**
    * Determines if an ArrowFunctionExpression is an AEUI component.
    * Strategies:
@@ -30,6 +126,18 @@ export default function aeuiTransform({ types: t }) {
     let varName = null;
     let isExported = false;
     let isUsedAsComponent = false;
+
+    const isAnonymousDefaultExport =
+      path.parentPath &&
+      path.parentPath.isExportDefaultDeclaration() &&
+      (
+        t.isArrowFunctionExpression(path.node) ||
+        ((t.isFunctionDeclaration(path.node) || t.isFunctionExpression(path.node)) && !path.node.id)
+      );
+
+    if (isAnonymousDefaultExport && returnsRenderableValue(path)) {
+      return true;
+    }
 
     // 1. Identify Variable Name & Export Status
     if (t.isFunctionDeclaration(path.node) && path.node.id) {
@@ -103,27 +211,20 @@ export default function aeuiTransform({ types: t }) {
    * Handles both expression bodies and block bodies.
    */
   const transformToFactory = (path) => {
-    // Handle Expression Body: () => <div />
-    if (isJSX(path.node.body)) {
-      path.node.body = t.arrowFunctionExpression([], path.node.body);
-    }
-    // Handle Block Statement Body: () => { return <div />; }
-    else if (t.isBlockStatement(path.node.body)) {
-      path.traverse({
-        ReturnStatement(returnPath) {
-          // Ensure we are transforming the return of the component, not a nested function
-          if (returnPath.getFunctionParent().node === path.node) {
-            if (isJSX(returnPath.node.argument)) {
-              // Avoid double wrapping
-              if (t.isArrowFunctionExpression(returnPath.node.argument) || t.isFunctionExpression(returnPath.node.argument)) {
-                return;
-              }
-              returnPath.node.argument = t.arrowFunctionExpression([], returnPath.node.argument);
-            }
-          }
+    ensureBlockBody(path);
+
+    path.traverse({
+      ReturnStatement(returnPath) {
+        if (returnPath.getFunctionParent().node !== path.node) return;
+
+        const arg = returnPath.node.argument;
+        if (!arg || isFunctionLike(arg) || !containsRenderableExpression(arg)) {
+          return;
         }
-      });
-    }
+
+        returnPath.node.argument = t.arrowFunctionExpression([], t.cloneNode(arg, true));
+      }
+    });
   };
 
   /**
@@ -137,14 +238,11 @@ export default function aeuiTransform({ types: t }) {
    */
   const injectReactiveProps = (path) => {
     const params = path.node.params;
+    const bodyPath = ensureBlockBody(path);
 
     let propsId = null;
     let destructuredNames = new Set();
     let resolvePropsId = null;
-
-    const isFunctionLike = (node) => (
-      t.isArrowFunctionExpression(node) || t.isFunctionExpression(node)
-    );
 
     const looksLikeDepsGetter = (node) => {
       if (!isFunctionLike(node)) return false;
@@ -157,34 +255,10 @@ export default function aeuiTransform({ types: t }) {
       return t.isReturnStatement(bodyStatements[0]) && t.isArrayExpression(bodyStatements[0].argument);
     };
 
-    const ensureBlockBody = (functionPath) => {
-      if (!isFunctionLike(functionPath.node)) return null;
-      if (t.isBlockStatement(functionPath.node.body)) {
-        return functionPath.get('body');
-      }
+    const rewriteResolvedPropsReferences = (targetPath, resolvedPropsId) => {
+      if (!resolvedPropsId) return;
 
-      functionPath.node.body = t.blockStatement([
-        t.returnStatement(functionPath.node.body)
-      ]);
-      return functionPath.get('body');
-    };
-
-    const injectResolvedProps = (functionPath) => {
-      if (!resolvePropsId || destructuredNames.size === 0 || !isFunctionLike(functionPath.node)) {
-        return;
-      }
-
-      const bodyPath = ensureBlockBody(functionPath);
-      const resolvedPropsId = functionPath.scope.generateUidIdentifier('resolvedProps');
-
-      bodyPath.unshiftContainer('body', t.variableDeclaration('const', [
-        t.variableDeclarator(
-          resolvedPropsId,
-          t.callExpression(t.cloneNode(resolvePropsId), [])
-        )
-      ]));
-
-      functionPath.traverse({
+      targetPath.traverse({
         Identifier(idPath) {
           const name = idPath.node.name;
 
@@ -201,6 +275,66 @@ export default function aeuiTransform({ types: t }) {
           );
         }
       });
+    };
+
+    const prepareResolvedProps = (functionPath) => {
+      if (!resolvePropsId || destructuredNames.size === 0 || !isFunctionLike(functionPath.node)) {
+        return null;
+      }
+
+      const resolvedPropsId = functionPath.scope.generateUidIdentifier('resolvedProps');
+      rewriteResolvedPropsReferences(functionPath, resolvedPropsId);
+
+      return {
+        resolvedPropsId,
+        declaration: t.variableDeclaration('const', [
+          t.variableDeclarator(
+            t.cloneNode(resolvedPropsId),
+            t.callExpression(t.cloneNode(resolvePropsId), [])
+          )
+        ])
+      };
+    };
+
+    const createRenderParamBindings = (param, sourceId) => {
+      if (!param) return [];
+
+      if (t.isIdentifier(param)) {
+        return [
+          t.variableDeclaration('const', [
+            t.variableDeclarator(t.cloneNode(param, true), t.cloneNode(sourceId))
+          ])
+        ];
+      }
+
+      if (t.isObjectPattern(param) || t.isArrayPattern(param)) {
+        return [
+          t.variableDeclaration('const', [
+            t.variableDeclarator(t.cloneNode(param, true), t.cloneNode(sourceId))
+          ])
+        ];
+      }
+
+      if (t.isAssignmentPattern(param)) {
+        if (!(t.isIdentifier(param.left) || t.isObjectPattern(param.left) || t.isArrayPattern(param.left))) {
+          return [];
+        }
+
+        return [
+          t.variableDeclaration('const', [
+            t.variableDeclarator(
+              t.cloneNode(param.left, true),
+              t.conditionalExpression(
+                t.binaryExpression('===', t.cloneNode(sourceId), t.identifier('undefined')),
+                t.cloneNode(param.right, true),
+                t.cloneNode(sourceId)
+              )
+            )
+          ])
+        ];
+      }
+
+      return [];
     };
 
     // --- Props-specific setup (only when params exist) ---
@@ -258,16 +392,10 @@ export default function aeuiTransform({ types: t }) {
         restoreVars = t.variableDeclaration("let", [
           t.variableDeclarator(originalParam, initialPropsId)
         ]);
-
-        if (t.isBlockStatement(path.node.body)) {
-          path.node.body.body.unshift(resolvePropsSetup);
-        }
+        bodyPath.unshiftContainer('body', [resolvePropsSetup]);
       }
 
-      // Insert setup code
-      if (t.isBlockStatement(path.node.body)) {
-        path.node.body.body.unshift(propsSetup, restoreVars);
-      }
+      bodyPath.unshiftContainer('body', [propsSetup, restoreVars]);
     }
 
     // --- Watch & Return transformation (always runs) ---
@@ -302,9 +430,12 @@ export default function aeuiTransform({ types: t }) {
           if (firstLooksLikeDeps && !secondLooksLikeDeps) {
             depsArg = firstArg;
             callbackArg = secondArg;
-          } else {
+          } else if (!firstLooksLikeDeps && secondLooksLikeDeps) {
             callbackArg = firstArg;
             depsArg = secondArg;
+          } else {
+            depsArg = firstArg;
+            callbackArg = secondArg;
           }
         } else {
           return;
@@ -320,8 +451,15 @@ export default function aeuiTransform({ types: t }) {
           const depsPath = callPath.get('arguments.0');
           const callbackPath = callPath.get('arguments.1');
 
-          injectResolvedProps(depsPath);
-          injectResolvedProps(callbackPath);
+          const preparedDeps = prepareResolvedProps(depsPath);
+          if (preparedDeps) {
+            ensureBlockBody(depsPath).unshiftContainer('body', preparedDeps.declaration);
+          }
+
+          const preparedCallback = prepareResolvedProps(callbackPath);
+          if (preparedCallback) {
+            ensureBlockBody(callbackPath).unshiftContainer('body', preparedCallback.declaration);
+          }
         }
       },
 
@@ -329,16 +467,19 @@ export default function aeuiTransform({ types: t }) {
         if (returnPath.getFunctionParent().node === path.node) {
           const arg = returnPath.node.argument;
           if (t.isArrowFunctionExpression(arg) || t.isFunctionExpression(arg)) {
-            const renderFn = arg;
-            if (renderFn.params.length > 0 && renderFn.params[0].name.startsWith("_newProps")) return;
+            const renderFnPath = returnPath.get("argument");
+            const renderFn = renderFnPath.node;
+            const originalParam = renderFn.params[0];
+            if (t.isIdentifier(originalParam) && originalParam.name.startsWith("_newProps")) return;
 
             const newPropsParam = path.scope.generateUidIdentifier("newProps");
+            const renderParamBindings = createRenderParamBindings(originalParam, newPropsParam);
             renderFn.params = [newPropsParam];
 
             // Inline Update Logic (only when props exist)
-            const updateLogic = [];
+            const preWatchLogic = [];
             if (propsId) {
-              updateLogic.push(
+              preWatchLogic.push(
                 t.expressionStatement(
                   t.callExpression(
                     t.memberExpression(t.identifier("AEUI"), t.identifier("updateProps")),
@@ -347,24 +488,27 @@ export default function aeuiTransform({ types: t }) {
                 )
               );
             }
-            updateLogic.push(
-              t.expressionStatement(
-                t.callExpression(
-                  t.memberExpression(t.identifier("AEUI"), t.identifier("_runComponentWatchers")),
-                  [t.memberExpression(t.identifier("AEUI"), t.identifier("_currentComponentNode"))]
-                )
+            const watcherLogic = t.expressionStatement(
+              t.callExpression(
+                t.memberExpression(t.identifier("AEUI"), t.identifier("_runComponentWatchers")),
+                [t.memberExpression(t.identifier("AEUI"), t.identifier("_currentComponentNode"))]
               )
             );
 
-            injectResolvedProps(returnPath.get("argument"));
+            const renderBodyPath = ensureBlockBody(renderFnPath);
+            const preparedRenderProps = prepareResolvedProps(renderFnPath);
+            const setupStatements = [
+              ...preWatchLogic,
+              ...(preparedRenderProps ? [preparedRenderProps.declaration] : []),
+              ...renderParamBindings,
+              watcherLogic
+            ];
+            const insertedPaths = renderBodyPath.unshiftContainer('body', setupStatements);
 
-            if (t.isBlockStatement(renderFn.body)) {
-              renderFn.body.body.unshift(...updateLogic);
-            } else {
-              renderFn.body = t.blockStatement([
-                ...updateLogic,
-                t.returnStatement(renderFn.body)
-              ]);
+            if (preparedRenderProps) {
+              insertedPaths.forEach((insertedPath) => {
+                rewriteResolvedPropsReferences(insertedPath, preparedRenderProps.resolvedPropsId);
+              });
             }
           }
         }

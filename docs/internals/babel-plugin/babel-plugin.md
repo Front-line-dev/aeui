@@ -200,6 +200,20 @@ path.traverse({
 });
 ```
 
+실제 구현은 위 두 형태를 내부적으로 모두 block body로 정규화한 뒤 처리한다. 따라서 다음처럼 **JSX를 포함하는 조건식/논리식/배열 반환**도 같은 규칙으로 `() => ...` render factory로 감싸진다.
+
+```javascript
+function Status({ ok }) {
+  return ok ? <strong>OK</strong> : <em>NO</em>;
+}
+
+function MaybeBanner({ show }) {
+  return show && <div>Visible</div>;
+}
+```
+
+또한 이름이 없는 `export default` 함수/화살표 함수만, top-level return이 JSX 또는 render 함수라면 컴포넌트로 인식해 동일한 변환을 적용한다. 이름이 있는 `export default function helper() { ... }` 형태는 이 예외 규칙에 포함되지 않고, 기존 heuristic(PascalCase 이름 또는 JSX 사용 여부)로만 판별한다.
+
 ### `isJSX` 헬퍼 함수
 
 return 값이 JSX인지 판별한다. 여러 형태를 지원한다:

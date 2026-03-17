@@ -354,15 +354,31 @@ comment anchor는 사용하지 않는다. 빈 fragment나 빈 subtree는 `firstD
 
 ## host controlled props — `syncHostControlledProps`
 
-`<select>` 요소의 `value`는 option children이 모두 마운트된 후에 설정해야 올바르게 동작한다. `syncHostControlledProps`는 host node의 children reconcile이 끝난 후 호출되어, `select` 요소의 value를 다시 동기화한다.
+`syncHostControlledProps`는 host node의 children reconcile이 끝난 후 호출되어, DOM이 사용자 입력 등으로 바뀌었더라도 controlled prop 상태를 다시 맞춘다.
+
+- `<select>`, `<textarea>`, `<input type!="file">`의 `value`
+- `<input>`의 `checked`
+
+특히 `<select>`의 `value`는 option children이 모두 마운트된 뒤 다시 설정해야 올바르게 동작한다.
 
 ```javascript
 function syncHostControlledProps(node) {
   if (!node || node.kind !== 'host' || !node.dom || !node.props) return;
 
-  if (node.tag === 'select' && Object.prototype.hasOwnProperty.call(node.props, 'value')) {
+  if (Object.prototype.hasOwnProperty.call(node.props, 'value')) {
     const normalizedValue = node.props.value == null ? '' : String(node.props.value);
-    node.dom.value = normalizedValue;
+
+    if (
+      node.tag === 'select' ||
+      node.tag === 'textarea' ||
+      (node.tag === 'input' && node.props.type !== 'file')
+    ) {
+      node.dom.value = normalizedValue;
+    }
+  }
+
+  if (node.tag === 'input' && Object.prototype.hasOwnProperty.call(node.props, 'checked')) {
+    node.dom.checked = !!node.props.checked;
   }
 }
 ```

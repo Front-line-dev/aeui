@@ -47,9 +47,7 @@ export function _runComponentWatchers(node) {
       const newDeps = watcher.getDeps();
       const hasChanged =
         !watcher.oldDeps ||
-        newDeps.some((dependency, index) => (
-          !this._deepEqual(dependency, watcher.oldDeps[index])
-        ));
+        !this._deepEqual(newDeps, watcher.oldDeps);
 
       if (hasChanged) {
         watcher.callback();

@@ -18,12 +18,41 @@ function getFragmentChildren(AEUI, vnode) {
   return [];
 }
 
+function cloneHostPropsSnapshot(AEUI, props = {}) {
+  const snapshot = {};
+
+  Object.entries(props).forEach(([key, value]) => {
+    if (key === 'children' || key === 'key' || key === 'ref') return;
+    snapshot[key] = AEUI._deepClone(value);
+  });
+
+  return snapshot;
+}
+
 function syncHostControlledProps(node) {
   if (!node || node.kind !== 'host' || !node.dom || !node.props) return;
 
-  if (node.tag === 'select' && Object.prototype.hasOwnProperty.call(node.props, 'value')) {
+  if (Object.prototype.hasOwnProperty.call(node.props, 'value')) {
     const normalizedValue = node.props.value == null ? '' : String(node.props.value);
-    node.dom.value = normalizedValue;
+
+    if (
+      node.tag === 'select' ||
+      node.tag === 'textarea' ||
+      (node.tag === 'input' && node.props.type !== 'file')
+    ) {
+      if (node.dom.value !== normalizedValue) {
+        node.dom.value = normalizedValue;
+        this._didMutate = true;
+      }
+    }
+  }
+
+  if (node.tag === 'input' && Object.prototype.hasOwnProperty.call(node.props, 'checked')) {
+    const normalizedChecked = !!node.props.checked;
+    if (node.dom.checked !== normalizedChecked) {
+      node.dom.checked = normalizedChecked;
+      this._didMutate = true;
+    }
   }
 }
 
@@ -184,13 +213,13 @@ function mountHostNode(parentDom, node, beforeDom) {
   const dom = this._createDomNode(node.vnode);
   parentDom.insertBefore(dom, beforeDom);
   node.dom = dom;
-  node.props = node.vnode.props || {};
+  node.props = cloneHostPropsSnapshot(this, node.vnode.props || {});
   node.firstDom = dom;
   node.lastDom = dom;
   this._didMutate = true;
 
   reconcileChildren.call(this, dom, node, node.vnode.children || [], null);
-  syncHostControlledProps(node);
+  syncHostControlledProps.call(this, node);
   node.firstDom = dom;
   node.lastDom = dom;
   return node;
@@ -259,9 +288,9 @@ function updateHostNode(node, newVNode) {
   node.vnode = newVNode;
   node.key = getVNodeKey(newVNode);
   node.tag = newVNode.tag;
-  node.props = newVNode.props || {};
+  node.props = cloneHostPropsSnapshot(this, newVNode.props || {});
   reconcileChildren.call(this, node.dom, node, newVNode.children || [], null);
-  syncHostControlledProps(node);
+  syncHostControlledProps.call(this, node);
   node.firstDom = node.dom;
   node.lastDom = node.dom;
   return node;
@@ -401,6 +430,9 @@ export function _updateDomProps(domNode, props, oldProps = {}) {
       else domNode.removeAttribute(key);
       this._didMutate = true;
     } else if (newValue === undefined || newValue === null) {
+      if (typeof oldValue === 'boolean' || typeof domNode[key] === 'boolean') {
+        domNode[key] = false;
+      }
       domNode.removeAttribute(key);
       this._didMutate = true;
     } else {

@@ -228,11 +228,16 @@ if (typeof newValue === 'boolean') {
 
 ```javascript
 if (newValue === undefined || newValue === null) {
+  if (typeof oldValue === 'boolean' || typeof domNode[key] === 'boolean') {
+    domNode[key] = false;
+  }
   domNode.removeAttribute(key);
 }
 ```
 
 새 props에 해당 key가 없거나 값이 `null`이면, DOM에서 해당 attribute를 제거한다.
+
+이때 기존 값이 boolean prop(`checked`, `disabled`, `readOnly` 등)이었다면 attribute만 지우면 부족하다. DOM property도 `false`로 되돌려야 브라우저 내부 상태가 남지 않는다.
 
 ### 일반 attribute 설정
 

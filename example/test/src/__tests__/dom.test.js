@@ -66,6 +66,17 @@ describe('_updateDomProps', () => {
     expect(div.hasAttribute('disabled')).toBe(false);
   });
 
+  it('boolean attribute가 undefined로 제거되면 DOM property도 false로 리셋', () => {
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+
+    AEUI._updateDomProps(checkbox, { checked: true });
+    AEUI._updateDomProps(checkbox, { checked: undefined }, { checked: true });
+
+    expect(checkbox.checked).toBe(false);
+    expect(checkbox.hasAttribute('checked')).toBe(false);
+  });
+
   it('일반 attribute 설정', () => {
     AEUI._updateDomProps(div, { id: 'test', 'data-value': '42' });
     expect(div.getAttribute('id')).toBe('test');
@@ -189,6 +200,77 @@ describe('_reconcile host controlled props', () => {
     reconcileRoot(container, root, null, vnode);
 
     expect(container.querySelector('select').value).toBe('DELIVERED');
+  });
+
+  it('input value는 DOM이 바뀌어도 동일 props로 다시 렌더링하면 복구됨', () => {
+    const root = createRoot(container);
+    const vnode = AEUI.createVNode('input', { value: 'hello' });
+
+    let node = reconcileRoot(container, root, null, vnode);
+    const input = container.querySelector('input');
+    input.value = 'user-edit';
+
+    node = reconcileRoot(container, root, node, vnode);
+
+    expect(input.value).toBe('hello');
+  });
+
+  it('textarea value는 DOM이 바뀌어도 동일 props로 다시 렌더링하면 복구됨', () => {
+    const root = createRoot(container);
+    const vnode = AEUI.createVNode('textarea', { value: 'memo' });
+
+    let node = reconcileRoot(container, root, null, vnode);
+    const textarea = container.querySelector('textarea');
+    textarea.value = 'changed';
+
+    node = reconcileRoot(container, root, node, vnode);
+
+    expect(textarea.value).toBe('memo');
+  });
+
+  it('checkbox checked는 DOM이 바뀌어도 동일 props로 다시 렌더링하면 복구됨', () => {
+    const root = createRoot(container);
+    const vnode = AEUI.createVNode('input', { type: 'checkbox', checked: true });
+
+    let node = reconcileRoot(container, root, null, vnode);
+    const input = container.querySelector('input');
+    input.checked = false;
+
+    node = reconcileRoot(container, root, node, vnode);
+
+    expect(input.checked).toBe(true);
+  });
+});
+
+describe('_reconcile mutable host props', () => {
+  let container;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+  });
+
+  it('같은 style 객체를 직접 변이해도 다음 reconcile에서 DOM에 반영됨', () => {
+    const root = createRoot(container);
+    const style = { color: 'red' };
+
+    let node = reconcileRoot(
+      container,
+      root,
+      null,
+      AEUI.createVNode('p', { style }, 'hello')
+    );
+
+    expect(container.querySelector('p').style.color).toBe('red');
+
+    style.color = 'blue';
+    node = reconcileRoot(
+      container,
+      root,
+      node,
+      AEUI.createVNode('p', { style }, 'hello')
+    );
+
+    expect(container.querySelector('p').style.color).toBe('blue');
   });
 });
 

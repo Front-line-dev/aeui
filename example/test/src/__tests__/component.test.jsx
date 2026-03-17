@@ -169,6 +169,33 @@ describe('watch 훅', () => {
     expect(watchLog).toEqual([]);
   });
 
+  it('deps getter의 길이가 줄어들어도 watch callback이 실행된다', () => {
+    function ShrinkingDepsWatch() {
+      let includeExtra = true;
+
+      watch(() => (includeExtra ? [1, 2] : [1]), () => {
+        watchLog.push(includeExtra ? 'full' : 'shrunk');
+      });
+
+      return (
+        <button id="shrink-watch" onClick={() => { includeExtra = false; }}>
+          shrink
+        </button>
+      );
+    }
+
+    AEUI.init(ShrinkingDepsWatch, container);
+    expect(watchLog).toEqual([]);
+
+    container.querySelector('#shrink-watch').click();
+    AEUI._tick();
+
+    expect(watchLog).toEqual(['shrunk']);
+
+    AEUI._tick();
+    expect(watchLog).toEqual(['shrunk']);
+  });
+
   it('local let 변수 변경도 watch deps getter가 감지함', () => {
     function LocalWatch() {
       let count = 0;
@@ -408,6 +435,137 @@ describe('props 구조분해 반응성', () => {
     AEUI._tick();
 
     expect(container.querySelector('#rest-id').textContent).toBe('Item:B');
+  });
+});
+
+describe('Babel 플러그인 변환 경계', () => {
+  it('expression-body 화살표 컴포넌트의 구조분해 props가 최신값으로 갱신된다', () => {
+    const Greeting = ({ name }) => <span id="expr-name">{name}</span>;
+
+    function GreetingApp() {
+      let name = 'first';
+
+      return (
+        <div>
+          <Greeting name={name} />
+          <button id="expr-change" onClick={() => { name = 'second'; }}>change</button>
+        </div>
+      );
+    }
+
+    AEUI.init(GreetingApp, container);
+    expect(container.querySelector('#expr-name').textContent).toBe('first');
+
+    container.querySelector('#expr-change').click();
+    AEUI._tick();
+
+    expect(container.querySelector('#expr-name').textContent).toBe('second');
+  });
+
+  it('top-level conditional return을 사용하는 컴포넌트가 정상 업데이트된다', () => {
+    function ConditionalLeaf({ ok }) {
+      return ok ? <p id="conditional-leaf">yes</p> : <button id="conditional-leaf">no</button>;
+    }
+
+    function ConditionalLeafApp() {
+      let ok = false;
+
+      return (
+        <div>
+          <ConditionalLeaf ok={ok} />
+          <button id="conditional-toggle" onClick={() => { ok = true; }}>toggle</button>
+        </div>
+      );
+    }
+
+    AEUI.init(ConditionalLeafApp, container);
+    expect(container.querySelector('#conditional-leaf').tagName).toBe('BUTTON');
+    expect(container.querySelector('#conditional-leaf').textContent).toBe('no');
+
+    container.querySelector('#conditional-toggle').click();
+    AEUI._tick();
+
+    expect(container.querySelector('#conditional-leaf').tagName).toBe('P');
+    expect(container.querySelector('#conditional-leaf').textContent).toBe('yes');
+  });
+
+  it('top-level logical return을 사용하는 컴포넌트가 mount/unmount 된다', () => {
+    function LogicalLeaf({ show }) {
+      return show && <span id="logical-leaf">visible</span>;
+    }
+
+    function LogicalLeafApp() {
+      let show = false;
+
+      return (
+        <div>
+          <LogicalLeaf show={show} />
+          <button id="logical-show" onClick={() => { show = true; }}>show</button>
+          <button id="logical-hide" onClick={() => { show = false; }}>hide</button>
+        </div>
+      );
+    }
+
+    AEUI.init(LogicalLeafApp, container);
+    expect(container.querySelector('#logical-leaf')).toBeNull();
+
+    container.querySelector('#logical-show').click();
+    AEUI._tick();
+    expect(container.querySelector('#logical-leaf').textContent).toBe('visible');
+
+    container.querySelector('#logical-hide').click();
+    AEUI._tick();
+    expect(container.querySelector('#logical-leaf')).toBeNull();
+  });
+
+  it('수동 render 함수가 구조분해 props 파라미터를 사용해도 동작한다', () => {
+    function ManualRenderChild() {
+      return ({ value }) => <span id="manual-render-value">{value}</span>;
+    }
+
+    function ManualRenderApp() {
+      let value = 'alpha';
+
+      return (
+        <div>
+          <ManualRenderChild value={value} />
+          <button id="manual-render-change" onClick={() => { value = 'beta'; }}>change</button>
+        </div>
+      );
+    }
+
+    AEUI.init(ManualRenderApp, container);
+    expect(container.querySelector('#manual-render-value').textContent).toBe('alpha');
+
+    container.querySelector('#manual-render-change').click();
+    AEUI._tick();
+
+    expect(container.querySelector('#manual-render-value').textContent).toBe('beta');
+  });
+
+  it('수동 render 함수의 기본값 식이 최신 외부 props를 참조한다', () => {
+    function ManualRenderDefaultChild({ outer }) {
+      return ({ value = outer }) => <span id="manual-render-default-value">{value}</span>;
+    }
+
+    function ManualRenderDefaultApp() {
+      let outer = 'alpha';
+
+      return (
+        <div>
+          <ManualRenderDefaultChild outer={outer} />
+          <button id="manual-render-default-change" onClick={() => { outer = 'beta'; }}>change</button>
+        </div>
+      );
+    }
+
+    AEUI.init(ManualRenderDefaultApp, container);
+    expect(container.querySelector('#manual-render-default-value').textContent).toBe('alpha');
+
+    container.querySelector('#manual-render-default-change').click();
+    AEUI._tick();
+
+    expect(container.querySelector('#manual-render-default-value').textContent).toBe('beta');
   });
 });
 
