@@ -472,44 +472,39 @@ export default function aeuiTransform({ types: t }) {
             const originalParam = renderFn.params[0];
             if (t.isIdentifier(originalParam) && originalParam.name.startsWith("_newProps")) return;
 
-            const newPropsParam = path.scope.generateUidIdentifier("newProps");
-            const renderParamBindings = createRenderParamBindings(originalParam, newPropsParam);
-            renderFn.params = [newPropsParam];
-
-            // Inline Update Logic (only when props exist)
-            const preWatchLogic = [];
-            if (propsId) {
-              preWatchLogic.push(
-                t.expressionStatement(
-                  t.callExpression(
-                    t.memberExpression(t.identifier("AEUI"), t.identifier("updateProps")),
-                    [propsId, newPropsParam]
-                  )
-                )
-              );
-            }
-            const watcherLogic = t.expressionStatement(
-              t.callExpression(
-                t.memberExpression(t.identifier("AEUI"), t.identifier("_runComponentWatchers")),
-                [t.memberExpression(t.identifier("AEUI"), t.identifier("_currentComponentNode"))]
-              )
-            );
+            const renderPhaseParam = path.scope.generateUidIdentifier("newProps");
+            const innerRenderParam = path.scope.generateUidIdentifier("renderProps");
+            const renderParamBindings = createRenderParamBindings(originalParam, innerRenderParam);
+            renderFn.params = [innerRenderParam];
 
             const renderBodyPath = ensureBlockBody(renderFnPath);
             const preparedRenderProps = prepareResolvedProps(renderFnPath);
             const setupStatements = [
-              ...preWatchLogic,
               ...(preparedRenderProps ? [preparedRenderProps.declaration] : []),
-              ...renderParamBindings,
-              watcherLogic
+              ...renderParamBindings
             ];
-            const insertedPaths = renderBodyPath.unshiftContainer('body', setupStatements);
+            const insertedPaths = setupStatements.length > 0
+              ? renderBodyPath.unshiftContainer('body', setupStatements)
+              : [];
 
             if (preparedRenderProps) {
               insertedPaths.forEach((insertedPath) => {
                 rewriteResolvedPropsReferences(insertedPath, preparedRenderProps.resolvedPropsId);
               });
             }
+
+            const innerRenderFn = t.cloneNode(renderFn, true);
+            returnPath.node.argument = t.arrowFunctionExpression(
+              [renderPhaseParam],
+              t.callExpression(
+                t.memberExpression(t.identifier("AEUI"), t.identifier("_runRenderPhase")),
+                [
+                  t.cloneNode(renderPhaseParam),
+                  propsId ? t.cloneNode(propsId) : t.nullLiteral(),
+                  innerRenderFn
+                ]
+              )
+            );
           }
         }
       }

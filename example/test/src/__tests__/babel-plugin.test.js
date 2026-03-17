@@ -25,8 +25,8 @@ describe('AEUI Babel Plugin', () => {
     `);
 
     expect(code).toMatch(/export default \(\) => \{/);
-    expect(code).toMatch(/return _newProps => \{/);
-    expect(code).toMatch(/_runComponentWatchers/);
+    expect(code).toMatch(/return _newProps => AEUI\._runRenderPhase\(/);
+    expect(code).not.toMatch(/_runComponentWatchers/);
     expect(code).toMatch(/AEUI\.createElement\("div"/);
   });
 
@@ -60,7 +60,7 @@ describe('AEUI Babel Plugin', () => {
       const Greeting = ({ name }) => <p>{name}</p>;
     `);
 
-    expect(code).toMatch(/return _newProps => \{/);
+    expect(code).toMatch(/return _newProps => AEUI\._runRenderPhase\(/);
     expect(code).toMatch(/resolvedProps\.name/);
   });
 
@@ -79,7 +79,7 @@ describe('AEUI Babel Plugin', () => {
       }
     `);
 
-    expect(code).toMatch(/const \{\s*value\s*\} = _newProps/);
-    expect(code).toMatch(/_runComponentWatchers/);
+    expect(code).toMatch(/AEUI\._runRenderPhase\(/);
+    expect(code).not.toMatch(/_runComponentWatchers/);
   });
 });

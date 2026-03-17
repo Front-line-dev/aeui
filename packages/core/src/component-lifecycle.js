@@ -13,6 +13,18 @@ function withCurrentComponent(state, node, callback) {
   }
 }
 
+function syncPropsTarget(propsTarget, nextProps) {
+  if (!propsTarget || typeof propsTarget !== 'object') return;
+
+  for (const key in propsTarget) {
+    delete propsTarget[key];
+  }
+
+  if (nextProps) {
+    Object.assign(propsTarget, nextProps);
+  }
+}
+
 export function createComponentNode(vnode, parentNode = null, parentDom = null) {
   return {
     kind: 'component',
@@ -52,8 +64,9 @@ export function runComponentRenderPhase(
   render = node.renderFactory || node.render,
   options = {}
 ) {
-  const { runWatchers = true } = options;
+  const { propsTarget = null, runWatchers = true } = options;
   node.props = nextProps || {};
+  syncPropsTarget(propsTarget, node.props);
 
   if (runWatchers) {
     runComponentWatchers(state, node);
@@ -63,7 +76,23 @@ export function runComponentRenderPhase(
     return null;
   }
 
+  if (state.currentComponentNode === node) {
+    return render(node.props);
+  }
+
   return withCurrentComponent(state, node, () => render(node.props));
+}
+
+export function invokeComponentRenderFactory(state, node, nextProps) {
+  node.props = nextProps || {};
+
+  if (typeof (node.renderFactory || node.render) !== 'function') {
+    return null;
+  }
+
+  return withCurrentComponent(state, node, () => (
+    (node.renderFactory || node.render)(node.props)
+  ));
 }
 
 export function commitRenderedNode(node, renderedNode) {

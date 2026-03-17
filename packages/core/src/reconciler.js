@@ -4,7 +4,7 @@
 import {
   cleanupComponentNode,
   commitRenderedNode,
-  runComponentRenderPhase,
+  invokeComponentRenderFactory,
   setupComponentNode,
 } from './component-lifecycle.js';
 import {
@@ -228,13 +228,7 @@ function mountFragmentNode(parentDom, node, beforeDom) {
 
 function mountComponentNode(parentDom, node, beforeDom) {
   setupComponentNode(this, node);
-  const renderedVNode = runComponentRenderPhase(
-    this,
-    node,
-    node.vnode.props || {},
-    node.renderFactory || node.render,
-    { runWatchers: false }
-  );
+  const renderedVNode = invokeComponentRenderFactory(this, node, node.vnode.props || {});
   const renderedNode = this._reconcile(parentDom, null, renderedVNode, beforeDom, node);
   commitRenderedNode(node, renderedNode);
   return node;
@@ -297,13 +291,7 @@ function updateComponentNode(parentDom, node, newVNode, beforeDom) {
   node.key = getVNodeKey(newVNode);
   node.component = newVNode.tag;
   setupComponentNode(this, node);
-  const renderedVNode = runComponentRenderPhase(
-    this,
-    node,
-    newVNode.props || {},
-    node.renderFactory || node.render,
-    { runWatchers: false }
-  );
+  const renderedVNode = invokeComponentRenderFactory(this, node, newVNode.props || {});
 
   const renderedNode = this._reconcile(
     parentDom,

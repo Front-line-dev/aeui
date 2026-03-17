@@ -2,6 +2,7 @@
  * AEUI Framework Core
  */
 import { _deepEqual, _deepClone } from './deep-compare.js';
+import { runComponentRenderPhase } from './component-lifecycle.js';
 import { createRuntimeState } from './runtime-state.js';
 import {
   setRuntimeContext,
@@ -65,6 +66,17 @@ export const AEUI = {
   _onAnimationFrame: (...args) => _onAnimationFrame(runtimeState, ...args),
 
   _runComponentWatchers: (node) => _runComponentWatchers(runtimeState, node),
+  _runRenderPhase: (nextProps, propsTarget, render) => {
+    const node = runtimeState.currentComponentNode;
+    if (!node) {
+      return typeof render === 'function' ? render(nextProps || {}) : null;
+    }
+
+    return runComponentRenderPhase(runtimeState, node, nextProps, render, {
+      propsTarget,
+      runWatchers: true,
+    });
+  },
 
   _createDomNode: (...args) => _createDomNode.call(runtimeState, ...args),
   updateProps,
@@ -76,6 +88,7 @@ export const AEUI = {
 runtimeState.createNode = (...args) => AEUI.createNode(...args);
 runtimeState._reconcileRoot = (...args) => AEUI._reconcileRoot(...args);
 runtimeState._runComponentWatchers = (node) => AEUI._runComponentWatchers(node);
+runtimeState._runRenderPhase = (...args) => AEUI._runRenderPhase(...args);
 runtimeState._stopScheduler = (...args) => AEUI._stopScheduler(...args);
 runtimeState._startScheduler = (...args) => AEUI._startScheduler(...args);
 runtimeState._onAnimationFrame = (...args) => AEUI._onAnimationFrame(...args);
