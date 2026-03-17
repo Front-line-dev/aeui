@@ -1,4 +1,4 @@
-import { _runComponentWatchers } from './runtime.js';
+import { runComponentWatchers } from './component-watchers.js';
 import { getVNodeKey } from './vnode-helpers.js';
 
 function withCurrentComponent(state, node, callback) {
@@ -45,9 +45,19 @@ export function setupComponentNode(state, node) {
   });
 }
 
-export function runComponentRenderPhase(state, node, nextProps, render = node.renderFactory || node.render) {
+export function runComponentRenderPhase(
+  state,
+  node,
+  nextProps,
+  render = node.renderFactory || node.render,
+  options = {}
+) {
+  const { runWatchers = true } = options;
   node.props = nextProps || {};
-  _runComponentWatchers(state, node);
+
+  if (runWatchers) {
+    runComponentWatchers(state, node);
+  }
 
   if (typeof render !== 'function') {
     return null;
@@ -63,7 +73,9 @@ export function commitRenderedNode(node, renderedNode) {
   node.lastDom = renderedNode ? renderedNode.lastDom : null;
 }
 
-export function cleanupComponentNode(state, node) {
+export function cleanupComponentNode(state, node, options = {}) {
+  const { preserveChildren = false, preserveDomRange = false } = options;
+
   node.cleanups.forEach((cleanup) => {
     try {
       cleanup();
@@ -77,7 +89,13 @@ export function cleanupComponentNode(state, node) {
   node.renderedNode = null;
   node.renderFactory = null;
   node.render = null;
-  node.children = [];
-  node.firstDom = null;
-  node.lastDom = null;
+
+  if (!preserveChildren) {
+    node.children = [];
+  }
+
+  if (!preserveDomRange) {
+    node.firstDom = null;
+    node.lastDom = null;
+  }
 }

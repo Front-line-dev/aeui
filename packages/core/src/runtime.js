@@ -2,6 +2,8 @@
  * Stateful runtime internals: hooks bridge, node creation,
  * watcher execution, root reconciliation, and scheduler loop.
  */
+import { runComponentWatchers } from './component-watchers.js';
+import { createComponentNode, setupComponentNode } from './component-lifecycle.js';
 import { getVNodeKey, isFragmentVNode } from './vnode-helpers.js';
 
 const MAX_FRAME_DELAY = 60;
@@ -31,24 +33,7 @@ export function createRootNode(containerElement) {
 }
 
 export function _runComponentWatchers(state, node) {
-  if (!node || !node.watchStates) return;
-
-  node.watchStates.forEach((watcher) => {
-    try {
-      const newDeps = watcher.getDeps();
-      const hasChanged =
-        !watcher.oldDeps ||
-        !state.deepEqual(newDeps, watcher.oldDeps);
-
-      if (hasChanged) {
-        watcher.callback();
-        const finalDeps = watcher.getDeps();
-        watcher.oldDeps = state.deepClone(finalDeps);
-      }
-    } catch (e) {
-      console.error('[AEUI] Watcher error:', e);
-    }
-  });
+  runComponentWatchers(state, node);
 }
 
 export function createNode(state, vnode, parentNode = null, parentDom = null) {
@@ -88,24 +73,9 @@ export function createNode(state, vnode, parentNode = null, parentDom = null) {
     return node;
   }
 
-  node.kind = 'component';
-  node.component = vnode.tag;
-  node.props = vnode.props || {};
-  node.watchStates = [];
-  node.cleanups = [];
-  node.renderedNode = null;
-  node.render = null;
-
-  state.currentComponentNode = node;
-  state.currentInstance = node;
-  try {
-    node.render = vnode.tag(vnode.props);
-  } finally {
-    state.currentComponentNode = null;
-    state.currentInstance = null;
-  }
-
-  return node;
+  const componentNode = createComponentNode(vnode, parentNode, parentDom);
+  setupComponentNode(state, componentNode);
+  return componentNode;
 }
 
 export function _reconcileRoot(state) {

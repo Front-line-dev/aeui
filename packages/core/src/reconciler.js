@@ -2,6 +2,12 @@
  * DOM operations, runtime node reconciliation, and unmounting
  */
 import {
+  cleanupComponentNode,
+  commitRenderedNode,
+  runComponentRenderPhase,
+  setupComponentNode,
+} from './component-lifecycle.js';
+import {
   getFragmentChildren,
   getVNodeKey,
   isFragmentVNode,
@@ -221,23 +227,16 @@ function mountFragmentNode(parentDom, node, beforeDom) {
 }
 
 function mountComponentNode(parentDom, node, beforeDom) {
-  node.props = node.vnode.props || {};
-
-  let renderedVNode;
-  this._currentComponentNode = node;
-  this._currentInstance = node;
-  try {
-    renderedVNode = node.render(node.props);
-  } finally {
-    this._currentComponentNode = null;
-    this._currentInstance = null;
-  }
-
+  setupComponentNode(this, node);
+  const renderedVNode = runComponentRenderPhase(
+    this,
+    node,
+    node.vnode.props || {},
+    node.renderFactory || node.render,
+    { runWatchers: false }
+  );
   const renderedNode = this._reconcile(parentDom, null, renderedVNode, beforeDom, node);
-  node.renderedNode = renderedNode;
-  node.children = renderedNode ? [renderedNode] : [];
-  node.firstDom = renderedNode ? renderedNode.firstDom : null;
-  node.lastDom = renderedNode ? renderedNode.lastDom : null;
+  commitRenderedNode(node, renderedNode);
   return node;
 }
 
@@ -297,17 +296,14 @@ function updateComponentNode(parentDom, node, newVNode, beforeDom) {
   node.vnode = newVNode;
   node.key = getVNodeKey(newVNode);
   node.component = newVNode.tag;
-  node.props = newVNode.props || {};
-
-  let renderedVNode;
-  this._currentComponentNode = node;
-  this._currentInstance = node;
-  try {
-    renderedVNode = node.render(node.props);
-  } finally {
-    this._currentComponentNode = null;
-    this._currentInstance = null;
-  }
+  setupComponentNode(this, node);
+  const renderedVNode = runComponentRenderPhase(
+    this,
+    node,
+    newVNode.props || {},
+    node.renderFactory || node.render,
+    { runWatchers: false }
+  );
 
   const renderedNode = this._reconcile(
     parentDom,
@@ -317,10 +313,7 @@ function updateComponentNode(parentDom, node, newVNode, beforeDom) {
     node
   );
 
-  node.renderedNode = renderedNode;
-  node.children = renderedNode ? [renderedNode] : [];
-  node.firstDom = renderedNode ? renderedNode.firstDom : null;
-  node.lastDom = renderedNode ? renderedNode.lastDom : null;
+  commitRenderedNode(node, renderedNode);
   return node;
 }
 
@@ -437,8 +430,9 @@ export function _unmountNode(node, removeDom = true) {
   node.isMounted = false;
 
   if (node.kind === 'component') {
-    node.cleanups.forEach((cleanup) => {
-      try { cleanup(); } catch (e) { console.error('[AEUI] Cleanup error:', e); }
+    cleanupComponentNode(this, node, {
+      preserveChildren: true,
+      preserveDomRange: true,
     });
   }
 
@@ -448,12 +442,6 @@ export function _unmountNode(node, removeDom = true) {
 
   if (removeDom && node.parentDom) {
     removeDomRange.call(this, node.parentDom, node);
-  }
-
-  if (node.kind === 'component') {
-    node.watchStates = [];
-    node.cleanups = [];
-    node.renderedNode = null;
   }
 
   node.children = [];
