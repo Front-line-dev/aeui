@@ -47,6 +47,57 @@ describe('컴포넌트 마운트', () => {
   });
 });
 
+describe('lifecycle characterization', () => {
+  it('component setup runs once across repeated ticks', () => {
+    const calls = [];
+
+    function App() {
+      calls.push('setup');
+      let count = 0;
+
+      return (
+        <button id="setup-once-btn" onClick={() => { count += 1; }}>
+          {count}
+        </button>
+      );
+    }
+
+    AEUI.init(App, container);
+    container.querySelector('#setup-once-btn').click();
+    AEUI._tick();
+    AEUI._tick();
+
+    expect(calls).toEqual(['setup']);
+  });
+
+  it('cleanup runs once when a keyed component is replaced', () => {
+    const cleanups = [];
+
+    function Child({ id }) {
+      clean(() => { cleanups.push(id); });
+      return <span id={`child-${id}`}>{id}</span>;
+    }
+
+    function App() {
+      let id = 'a';
+
+      return (
+        <div>
+          <Child key={id} id={id} />
+          <button id="swap-child" onClick={() => { id = 'b'; }}>swap</button>
+        </div>
+      );
+    }
+
+    AEUI.init(App, container);
+    container.querySelector('#swap-child').click();
+    AEUI._tick();
+
+    expect(cleanups).toEqual(['a']);
+    expect(container.querySelector('#child-b').textContent).toBe('b');
+  });
+});
+
 // ─── 상태 변경 (let 변수) ───
 
 function CounterApp() {
