@@ -9,7 +9,7 @@ AEUI 스케줄러는 `requestAnimationFrame` 기반으로 동작한다. 핵심 �
 
 AEUI는 `setState` 트리거 방식이 아니라 Polling(Dirty Checking) 기반이므로, scheduler가 주기적으로 렌더를 시도한다.
 
-최근 구조 정리 이후 public API는 여전히 `AEUI.init()`, `AEUI.render()`, `AEUI._tick()` 형태를 유지하지만, 실제 mutable 값은 `runtime-state.js`의 explicit `runtimeState` 객체에 저장된다. 즉 외부에서 보는 스케줄러 모델은 동일하지만, 내부 구현은 `AEUI` facade와 상태 저장소가 분리된 형태다.
+public API는 `AEUI.init()`, `AEUI.render()`, `AEUI._tick()` 형태를 유지하고, mutable 값은 `runtime-state.js`의 explicit `runtimeState` 객체에 저장된다. 즉 스케줄러의 진입점은 `AEUI` facade에 있고, 상태 저장은 `runtimeState`가 맡는다.
 
 ---
 
@@ -93,7 +93,7 @@ export function _reconcileRoot(state) {
 }
 ```
 
-이전 모델에서는 `_rootInstance.update()`를 호출하여 컴포넌트별로 start index를 계산했지만, 현재 모델에서는 root wrapper node가 루트 child node를 소유하고, `_reconcile`이 `firstDom`/`lastDom` 범위로 DOM 위치를 관리하므로, 인덱스 계산이나 `_getDomNodeCount` 합산이 불필요하다.
+root wrapper node가 루트 child node를 소유하고, `_reconcile`이 `firstDom`/`lastDom` 범위로 DOM 위치를 관리하므로, 인덱스 계산이나 `_getDomNodeCount` 합산이 필요하지 않다.
 
 ---
 
@@ -252,7 +252,7 @@ AEUI.render();
 
 ## runtime state
 
-현재 스케줄러 관련 값은 `runtimeState`에 저장된다.
+스케줄러 관련 값은 `runtimeState`에 저장된다.
 
 ```javascript
 {
@@ -269,7 +269,7 @@ AEUI.render();
 }
 ```
 
-호환성을 위해 `AEUI._rootNode`, `AEUI._frameDelay`, `AEUI._didMutate` 같은 legacy underscore accessor는 여전히 존재하지만, 실제 저장소는 `AEUI` object 자체가 아니라 `runtimeState`다.
+`AEUI._rootNode`, `AEUI._frameDelay`, `AEUI._didMutate` 같은 underscore accessor도 제공되지만, 이 필드들은 `runtimeState`를 읽고 쓰는 proxy다.
 
 ---
 

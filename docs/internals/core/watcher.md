@@ -11,19 +11,19 @@ watch([count], () => {
 });
 ```
 
-현재 구조에서는 watcher 실행 책임이 세 층으로 나뉜다.
+watcher 실행 책임은 세 층으로 나뉜다.
 
 - `hooks.js`: watcher 등록
 - `component-watchers.js`: 의존성 비교와 callback 실행
 - `component-lifecycle.js`: render phase 안에서 watcher 호출 순서 관리
 
-호환성을 위해 `AEUI._runComponentWatchers()` wrapper도 남아 있지만, 실제 주 경로는 `AEUI._runRenderPhase()`가 render phase 안에서 watcher를 실행하는 방식이다.
+`AEUI._runComponentWatchers()` wrapper도 제공되며, render phase에서는 `AEUI._runRenderPhase()`를 통해 watcher가 실행된다.
 
 ---
 
 ## 함수 시그니처
 
-실제 실행 엔진은 현재 다음 형태다.
+실행 엔진은 다음 형태다.
 
 ```javascript
 runComponentWatchers(state, node)
@@ -113,9 +113,9 @@ export function runComponentWatchers(state, node) {
 
 ## 호출 시점
 
-이전 구조에서는 Babel이 render wrapper 안에서 `updateProps()`와 `_runComponentWatchers()`를 직접 호출했다. 현재 구조에서는 render wrapper가 `AEUI._runRenderPhase()` 하나만 호출하고, 그 안에서 `runComponentRenderPhase()`가 watcher를 render 전에 실행한다.
+render wrapper는 `AEUI._runRenderPhase()`를 호출하고, 그 안에서 `runComponentRenderPhase()`가 watcher를 render 전에 실행한다.
 
-| 호출 위치 | 현재 역할 |
+| 호출 위치 | 역할 |
 |-----------|-----------|
 | `packages/core/src/babel-plugin.js` | render wrapper에서 `AEUI._runRenderPhase()` 호출 |
 | `packages/core/src/core.js` | `_runRenderPhase()` public/runtime bridge |

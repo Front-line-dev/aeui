@@ -283,11 +283,11 @@ export function watch(deps, callback) {
 
 ### `_currentInstance` alias
 
-Babel 플러그인이 렌더 함수에 `AEUI._runComponentWatchers(AEUI._currentComponentNode)`를 주입하므로, `_currentComponentNode`가 기준 필드이다. `_currentInstance`는 내부 호환성을 위해 같은 값이 설정되지만, 개념적으로는 `_currentComponentNode`가 정확한 모델이다. 장기적으로 `_currentInstance`는 제거 대상이다.
+render phase가 실행될 때 `_currentComponentNode`가 기준 필드로 사용된다. `_currentInstance`는 같은 값을 가리키는 alias이며, 개념적으로는 `_currentComponentNode`가 더 정확한 모델이다. 장기적으로 `_currentInstance`는 제거 대상이다.
 
 ### 동기적 작동 보장
 
-`_currentComponentNode`는 전역 변수 하나이므로, 만약 컴포넌트 A의 setup 중에 컴포넌트 B의 setup이 시작되면 A의 컨텍스트가 덮어씌워질 수 있다. 그러나 현재 AEUI의 모든 코드는 **동기적으로 실행**되므로 (비동기 렌더링 없음), 한 컴포넌트의 setup이 완전히 끝난 후에야 다음 컴포넌트의 setup이 시작된다. 따라서 이 문제는 발생하지 않는다.
+`_currentComponentNode`는 전역 변수 하나이므로, 만약 컴포넌트 A의 setup 중에 컴포넌트 B의 setup이 시작되면 A의 컨텍스트가 덮어씌워질 수 있다. 그러나 AEUI의 코드는 **동기적으로 실행**되므로 (비동기 렌더링 없음), 한 컴포넌트의 setup이 완전히 끝난 후에야 다음 컴포넌트의 setup이 시작된다. 따라서 이 문제는 발생하지 않는다.
 
 ---
 
@@ -304,7 +304,7 @@ Babel 플러그인이 렌더 함수에 `AEUI._runComponentWatchers(AEUI._current
 
 ### 왜 range 방식인가
 
-이전 모델에서는 `_getDomNodeCount`로 각 컴포넌트가 차지하는 DOM 노드 수를 계산하고, `parentElement.childNodes[index]`로 접근했다. 이 방식은 Fragment나 컴포넌트가 여러 DOM 노드를 생성하는 경우에 노드 수 합산이 복잡했다.
+`_getDomNodeCount`처럼 DOM 노드 수를 따로 계산하는 방식보다, `firstDom`/`lastDom` 범위로 ownership을 표현하는 편이 Fragment나 컴포넌트처럼 여러 DOM 노드를 갖는 경우를 더 직접적으로 다룰 수 있다.
 
 `firstDom`/`lastDom` 범위를 사용하면:
 - DOM 이동과 상태 이동을 같은 트리 연산으로 다룰 수 있다

@@ -12,9 +12,9 @@ tick N에서 저장된 RuntimeNode  →  ─┐
 tick N+1에서 생성된 VNode      →  ─┘
 ```
 
-이전 모델에서는 `prevVNode + index`로 비교했지만, 현재 모델의 핵심 비교 단위는 **old RuntimeNode + new VNode**이다.
+핵심 비교 단위는 **old RuntimeNode + new VNode**이다.
 
-추가로 최근 구조 정리 이후에는 component setup/render/cleanup 세부 실행을 `reconciler.js`가 직접 다루지 않고, `component-lifecycle.js` helper에 위임한다. 따라서 이 문서의 중심은 여전히 "RuntimeNode 재사용과 DOM 반영"이며, 컴포넌트 실행 자체는 별도 계층으로 분리되어 있다.
+component setup/render/cleanup 세부 실행은 `component-lifecycle.js` helper가 담당한다. 따라서 이 문서의 중심은 "RuntimeNode 재사용과 DOM 반영"이며, 컴포넌트 실행 자체는 별도 계층으로 다룬다.
 
 ---
 
@@ -122,7 +122,7 @@ function isSameNodeType(AEUI, oldNode, newVNode) {
 }
 ```
 
-`key` 비교가 먼저 수행되므로, key가 있는 형제 목록에서 node 식별 기준이 항상 우선된다. 최근에는 key/fragment 판별 로직도 `vnode-helpers.js`로 공용화되어 `runtime.js`와 `reconciler.js`가 같은 규칙을 공유한다.
+`key` 비교가 먼저 수행되므로, key가 있는 형제 목록에서 node 식별 기준이 항상 우선된다. key/fragment 판별 로직은 `vnode-helpers.js`가 제공하며, `runtime.js`와 `reconciler.js`가 같은 규칙을 공유한다.
 
 ---
 
@@ -171,7 +171,7 @@ function mountComponentNode(parentDom, node, beforeDom) {
 }
 ```
 
-최근 구조 변경 이후 watcher 실행과 props 동기화는 `reconciler`가 직접 수행하지 않는다. Babel 플러그인이 만든 render wrapper는 `AEUI._runRenderPhase()` 하나만 호출하고, 실제 render phase 내부에서 `component-lifecycle.js`가 props 동기화와 watcher 실행 순서를 관리한다.
+watcher 실행과 props 동기화는 `reconciler`가 직접 수행하지 않는다. Babel 플러그인이 만든 render wrapper는 `AEUI._runRenderPhase()`를 호출하고, render phase 내부에서 `component-lifecycle.js`가 props 동기화와 watcher 실행 순서를 관리한다.
 
 ### updateXxxNode — 기존 node 갱신
 
@@ -359,7 +359,7 @@ function syncHostControlledProps(node) {
 }
 ```
 
-추가로 `_updateDomProps` 단계에서도 `<input type="file">`의 `value`는 DOM property에 직접 쓰지 않는다. 브라우저가 file input value의 programmatic set을 제한하기 때문에, 현재 구현은 `value` attribute를 제거하고 예외를 피한다.
+또한 `_updateDomProps` 단계에서도 `<input type="file">`의 `value`는 DOM property에 직접 쓰지 않는다. 브라우저가 file input value의 programmatic set을 제한하기 때문에, `value` attribute를 제거하는 방식으로 예외를 피한다.
 
 ---
 

@@ -192,7 +192,7 @@ if (node.kind === 'component') {
 
 ### DOM 제거와 lifecycle 정리의 통합
 
-이전 모델에서는 DOM 제거(`_reconcile`에서 `removeChild`)와 lifecycle 정리(`_unmount`)가 분리되어 있었다. 현재 모델에서는 `_unmountNode`가 **DOM 제거와 lifecycle 정리를 같은 경로**에서 처리한다. keyed reorder와 subtree replacement에서 이 두 작업이 항상 동기화되므로, 리소스 누수가 발생할 가능성이 줄어든다.
+`_unmountNode`는 **DOM 제거와 lifecycle 정리를 같은 경로**에서 처리한다. keyed reorder와 subtree replacement에서 이 두 작업이 항상 동기화되므로, 리소스 누수가 발생할 가능성이 줄어든다.
 
 ---
 

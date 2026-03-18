@@ -14,7 +14,7 @@ AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은
 | **Props 반응화** | `function Comp(props)` | `function Comp(_initialProps)` + `__props` 객체 | props 변경 시 클로저 참조를 최신 상태로 유지 |
 | **Watch deps 래핑** | `watch([count], cb)` | `watch(() => [count], cb)` | 매 호출 시 현재 값을 읽도록 함수화 |
 
-최근 코어 정리 이후, 플러그인이 런타임과 맺는 계약은 더 단순해졌다. 예전에는 render wrapper가 `AEUI.updateProps()`와 `AEUI._runComponentWatchers()`를 직접 호출했지만, 지금은 **`AEUI._runRenderPhase()` 하나만 호출**한다. props 동기화, watcher 실행, render context 설정은 모두 런타임 helper 안으로 이동했다.
+플러그인은 render wrapper에서 **`AEUI._runRenderPhase()`를 호출**한다. props 동기화, watcher 실행, render context 설정은 이 runtime helper가 담당한다.
 
 ### 전체 변환 흐름
 
@@ -243,11 +243,11 @@ watch([count], () => console.log(count));
 watch(() => [count], () => console.log(count));
 ```
 
-현재 기준 시그니처는 `watch(deps, callback)`이다. 플러그인은 구버전 순서인 `watch(callback, deps)`를 만나도 내부적으로 정규화한 뒤 deps 표현식을 함수로 감싼다. 이렇게 해야 매 실행 시점에 현재 deps를 다시 읽을 수 있다.
+플러그인은 `watch(deps, callback)` 형태를 기준으로 다룬다. 구버전 순서인 `watch(callback, deps)`를 만나도 내부적으로 정규화한 뒤 deps 표현식을 함수로 감싼다. 이렇게 해야 매 실행 시점에 현재 deps를 다시 읽을 수 있다.
 
 ### 3-3. 구조 분해된 props의 재해석
 
-초기 구현은 구조 분해된 이름을 `__props.name`으로 직접 치환했지만, alias/default/nested/rest 패턴을 정확히 표현하기 어려웠다. 현재 구현은 원래 구조 분해 패턴 자체를 `_resolveProps()`에 보존하고, watch/render 시점마다 이를 다시 호출한다.
+구조 분해 props는 원래 패턴 자체를 `_resolveProps()`에 보존하고, watch/render 시점마다 이를 다시 호출한다.
 
 ```javascript
 function UserCard({ title: label, count = 0 }) {
@@ -271,17 +271,7 @@ function UserCard(_initialProps) {
 
 ### 3-4. render phase helper 주입
 
-최근 변경의 핵심은 여기다. 예전에는 render wrapper가 다음을 직접 수행했다.
-
-```javascript
-return (_newProps) => {
-  AEUI.updateProps(__props, _newProps);
-  AEUI._runComponentWatchers(AEUI._currentComponentNode);
-  return <div>{count}</div>;
-};
-```
-
-현재는 이 로직이 단일 helper 호출로 축소되었다.
+render wrapper는 다음 helper를 호출한다.
 
 ```javascript
 return (_newProps) => AEUI._runRenderPhase(
@@ -300,7 +290,7 @@ return (_newProps) => AEUI._runRenderPhase(
 - watcher 실행 순서도 runtime helper가 보장
 - current component context 설정도 runtime helper가 책임진다
 
-즉, compile-time과 runtime 사이 결합이 더 느슨해졌다.
+즉, compile-time 코드는 render phase 진입만 표현하고, props/watcher/context 제어는 runtime helper가 맡는다.
 
 ### render parameter 보존
 
@@ -310,7 +300,7 @@ render 함수가 직접 파라미터를 받을 때도 의미를 유지해야 한
 return ({ size = 'm' }) => <div>{size}</div>;
 ```
 
-현재 구현은 내부적으로 별도 render param을 만들고, 원래 파라미터 패턴을 다시 바인딩하는 helper를 사용한다. 덕분에:
+render parameter 처리는 내부적으로 별도 render param을 만들고, 원래 파라미터 패턴을 다시 바인딩하는 helper를 사용한다. 덕분에:
 
 - identifier 파라미터
 - object / array destructuring
