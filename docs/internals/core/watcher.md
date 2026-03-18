@@ -1,37 +1,60 @@
-# Watcher 실행 — `runComponentWatchers`, `_runRenderPhase`
+# Watcher 실행 — `_runComponentWatchers`
 
 ## 개요
 
-watcher 실행 경로도 이번 단순화에서 분리되었다.
-
-- watcher 등록: `hooks.js`
-- watcher 실행 엔진: `component-watchers.js`
-- render phase orchestration: `component-lifecycle.js`
-- public 진입점: `AEUI._runRenderPhase()`
-
-즉, watcher는 더 이상 Babel이 `updateProps()`와 `_runComponentWatchers()`를 각각 직접 호출하는 방식에 의존하지 않는다. 이제 Babel은 **단일 helper인 `AEUI._runRenderPhase(...)`만 호출**하고, 그 안에서 props sync와 watcher 실행이 함께 처리된다.
-
----
-
-## Watcher 구조
-
-`watch()`로 등록된 항목은 컴포넌트 node의 `watchStates` 배열에 저장된다.
+watcher는 컴포넌트에 등록된 **의존성 감시 로직**이다. `watch()` 훅으로 등록되며, 특정 값이 변경되면 콜백을 실행한다. React의 `useEffect`와 비슷한 역할이지만, AEUI에서는 render phase와 dirty checking 루프에 맞춰 동작한다.
 
 ```javascript
-{
-  callback: Function,
-  getDeps: () => Array,
-  oldDeps: Array | null
-}
+let count = 0;
+watch([count], () => {
+  console.log("count가 변경됨:", count);
+});
 ```
 
-여기서 `getDeps`는 Babel이 `watch([a, b], cb)`를 `watch(() => [a, b], cb)`로 바꿔 주기 때문에 항상 현재 값을 다시 읽을 수 있다.
+현재 구조에서는 watcher 실행 책임이 세 층으로 나뉜다.
+
+- `hooks.js`: watcher 등록
+- `component-watchers.js`: 의존성 비교와 callback 실행
+- `component-lifecycle.js`: render phase 안에서 watcher 호출 순서 관리
+
+호환성을 위해 `AEUI._runComponentWatchers()` wrapper도 남아 있지만, 실제 주 경로는 `AEUI._runRenderPhase()`가 render phase 안에서 watcher를 실행하는 방식이다.
 
 ---
 
-## 실행 엔진
+## 함수 시그니처
 
-실제 비교와 실행은 `component-watchers.js`의 `runComponentWatchers(state, node)`가 담당한다.
+실제 실행 엔진은 현재 다음 형태다.
+
+```javascript
+runComponentWatchers(state, node)
+```
+
+| 파라미터 | 설명 |
+|----------|------|
+| `state` | `deepEqual`, `deepClone` 등을 제공하는 runtime state |
+| `node` | watcher를 실행할 컴포넌트 RuntimeNode |
+
+`runtime.js`의 `_runComponentWatchers(state, node)`와 `core.js`의 `AEUI._runComponentWatchers(node)`는 이 엔진을 감싸는 wrapper이다.
+
+---
+
+## 동작 과정
+
+```text
+node.watchStates 배열을 순회:
+  각 watcher에 대해:
+    1. getDeps() 호출 → 현재 의존성 값 배열 획득
+    2. oldDeps와 비교
+       ├── oldDeps가 null → 변경됨
+       └── state.deepEqual(newDeps, oldDeps)가 false → 변경됨
+    3. 변경된 경우:
+       ├── callback() 실행
+       ├── getDeps()를 다시 호출해 callback 이후 최종 deps 획득
+       └── oldDeps = state.deepClone(finalDeps)
+    4. try-catch로 감싸 에러를 격리
+```
+
+### 코드
 
 ```javascript
 export function runComponentWatchers(state, node) {
@@ -40,7 +63,9 @@ export function runComponentWatchers(state, node) {
   node.watchStates.forEach((watcher) => {
     try {
       const newDeps = watcher.getDeps();
-      const hasChanged = !watcher.oldDeps || !state.deepEqual(newDeps, watcher.oldDeps);
+      const hasChanged =
+        !watcher.oldDeps ||
+        !state.deepEqual(newDeps, watcher.oldDeps);
 
       if (hasChanged) {
         watcher.callback();
@@ -54,92 +79,84 @@ export function runComponentWatchers(state, node) {
 }
 ```
 
-핵심 차이:
-
-- deps 비교는 element 단위 루프가 아니라 `state.deepEqual(newDeps, oldDeps)`에 위임된다
-- callback 이후 deps를 다시 읽어 최종 상태를 snapshot으로 저장한다
-- watcher 하나가 실패해도 나머지는 계속 실행한다
-
 ---
 
-## Render Phase와의 연결
+## Watcher 구조
 
-watcher는 현재 `runComponentRenderPhase()` 안에서 실행된다.
+`watch()` 훅으로 등록되는 각 watcher 객체의 형태:
 
 ```javascript
-export function runComponentRenderPhase(state, node, nextProps, render, options = {}) {
-  const { propsTarget = null, runWatchers = true } = options;
-  node.props = nextProps || {};
-  syncPropsTarget(propsTarget, node.props);
-
-  if (runWatchers) {
-    runComponentWatchers(state, node);
-  }
-
-  return withCurrentComponent(state, node, () => render(node.props));
+{
+  callback: Function,
+  getDeps: () => Array,
+  oldDeps: Array | null
 }
 ```
 
-따라서 render phase의 순서는 다음과 같다.
+각 필드의 역할:
 
-```text
-1. 새 props를 node.props에 반영
-2. 필요하면 propsTarget(__props)을 동기화
-3. watcher 실행
-4. 현재 component context로 render 함수 실행
-```
+| 필드 | 설명 |
+|------|------|
+| `callback` | 의존성이 변경되었을 때 실행할 사용자 정의 함수 |
+| `getDeps` | 호출될 때마다 현재 의존성 값을 반환하는 함수 |
+| `oldDeps` | 마지막 실행 시점의 의존성 스냅샷 |
 
-watcher가 state를 바꾸더라도 같은 render phase 안에서 바로 다음 JSX 계산에 반영될 수 있다.
+### getDeps가 함수인 이유
+
+사용자는 `watch([count], cb)`처럼 배열을 직접 전달하지만, Babel 플러그인이 이를 `watch(() => [count], cb)`로 변환한다. 그래야 매 호출 시 클로저에서 **현재 값**을 다시 읽을 수 있다.
+
+### oldDeps에 `deepClone`을 사용하는 이유
+
+의존성에 객체나 배열이 포함되면 참조 공유로는 변경 감지가 불안정해질 수 있다. 따라서 watcher는 callback 이후 deps를 다시 읽고, 그 최종 상태를 깊은 복사본으로 보관한다.
 
 ---
 
-## `AEUI._runRenderPhase()`
+## 호출 시점
 
-`core.js`는 Babel과 runtime 사이의 안정적인 단일 진입점으로 `_runRenderPhase()`를 노출한다.
+이전 구조에서는 Babel이 render wrapper 안에서 `updateProps()`와 `_runComponentWatchers()`를 직접 호출했다. 현재 구조에서는 render wrapper가 `AEUI._runRenderPhase()` 하나만 호출하고, 그 안에서 `runComponentRenderPhase()`가 watcher를 render 전에 실행한다.
+
+| 호출 위치 | 현재 역할 |
+|-----------|-----------|
+| `packages/core/src/babel-plugin.js` | render wrapper에서 `AEUI._runRenderPhase()` 호출 |
+| `packages/core/src/core.js` | `_runRenderPhase()` public/runtime bridge |
+| `packages/core/src/component-lifecycle.js` | props 동기화 후 `runComponentWatchers()` 호출 |
+
+### 왜 render 전에 실행하는가
+
+watch callback이 state를 변경할 수 있기 때문이다.
 
 ```javascript
-_runRenderPhase: (nextProps, propsTarget, render) => {
-  const node = runtimeState.currentComponentNode;
-  if (!node) {
-    return typeof render === 'function' ? render(nextProps || {}) : null;
-  }
+let count = 0;
+let displayText = "";
 
-  return runComponentRenderPhase(runtimeState, node, nextProps, render, {
-    propsTarget,
-    runWatchers: true,
-  });
-}
+watch([count], () => {
+  displayText = `카운트: ${count}`;
+});
+
+return <p>{displayText}</p>;
 ```
 
-이 구조 덕분에 Babel은 더 이상 runtime 내부 세부 구현을 알 필요가 없다. "render phase 실행"이라는 계약 하나만 알면 된다.
+watcher를 render보다 먼저 실행하면, 같은 render phase 안에서 최신 `displayText`로 JSX를 계산할 수 있다.
 
-`AEUI._runComponentWatchers(node)`는 여전히 남아 있지만, 현재는 호환성과 테스트 편의를 위한 wrapper에 가깝다. 주 경로는 `_runRenderPhase()`다.
+### callback 이후 최종 deps를 다시 저장하는 이유
+
+watch callback이 deps를 다시 변경할 수 있기 때문이다.
+
+```javascript
+let count = 0;
+
+watch([count], () => {
+  if (count > 10) count = 10;
+});
+```
+
+callback 종료 후 deps를 다시 읽어야 다음 tick에서 불필요한 재실행을 막을 수 있다.
 
 ---
 
-## 왜 이 구조가 단순한가
+## 에러 격리
 
-이전 경로:
-
-```text
-Babel wrapper
-  -> updateProps(__props, _newProps)
-  -> _runComponentWatchers(currentNode)
-  -> inner render()
-```
-
-현재 경로:
-
-```text
-Babel wrapper
-  -> _runRenderPhase(_newProps, __props, innerRender)
-```
-
-watcher 실행 책임이 한 함수 안으로 모였기 때문에:
-
-- Babel contract가 줄어들고
-- runtime의 내부 helper 조합이 외부에 노출되지 않고
-- watcher ordering을 한 곳에서 테스트할 수 있다
+각 watcher는 개별 `try-catch`로 감싸진다. 하나의 watcher에서 에러가 나도 나머지 watcher와 component render flow는 계속 진행된다.
 
 ---
 
@@ -148,4 +165,5 @@ watcher 실행 책임이 한 함수 안으로 모였기 때문에:
 - `packages/core/src/hooks.js`
 - `packages/core/src/component-watchers.js`
 - `packages/core/src/component-lifecycle.js`
+- `packages/core/src/runtime.js`
 - `packages/core/src/core.js`
