@@ -11,8 +11,8 @@
 
     <!-- Framework & Plugin Definition -->
     <script type="module">
-      import { AEUI, watch, clean } from "../../src/index.js";
-      import aeuiTransform from "../../src/babel-plugin.js";
+      import { AEUI, watch, clean } from "../../packages/core/src/index.js";
+      import aeuiTransform from "../../packages/core/src/babel-plugin.js";
 
       window.AEUI = AEUI;
       window.watch = watch;
@@ -70,7 +70,7 @@
             <p>Local Count: {count}</p>
             <Child count={count} onIncrement={increment} />
             <p style="font-size: 0.8em; color: #666;">
-              Note: AEUI updates every 1 second, so the UI might lag slightly behind the click.
+              Note: DOM 이벤트 변경은 다음 프레임에 바로 반영되고, 비동기 변경은 polling fallback으로 반영됩니다.
             </p>
           </div>
         );

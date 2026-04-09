@@ -16,7 +16,7 @@
 
 - `runtimeState` 기반의 explicit 상태 저장 구조 도입
 - `component-lifecycle.js`, `component-watchers.js` 분리
-- Babel render wrapper를 `AEUI._runRenderPhase()` 호출 구조로 정리
+- Babel render wrapper를 `AEUI.__runtime.runRenderPhase()` 호출 구조로 정리
 - 공통 vnode helper 분리
 - controlled host prop 경계 보강 (`input[type="file"]`의 `value` 예외 처리)
 
@@ -25,10 +25,6 @@
 ---
 
 ## 🟡 중간 우선순위
-
-### 런타임 facade 축소
-
-`AEUI`는 호환성 때문에 underscore accessor와 여러 internal wrapper를 계속 노출한다. 장기적으로는 public API와 internal helper 경계를 더 분명히 나눌 필요가 있다.
 
 ### 문서/테스트 coverage 확장
 
@@ -48,9 +44,9 @@
 - 최소한 `AEUI`, `watch`, `clean`, `createVNode`의 타입 선언
 - `package.json`에 `types` 필드 추가
 
-### 컴포넌트 컨텍스트 스택 구조 전환
+### App-local runtime context
 
-비동기 렌더링 대비, 단일 전역 component context를 스택 구조로 변경. 내부 alias인 `_currentInstance`는 최종적으로 제거 대상이다.
+현재는 active runtime stack이 모듈 레벨에 있다. 장기적으로는 app instance가 자기 context stack을 직접 소유하도록 더 좁히는 방향을 검토한다.
 
 ### 빌드 설정 개선
 

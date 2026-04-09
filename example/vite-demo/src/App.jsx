@@ -70,7 +70,7 @@ function TestingContainer() {
   const timer = setInterval(() => {
     globalCount++;
     // No explicit watch or update call!
-    // AEUI core will now pick this up via root re-render on tick.
+    // AEUI core will pick this up via the polling fallback render path.
   }, 2000);
 
   clean(() => clearInterval(timer));

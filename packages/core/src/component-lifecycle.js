@@ -1,17 +1,6 @@
 import { runComponentWatchers } from './component-watchers.js';
+import { withComponentContext } from './runtime-context.js';
 import { getVNodeKey } from './vnode-helpers.js';
-
-function withCurrentComponent(state, node, callback) {
-  state.currentComponentNode = node;
-  state.currentInstance = node;
-
-  try {
-    return callback();
-  } finally {
-    state.currentComponentNode = null;
-    state.currentInstance = null;
-  }
-}
 
 function syncPropsTarget(propsTarget, nextProps) {
   if (!propsTarget || typeof propsTarget !== 'object') return;
@@ -49,7 +38,7 @@ export function createComponentNode(vnode, parentNode = null, parentDom = null) 
 export function setupComponentNode(state, node) {
   if (node.renderFactory) return node.renderFactory;
 
-  return withCurrentComponent(state, node, () => {
+  return withComponentContext(state, node, 'setup', () => {
     const renderFactory = node.component(node.props);
     node.renderFactory = renderFactory;
     node.render = renderFactory;
@@ -76,11 +65,11 @@ export function runComponentRenderPhase(
     return null;
   }
 
-  if (state.currentComponentNode === node) {
+  if (state.currentComponentNode === node && state.currentComponentPhase === 'render') {
     return render(node.props);
   }
 
-  return withCurrentComponent(state, node, () => render(node.props));
+  return withComponentContext(state, node, 'render', () => render(node.props));
 }
 
 export function invokeComponentRenderFactory(state, node, nextProps) {
@@ -90,9 +79,26 @@ export function invokeComponentRenderFactory(state, node, nextProps) {
     return null;
   }
 
-  return withCurrentComponent(state, node, () => (
+  return withComponentContext(state, node, 'render', () => (
     (node.renderFactory || node.render)(node.props)
   ));
+}
+
+export function renderComponentNode(state, parentDom, node, nextProps, beforeDom) {
+  node.props = nextProps || {};
+  setupComponentNode(state, node);
+
+  const renderedVNode = invokeComponentRenderFactory(state, node, node.props);
+  const renderedNode = state.reconcile(
+    parentDom,
+    node.renderedNode,
+    renderedVNode,
+    beforeDom,
+    node
+  );
+
+  commitRenderedNode(node, renderedNode);
+  return node;
 }
 
 export function commitRenderedNode(node, renderedNode) {

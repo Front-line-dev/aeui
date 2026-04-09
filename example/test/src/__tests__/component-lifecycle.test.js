@@ -3,6 +3,7 @@ import {
   createComponentNode,
   setupComponentNode,
   runComponentRenderPhase,
+  renderComponentNode,
   commitRenderedNode,
   cleanupComponentNode,
 } from '../../../../packages/core/src/component-lifecycle.js';
@@ -51,6 +52,26 @@ describe('component-lifecycle', () => {
 
     expect(callback).toHaveBeenCalledTimes(1);
     expect(render).toHaveBeenCalledWith({ value: 2 });
+  });
+
+  it('renders component nodes through the shared lifecycle entrypoint', () => {
+    const state = createRuntimeState({
+      deepEqual: Object.is,
+      deepClone: (value) => structuredClone(value),
+    });
+    const renderedNode = { firstDom: { nodeType: 1 }, lastDom: { nodeType: 1 } };
+    const renderFactory = vi.fn(() => 'rendered');
+    const component = vi.fn(() => renderFactory);
+    const node = createComponentNode({ tag: component, props: { value: 1 } }, null, null);
+
+    state.reconcile = vi.fn(() => renderedNode);
+
+    renderComponentNode(state, document.createElement('div'), node, { value: 2 }, null);
+
+    expect(component).toHaveBeenCalledTimes(1);
+    expect(renderFactory).toHaveBeenCalledWith({ value: 2 });
+    expect(state.reconcile).toHaveBeenCalledTimes(1);
+    expect(node.renderedNode).toBe(renderedNode);
   });
 
   it('commits rendered node bookkeeping', () => {

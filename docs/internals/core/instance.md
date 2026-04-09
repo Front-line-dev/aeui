@@ -1,33 +1,35 @@
-# RuntimeNode 관리 — `createNode`, `_currentComponentNode`
+# RuntimeNode 관리 — `node-factory`, `runtime-context`, `component-lifecycle`
 
 ## 개요
 
-AEUI에서 **RuntimeNode**는 하나의 VNode이 화면에 마운트된 후의 **런타임 상태를 담는 객체**이다.
+AEUI에서 **RuntimeNode**는 VNode가 실제 렌더 트리에 들어온 뒤의 실행 중 상태 객체다.
 
-VNode은 `createVNode`이 매 렌더마다 새로 만드는 입력 명세일 뿐이고, RuntimeNode는 실제 DOM 참조, lifecycle state, 자식 관계를 가진 실행 중 객체이다. reconcile 과정에서 old RuntimeNode와 new VNode을 비교하여, RuntimeNode를 재사용하거나 새로 생성한다.
+- VNode는 매 렌더마다 새로 만들어지는 입력 명세다.
+- RuntimeNode는 DOM 참조, lifecycle 상태, 자식 관계를 보관하는 장기 객체다.
+- reconcile은 `old RuntimeNode + new VNode`를 비교해 RuntimeNode를 재사용하거나 교체한다.
 
 ```jsx
-// Counter 함수는 1개, 하지만 RuntimeNode는 2개 생성
-<Counter name="A" />   →  component node 1 (count=0, name="A")
-<Counter name="B" />   →  component node 2 (count=0, name="B")
+<Counter name="A" />
+<Counter name="B" />
 ```
 
-React의 Fiber Node가 이에 해당한다.
+위 JSX는 같은 컴포넌트 함수를 두 번 사용하지만, 런타임에서는 서로 다른 component RuntimeNode 두 개를 가진다.
 
 ---
 
 ## Node 종류
 
-AEUI 내부의 RuntimeNode 종류는 4가지이다.
+AEUI 내부 RuntimeNode는 다음 다섯 종류를 가진다.
 
 | kind | 설명 | 자체 DOM | hook state |
 |------|------|----------|------------|
 | `text` | 문자열/숫자 같은 원시 렌더 결과 | TextNode 1개 | 없음 |
-| `host` | 실제 DOM 요소를 가지는 노드 (`div`, `span` 등) | HTMLElement 1개 | 없음 |
-| `component` | setup/render/watch/clean state를 가지는 컴포넌트 노드 | 없음 (renderedNode에 위임) | 있음 |
-| `fragment` | DOM 요소 없이 여러 자식을 묶는 노드. 배열 반환과 `AEUI.Fragment`를 모두 포함 | 없음 (children에 위임) | 없음 |
+| `host` | 실제 DOM 요소 (`div`, `span` 등) | HTMLElement 1개 | 없음 |
+| `component` | setup/render/watch/clean 상태를 가지는 컴포넌트 | 없음 | 있음 |
+| `fragment` | DOM 요소 없이 여러 자식을 묶는 그룹 | 없음 | 없음 |
+| `root` | 루트 컨테이너 wrapper | 없음 | 없음 |
 
-루트 컨테이너는 내부적으로 `kind: 'root'`인 별도 wrapper node가 children을 소유하지만, 사용자 의미의 node 종류는 위 4가지이다.
+사용자 관점의 핵심 node 종류는 `text | host | component | fragment`이고, `root`는 내부 wrapper다.
 
 ---
 
@@ -37,29 +39,29 @@ AEUI 내부의 RuntimeNode 종류는 4가지이다.
 
 ```javascript
 {
-  kind,        // 'text' | 'host' | 'component' | 'fragment'
-  key,         // sibling diff에 사용되는 선택적 식별자
-  vnode,       // 이 node를 만든 현재 입력 VNode
-  parent,      // 부모 RuntimeNode
-  parentDom,   // 이 node의 DOM range가 속한 실제 DOM 부모
-  children,    // 자식 RuntimeNode 목록
-  firstDom,    // 이 node가 차지하는 실제 DOM 범위의 시작
-  lastDom,     // 이 node가 차지하는 실제 DOM 범위의 끝
-  isMounted    // unmount 이후 재사용을 방지하기 위한 상태
+  kind,
+  key,
+  vnode,
+  parent,
+  parentDom,
+  children,
+  firstDom,
+  lastDom,
+  isMounted,
 }
 ```
 
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `kind` | `string` | node의 종류. `'text'`, `'host'`, `'component'`, `'fragment'` 중 하나 |
-| `key` | `string \| number \| null` | `props.key`에서 추출된 값. sibling diff에서 같은 부모의 이전 child node를 key로 매칭하는 데 사용된다. key가 없으면 `null` |
-| `vnode` | `VNode \| string \| number` | 이 node를 생성하거나 마지막으로 갱신한 입력 VNode. 재렌더링 시 새 VNode으로 갱신된다 |
-| `parent` | `RuntimeNode \| null` | 부모 RuntimeNode. 루트 node의 parent는 root wrapper node이다 |
-| `parentDom` | `HTMLElement` | 이 node의 DOM range가 삽입된 실제 DOM 부모 요소. host node의 children은 host의 DOM 요소가 parentDom이 되고, fragment/component의 children은 상위의 parentDom을 그대로 사용한다 |
-| `children` | `RuntimeNode[]` | 자식 RuntimeNode 목록. host node는 자기 DOM 요소 안의 자식들, component node는 `renderedNode`를 children에 보관한다 |
-| `firstDom` | `Node \| null` | 이 node가 차지하는 실제 DOM 범위의 **시작** 노드. text/host는 자기 DOM 노드, fragment/component는 첫 자식의 firstDom |
-| `lastDom` | `Node \| null` | 이 node가 차지하는 실제 DOM 범위의 **끝** 노드. text/host는 자기 DOM 노드, fragment/component는 마지막 자식의 lastDom |
-| `isMounted` | `boolean` | `true`면 현재 활성 상태. `_unmountNode` 시 `false`로 설정되어 이미 정리된 node의 재사용을 방지한다 |
+| 필드 | 설명 |
+|------|------|
+| `kind` | node 종류 |
+| `key` | sibling diff용 식별자 (`props.key`) |
+| `vnode` | 이 node를 만든 현재 입력 VNode |
+| `parent` | 부모 RuntimeNode |
+| `parentDom` | 이 node의 DOM range가 속한 실제 DOM 부모 |
+| `children` | 자식 RuntimeNode 목록 |
+| `firstDom` | 이 node가 차지하는 DOM 범위의 시작 |
+| `lastDom` | 이 node가 차지하는 DOM 범위의 끝 |
+| `isMounted` | 언마운트 여부를 나타내는 상태 |
 
 ---
 
@@ -70,8 +72,8 @@ AEUI 내부의 RuntimeNode 종류는 4가지이다.
 ```javascript
 {
   kind: 'text',
-  value,   // String — TextNode의 현재 문자열 값
-  dom      // TextNode — 실제 DOM TextNode 참조
+  value,
+  dom,
 }
 ```
 
@@ -80,290 +82,169 @@ AEUI 내부의 RuntimeNode 종류는 4가지이다.
 ```javascript
 {
   kind: 'host',
-  tag,     // String — 'div', 'span' 등 HTML 태그명
-  dom,     // HTMLElement — 실제 DOM 요소 참조
-  props    // Object — 현재 적용된 props (이전/새 비교에 사용)
+  tag,
+  dom,
+  props,
 }
 ```
 
 ### component node
 
-컴포넌트 node만 lifecycle state를 가진다.
-
 ```javascript
 {
   kind: 'component',
-  component,     // Function — 컴포넌트 함수 (vnode.tag)
-  props,         // Object — 현재 props
-  render,        // Function — setup이 반환한 렌더 함수
-  watchStates,   // Array — watch 등록 목록
-  cleanups,      // Array — clean 등록 목록
-  renderedNode   // RuntimeNode — render 결과 subtree의 루트 node
+  component,
+  props,
+  watchStates,
+  cleanups,
+  renderedNode,
+  renderFactory,
+  render,
 }
 ```
 
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `component` | `Function` | 컴포넌트 함수. `vnode.tag`와 동일하다. 같은 위치에 같은 함수가 오면 node를 재사용한다 |
-| `props` | `Object` | 현재 이 컴포넌트에 전달된 props. 부모가 새 props를 전달하면 갱신된다 |
-| `render` | `Function` | 컴포넌트의 **렌더 함수**. 컴포넌트 함수(setup)를 실행하면 반환되는 `(_newProps) => { ... JSX ... }` 형태의 함수. 매 tick마다 이 함수가 호출되어 새 VNode을 생성한다 |
-| `watchStates` | `Array` | `watch()` 훅으로 등록된 watcher 객체들의 배열. 각 watcher는 `{ callback, getDeps, oldDeps }` 구조를 가진다. 상세한 동작은 `watcher.md` 참조 |
-| `cleanups` | `Array` | `clean()` 훅으로 등록된 정리 함수들의 배열. node가 언마운트될 때 순서대로 실행된다. 예: `clearInterval`, 이벤트 리스너 해제 등 |
-| `renderedNode` | `RuntimeNode \| null` | `render(props)`가 반환한 VNode을 reconcile한 결과. component node의 `children`은 `[renderedNode]`이고, `firstDom`/`lastDom`은 `renderedNode`의 범위와 동일하다 |
+| 필드 | 설명 |
+|------|------|
+| `component` | 원본 컴포넌트 함수 (`vnode.tag`) |
+| `props` | 현재 props |
+| `watchStates` | `watch()` 등록 목록 |
+| `cleanups` | `clean()` 등록 목록 |
+| `renderedNode` | render 결과 subtree 루트 |
+| `renderFactory` | setup이 반환한 render 함수 |
+| `render` | 기존 호환성을 위한 alias |
 
-`host`, `text`, `fragment`는 구조 노드일 뿐이며 hook state를 가지지 않는다.
+component node만 hook state를 가진다.
 
 ### fragment node
 
-fragment node는 추가 필드가 없다. `children` 배열과 `firstDom`/`lastDom` 범위만 관리한다.
+fragment node는 별도 DOM 없이 `children`과 DOM range만 관리한다.
 
 ---
 
-## `createNode(vnode, parentNode, parentDom)`
+## `createNode(state, vnode, parentNode, parentDom)`
 
-RuntimeNode를 생성하는 함수이다. VNode의 타입을 판별하여 적절한 kind의 node를 반환한다.
+`node-factory.js`의 `createNode()`는 RuntimeNode **shell만 생성**한다. component setup은 여기서 실행하지 않는다.
 
-### 파라미터
+### 처리 규칙
 
-| 파라미터 | 설명 |
-|----------|------|
-| `vnode` | VNode 객체, 원시값(문자열/숫자), 또는 배열 |
-| `parentNode` | 부모 RuntimeNode. 루트면 root wrapper node |
-| `parentDom` | 이 node가 삽입될 실제 DOM 부모 요소 |
-
-### 동작 과정
-
-```
-1. 공통 필드로 기본 node 객체 생성 (kind, key, vnode, parent, parentDom, children, firstDom, lastDom, isMounted)
-
-2. VNode 타입 판별:
-   ├── null / boolean         → null 반환 (렌더링할 것 없음)
-   ├── 원시값 (string/number) → kind='text', value=String(vnode), dom=null
-   ├── 배열 또는 Fragment     → kind='fragment'
-   ├── tag가 문자열           → kind='host', tag/dom/props 설정
-   └── tag가 함수             → kind='component' (아래 상세)
-
-3. component인 경우:
-   ├── component, props, watchStates, cleanups, renderedNode, render 필드 추가
-   ├── _currentComponentNode = node   ← 전역 컨텍스트 설정
-   ├── _currentInstance = node        ← Babel 호환 alias
-   ├── node.render = vnode.tag(vnode.props)
-   │   └→ 컴포넌트 함수(setup) 실행 — 이 코드는 컴포넌트 생명 동안 딱 1번만 실행됨
-   │   └→ 이 실행 중에 watch(), clean() 등의 훅이 호출되면
-   │      _currentComponentNode를 통해 이 node에 등록됨
-   │   └→ 반환값은 렌더 함수((_newProps) => VNode)
-   ├── _currentComponentNode = null   ← 컨텍스트 해제
-   └── _currentInstance = null        ← 컨텍스트 해제
-
-4. node 반환
+```text
+1. 공통 필드가 있는 기본 node shell 생성
+2. vnode 타입 분기
+   ├── null / boolean         → null
+   ├── 원시값                 → text node
+   ├── 배열 / Fragment        → fragment node
+   ├── tag가 문자열           → host node
+   └── tag가 함수             → component node shell
 ```
 
-### 코드
+component의 경우 `createComponentNode()`가 `watchStates`, `cleanups`, `renderFactory` 등을 가진 shell을 만든다. 실제 setup 실행은 `component-lifecycle.js`의 `setupComponentNode()`가 맡는다.
 
-```javascript
-export function createNode(vnode, parentNode = null, parentDom = null) {
-  const node = {
-    kind: null,
-    key: getVNodeKey(vnode),
-    vnode,
-    parent: parentNode,
-    parentDom,
-    children: [],
-    firstDom: null,
-    lastDom: null,
-    isMounted: true,
-  };
+이 분리 덕분에:
 
-  if (vnode == null || typeof vnode === 'boolean') {
-    return null;
-  }
-
-  if (typeof vnode !== 'object') {
-    node.kind = 'text';
-    node.value = String(vnode);
-    node.dom = null;
-    return node;
-  }
-
-  if (isFragmentVNode(this, vnode)) {
-    node.kind = 'fragment';
-    return node;
-  }
-
-  if (typeof vnode.tag === 'string') {
-    node.kind = 'host';
-    node.tag = vnode.tag;
-    node.dom = null;
-    node.props = vnode.props || {};
-    return node;
-  }
-
-  // component
-  node.kind = 'component';
-  node.component = vnode.tag;
-  node.props = vnode.props || {};
-  node.watchStates = [];
-  node.cleanups = [];
-  node.renderedNode = null;
-  node.render = null;
-
-  this._currentComponentNode = node;
-  this._currentInstance = node;
-  try {
-    node.render = vnode.tag(vnode.props);
-  } finally {
-    this._currentComponentNode = null;
-    this._currentInstance = null;
-  }
-
-  return node;
-}
-```
-
-### 핵심 원리: Setup 1회 실행
-
-AEUI 컴포넌트의 가장 중요한 특성은, **컴포넌트 함수의 본문(setup)이 마운트 시 딱 한 번만 실행**된다는 것이다. 이후에는 setup이 반환한 **렌더 함수**만 반복 실행된다.
-
-이것이 가능한 이유는 Babel 플러그인이 `return (JSX)`를 `return () => (JSX)` 형태로 변환하기 때문이다:
-
-```javascript
-// 사용자가 작성한 코드
-function Counter() {
-  let count = 0;     // ← setup: 1회만 실행
-
-  return (
-    <div>{count}</div>  // ← JSX
-  );
-}
-
-// Babel 변환 후 실제 실행되는 코드
-function Counter() {
-  let count = 0;     // ← setup: 1회만 실행
-
-  return (_newProps) => {        // ← 이것이 node.render가 된다
-    return AEUI.createVNode("div", null, count);
-    // ↑ 이 함수만 매 tick마다 반복 실행됨
-    // count는 클로저로 참조되므로, 외부에서 count++ 하면 다음 렌더에서 새 값이 반영됨
-  };
-}
-```
-
-자바스크립트의 **클로저(closure)** 덕분에, setup에서 선언된 `let count = 0`은 렌더 함수가 참조를 유지하고, `count++` 같은 변경이 다음 렌더에서 자동으로 반영된다. React처럼 `useState`를 사용할 필요가 없다.
+- `createNode()`는 더 이상 훅 컨텍스트와 setup 실행을 직접 들고 있지 않다.
+- component mount/update 흐름은 `renderComponentNode()`로 한곳에 모인다.
+- 테스트에서 "node 생성"과 "setup 실행"을 분리해서 검증할 수 있다.
 
 ---
 
-## Hook 컨텍스트 — `_currentComponentNode`
+## 컴포넌트 컨텍스트와 phase
 
-### 역할
-
-`watch()`와 `clean()` 같은 훅 함수는 독립적인 함수이므로, "지금 어떤 컴포넌트의 setup 안에서 호출되고 있는지"를 스스로 알 수 없다. `_currentComponentNode`는 이 정보를 전해주는 전역 변수이다.
+`runtime-context.js`는 현재 실행 중인 컴포넌트와 phase를 관리한다. 구현은 단일 글로벌 포인터가 아니라 active runtime stack이다.
 
 ```javascript
-// hooks.js
-export function watch(deps, callback) {
-  const runtime = getRuntimeContext();
-  if (!runtime) return;
+withComponentContext(state, node, 'setup', () => {
+  // watch/clean 등록 가능
+});
 
-  const node = runtime.getCurrentComponentNode();  // ← "지금 어떤 컴포넌트?"
-  if (node) {
-    node.watchStates.push({ ... });                // ← 그 컴포넌트의 watcher 목록에 등록
-  }
-}
+withComponentContext(state, node, 'render', () => {
+  // render 실행
+});
 ```
 
-### 설정 시점
+관리되는 값은 다음 세 가지다.
 
-| 시점 | 설정되는 값 | 목적 |
-|------|-------------|------|
-| `createNode`에서 setup 실행 전 | 새로 생성된 node | `watch()`, `clean()` 훅이 이 node에 등록되도록 |
-| `mountComponentNode`에서 render 실행 전 | 해당 component node | 최초 마운트 시 watcher 실행 컨텍스트 제공 |
-| `updateComponentNode`에서 render 실행 전 | 해당 component node | 업데이트 시 watcher 실행 컨텍스트 제공 |
+| 필드 | 의미 |
+|------|------|
+| `currentComponentNode` | 현재 실행 중인 component node |
+| `currentComponentPhase` | `setup` 또는 `render` |
 
-각 설정 후, 해당 작업이 끝나면 반드시 `finally` 블록에서 `_currentComponentNode = null`로 해제한다.
+### 왜 phase가 필요한가
 
-### `_currentInstance` alias
+과거에는 "현재 component가 있는가"만으로 hook 등록 여부를 판단했다. 이제는 phase까지 함께 검사한다.
 
-render phase가 실행될 때 `_currentComponentNode`가 기준 필드로 사용된다. `_currentInstance`는 같은 값을 가리키는 alias이며, 개념적으로는 `_currentComponentNode`가 더 정확한 모델이다. 장기적으로 `_currentInstance`는 제거 대상이다.
-
-### 동기적 작동 보장
-
-`_currentComponentNode`는 전역 변수 하나이므로, 만약 컴포넌트 A의 setup 중에 컴포넌트 B의 setup이 시작되면 A의 컨텍스트가 덮어씌워질 수 있다. 그러나 AEUI의 코드는 **동기적으로 실행**되므로 (비동기 렌더링 없음), 한 컴포넌트의 setup이 완전히 끝난 후에야 다음 컴포넌트의 setup이 시작된다. 따라서 이 문제는 발생하지 않는다.
+- `watch()`와 `clean()`은 `setup` phase에서만 등록된다.
+- render 중에 호출된 `watch()`는 무시된다.
+- 예외가 발생해도 `finally`에서 컨텍스트가 복구된다.
+- 중첩된 component setup/render가 생겨도 바깥 runtime 컨텍스트가 stack으로 복원된다.
 
 ---
 
-## DOM Ownership — `firstDom`/`lastDom`
+## component lifecycle
 
-`fragment`와 `component`는 자체 DOM 노드가 없을 수 있으므로, 각 node는 단일 `dom` 대신 `firstDom`/`lastDom` 범위를 가진다.
+component node는 `component-lifecycle.js`가 관리한다.
+
+### setup
+
+```javascript
+setupComponentNode(state, node)
+```
+
+- `renderFactory`가 없을 때만 setup을 실행한다.
+- setup은 `withComponentContext(..., 'setup')` 안에서 실행된다.
+- 결과로 받은 render 함수를 `renderFactory`에 저장한다.
+
+### render
+
+```javascript
+renderComponentNode(state, parentDom, node, nextProps, beforeDom)
+```
+
+이 함수가 component mount/update 공통 진입점이다.
+
+1. props 동기화
+2. 필요하면 setup 실행
+3. render factory 호출
+4. render 결과 VNode를 `state.reconcile()`로 subtree diff
+5. `renderedNode`, `children`, `firstDom`, `lastDom` 갱신
+
+---
+
+## DOM ownership — `firstDom` / `lastDom`
+
+`fragment`와 `component`는 자체 DOM이 없을 수 있으므로, AEUI는 단일 `dom` 대신 DOM range를 관리한다.
 
 | kind | firstDom | lastDom |
 |------|----------|---------|
-| `text` | `TextNode` | `TextNode` (firstDom과 동일) |
-| `host` | `HTMLElement` | `HTMLElement` (firstDom과 동일) |
+| `text` | TextNode | TextNode |
+| `host` | HTMLElement | HTMLElement |
 | `fragment` | 첫 자식의 `firstDom` | 마지막 자식의 `lastDom` |
 | `component` | `renderedNode.firstDom` | `renderedNode.lastDom` |
 
-### 왜 range 방식인가
-
-`_getDomNodeCount`처럼 DOM 노드 수를 따로 계산하는 방식보다, `firstDom`/`lastDom` 범위로 ownership을 표현하는 편이 Fragment나 컴포넌트처럼 여러 DOM 노드를 갖는 경우를 더 직접적으로 다룰 수 있다.
-
-`firstDom`/`lastDom` 범위를 사용하면:
-- DOM 이동과 상태 이동을 같은 트리 연산으로 다룰 수 있다
-- sibling reorder는 "DOM 개수 계산"이 아니라 **node range 이동**으로 처리할 수 있다
-- Fragment/배열/DOM/컴포넌트를 같은 diff 모델에서 처리할 수 있다
-
-### range 갱신
-
-`updateRangeFromChildren` 함수가 fragment/root node의 `firstDom`/`lastDom`을 자식으로부터 재계산한다:
-
-```javascript
-function updateRangeFromChildren(node) {
-  let firstDom = null;
-  let lastDom = null;
-
-  for (const child of node.children || []) {
-    if (!firstDom && child && child.firstDom) {
-      firstDom = child.firstDom;
-    }
-    if (child && child.lastDom) {
-      lastDom = child.lastDom;
-    }
-  }
-
-  node.firstDom = firstDom;
-  node.lastDom = lastDom;
-}
-```
+이 range 모델 덕분에 fragment, 배열, component subtree를 같은 이동/삭제 로직으로 처리할 수 있다.
 
 ---
 
-## Root Node — `createRootNode`
+## Root node
 
-`AEUI.init()` 호출 시 `createRootNode(containerElement)`로 생성되는 최상위 wrapper node이다.
+루트 wrapper는 `createRootNode(containerElement)`가 만든다.
 
 ```javascript
-export function createRootNode(containerElement) {
-  return {
-    kind: 'root',
-    key: null,
-    vnode: null,
-    parent: null,
-    parentDom: containerElement,
-    children: [],
-    firstDom: null,
-    lastDom: null,
-    isMounted: true,
-  };
+{
+  kind: 'root',
+  parentDom: containerElement,
+  children: [],
+  firstDom: null,
+  lastDom: null,
 }
 ```
 
-root node는 사용자 컴포넌트의 부모 역할을 하며, `_reconcileRoot()`에서 root node의 `children[0]`이 실제 루트 컴포넌트의 RuntimeNode를 참조한다.
+`runtime.js:reconcileRoot()`는 root wrapper의 첫 child를 실제 루트 component subtree로 관리한다.
 
 ---
 
 ## 관련 코드 위치
 
-- `createNode`: `packages/core/src/runtime.js` L64-L118
-- `createRootNode`: `packages/core/src/runtime.js` L28-L40
-- `_currentComponentNode` 선언: `packages/core/src/core.js` L21
-- `_currentComponentNode` 참조 (hooks): `packages/core/src/hooks.js` (`runtime.js` 경유)
-- runtime bridge: `packages/core/src/runtime.js` L20-L26
+- `packages/core/src/node-factory.js`
+- `packages/core/src/runtime-context.js`
+- `packages/core/src/component-lifecycle.js`
+- `packages/core/src/runtime-state.js`

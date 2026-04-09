@@ -55,7 +55,7 @@ import App from './App.jsx';
 AEUI.init(App, document.getElementById('root'));
 ```
 
-`AEUI.init`은 `App` 컴포넌트를 `#root` 요소에 렌더링하고, `requestAnimationFrame` 기반 tick 루프를 시작해 자동으로 화면을 업데이트한다.
+`AEUI.init`은 `App` 컴포넌트를 `#root` 요소에 렌더링하고, `requestAnimationFrame` 기반 루프를 시작해 자동으로 화면을 업데이트한다. DOM 이벤트(`onClick`, `onInput` 등) 안에서 발생한 상태 변경은 다음 프레임에 즉시 반영되고, 그 외 비동기 변경은 polling fallback이 계속 감시한다.
 
 ---
 
@@ -88,7 +88,11 @@ function App() {
 
 ## 상태 (State) — `let`
 
-AEUI에서 상태는 단순한 `let` 변수이다. 변수를 수정하면 다음 tick에서 화면이 자동으로 업데이트된다. (변화가 없으면 tick 간격이 점진적으로 늘어난다.)
+AEUI에서 상태는 단순한 `let` 변수이다. 변수를 수정하면 화면이 자동으로 업데이트된다.
+
+- DOM 이벤트 핸들러 안의 변경: 다음 프레임에 즉시 반영
+- `setTimeout`, `Promise`, 외부 콜백 안의 변경: polling fallback으로 감지
+- 변화가 없으면 polling 간격은 점진적으로 늘어난다
 
 ```jsx
 function Counter() {
@@ -212,7 +216,7 @@ function ColorBox({ color }) {
 }
 ```
 
-버튼을 클릭하면 `color`가 변경되고, 다음 tick에서 `ColorBox`가 새로운 `color` 값으로 렌더링된다.
+버튼을 클릭하면 `color`가 변경되고, 다음 프레임에서 `ColorBox`가 새로운 `color` 값으로 렌더링된다.
 
 ---
 

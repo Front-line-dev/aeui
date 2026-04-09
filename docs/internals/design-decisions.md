@@ -10,7 +10,7 @@ AEUI 프레임워크의 주요 설계 선택과 그 이유를 기록한다. "왜
 
 ### 결정
 
-`setState`나 Proxy 같은 명시적 상태 알림 대신, **1초마다 전체 상태를 비교하여 변경을 감지**하는 Polling 방식을 선택했다.
+`setState`나 Proxy 같은 명시적 상태 알림 대신, **Dirty Checking + DOM 이벤트 fast path** 조합을 선택했다.
 
 ### 이유
 
@@ -19,26 +19,26 @@ AEUI 프레임워크의 주요 설계 선택과 그 이유를 기록한다. "왜
 ```jsx
 // AEUI: let 변수 직접 수정
 let count = 0;
-count++;  // 다음 tick에서 자동 반영
+count++;  // DOM 이벤트 안이면 다음 프레임, 그 외엔 polling으로 반영
 
 // React: useState 호출 필요
 const [count, setCount] = useState(0);
 setCount(count + 1);
 ```
 
-Proxy나 Signal 기반 방식은 객체를 래핑해야 하므로 `let` 직접 수정이 불가하다. Polling만이 **일반 JavaScript 변수의 직접 변이(mutation)를 감지**할 수 있다. 이것은 Babel 플러그인이 렌더 함수를 매 tick마다 재실행하는 구조와 결합되어 작동한다.
+Proxy나 Signal 기반 방식은 객체를 래핑해야 하므로 `let` 직접 수정이 불가하다. Polling fallback은 **일반 JavaScript 변수의 직접 변이(mutation)**를 DOM 이벤트 밖에서도 감지할 수 있게 해준다. 여기에 AEUI가 등록한 DOM 이벤트가 끝나면 다음 프레임 렌더를 앞당기는 fast path를 더해, 클릭과 입력처럼 흔한 상호작용의 지연을 줄였다. 이것은 Babel 플러그인이 렌더 함수를 매 tick마다 재실행하는 구조와 결합되어 작동한다.
 
 ### 트레이드오프
 
 | 장점 | 단점 |
 |------|------|
-| 사용자가 `useState` 같은 API를 배울 필요 없음 | 최대 1초의 UI 업데이트 지연 |
+| 사용자가 `useState` 같은 API를 배울 필요 없음 | DOM 이벤트 밖의 변경은 여전히 polling 지연 가능 |
 | 직접 변이(`push`, `splice` 등) 가능 | 변경 없어도 매 tick마다 비교 비용 발생 |
 | 코드가 일반 JavaScript처럼 자연스러움 | 복잡한 상태에서 `_deepEqual` 비용 증가 |
 
 ### 향후 계획
 
-고정 1초 대신 **적응형 tick interval**을 도입하여, 이벤트 발생 시 즉시 tick을 실행하고 유휴 시에는 간격을 늘리는 방식으로 종합적인 반응성을 개선할 예정이다.
+고정 1초 대신 **적응형 tick interval + DOM 이벤트 fast path**를 사용한다. 앞으로의 과제는 외부 비동기 변경까지 더 빠르게 포착할 보조 트리거를 추가할지 여부다.
 
 ---
 
@@ -114,7 +114,7 @@ setup이 1회만 실행되므로 `function Comp({ name })`에서 `name`은 초�
 
 ### 결정
 
-`_runComponentWatchers`를 렌더 함수 **호출 전에** 실행한다.
+`runComponentWatchers`를 렌더 함수 **호출 전에** 실행한다.
 
 ### 이유
 
@@ -139,7 +139,7 @@ return <p>{label}</p>;  // ← label이 최신이어야 정확한 렌더
 
 ### 결정
 
-훅(`watch`, `clean`)이 현재 컴포넌트를 알기 위해 **단일 전역 컨텍스트**를 사용한다. 현재 런타임 모델에서 이 컨텍스트의 실제 대상은 "컴포넌트 인스턴스"가 아니라 **component RuntimeNode**다.
+훅(`watch`, `clean`)이 현재 컴포넌트를 알기 위해 **active runtime stack 기반 컨텍스트**를 사용한다. 현재 런타임 모델에서 이 컨텍스트의 실제 대상은 "컴포넌트 인스턴스"가 아니라 **component RuntimeNode**다.
 
 ### 이유
 
@@ -153,11 +153,11 @@ watch(node, [count], () => { ... });  // 사용자가 불편
 watch([count], () => { ... });            // 깔끔한 API
 ```
 
-현재 AEUI의 모든 코드는 동기적으로 실행되므로, 전역 컨텍스트가 덮어씌워지는 문제는 발생하지 않는다.
+현재 AEUI의 모든 코드는 여전히 동기 중심으로 실행되지만, nested component setup/render 복구를 위해 컨텍스트는 stack으로 관리한다.
 
 ### 향후 계획
 
-비동기 렌더링이나 Concurrent Mode를 도입하게 되면 **컨텍스트 스택 구조**로 전환이 필요하다. Babel 플러그인과의 내부 호환 때문에 `_currentInstance` alias가 남아 있을 수는 있지만, 개념적으로는 `_currentComponentNode`가 기준이다. 관련 항목은 `docs/roadmap.md`에서 관리한다.
+비동기 렌더링이나 Concurrent Mode를 도입하게 되면 이 stack의 소유 범위를 app instance 쪽으로 더 좁히는 재설계가 필요할 수 있다. 현재 개념 기준은 `currentComponentNode`와 `currentComponentPhase`다.
 
 ---
 
@@ -165,7 +165,7 @@ watch([count], () => { ... });            // 깔끔한 API
 
 ### 결정
 
-`_reconcile`은 `prevVNode + index` 비교가 아니라 **old RuntimeNode + new VNode** 비교를 사용한다. 형제 목록 diff는 RuntimeNode 배열 기준으로 처리하며, `key`가 있는 형제는 key로 우선 매칭하고 `key`가 없는 형제는 순서 기반으로 fallback 한다.
+`reconcile`은 `prevVNode + index` 비교가 아니라 **old RuntimeNode + new VNode** 비교를 사용한다. 형제 목록 diff는 RuntimeNode 배열 기준으로 처리하며, `key`가 있는 형제는 key로 우선 매칭하고 `key`가 없는 형제는 순서 기반으로 fallback 한다.
 
 ### 이유
 

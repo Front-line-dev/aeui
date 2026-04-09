@@ -2,20 +2,19 @@
 
 ## 개요
 
-`watch`는 **특정 값의 변경을 감시하고, 변경 시 콜백을 실행**하는 훅이다. React의 `useEffect`와 유사한 역할을 하지만, 동작 방식이 근본적으로 다르다.
+`watch`는 특정 값의 변경을 감시하고, 값이 바뀌면 콜백을 실행하는 훅이다.
 
-- React `useEffect`: 렌더링 후에 실행되며, deps 배열의 참조가 변경되면 트리거
-- AEUI `watch`: 매 tick(1초)마다 deps의 **값(내용)**을 깊은 비교하여 변경 시 트리거
+- React `useEffect`처럼 보이지만, 실행 타이밍은 AEUI의 render phase와 dirty checking 루프에 맞춰져 있다.
+- deps 비교는 참조 비교가 아니라 `deepEqual` 기반 값 비교다.
+- 등록은 component setup에서 1회만 일어난다.
 
 ```javascript
 let count = 0;
 
 watch([count], () => {
-  console.log("count 변경됨:", count);
+  console.log('count 변경됨:', count);
 });
 ```
-
-위 코드는 "매 tick마다 `count`의 현재 값을 이전 값과 비교하고, 다르면 콜백을 실행해라"라는 의미이다.
 
 ---
 
@@ -23,210 +22,123 @@ watch([count], () => {
 
 ```javascript
 watch(deps, callback)
+watch(callback, deps) // 구버전 호환
 ```
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
-| `deps` | `Array` 또는 `() => Array` | 감시할 값들의 배열 또는 이를 반환하는 함수. Babel 플러그인이 함수로 변환해 주므로 사용자는 배열만 전달하면 된다 |
-| `callback` | `Function` | 의존성이 변경되었을 때 실행할 함수 |
+| `deps` | `Array` 또는 `() => Array` | 감시할 값 또는 값을 반환하는 함수 |
+| `callback` | `Function` | 변경 시 실행할 함수 |
+
+Babel 플러그인은 일반적으로 `watch([count], cb)`를 deps getter 형태로 바꾸고, 호출 지점도 `AEUI.__runtime.watch(...)` helper로 옮긴다.
 
 ---
 
-## 사용자 관점 사용법
+## 등록 규칙
 
-### 기본 사용
+`watch()`는 **setup phase에서만 등록**된다.
 
-```jsx
-function Counter() {
-  let count = 0;
+compiled main path에서는 `AEUI.__runtime.watch(...)`가 현재 runtime state를 직접 사용한다. `hooks.js`의 `watch()`는 Babel 변환을 거치지 않은 호출을 위한 fallback wrapper다.
 
-  watch([count], () => {
-    document.title = `카운트: ${count}`;
-  });
+즉 다음 경우만 유효하다.
 
-  return <button onClick={() => count++}>{count}</button>;
-}
-```
+- 컴포넌트 setup 본문 최상위에서 호출
+- compiled path에서는 현재 runtime state가 setup phase
+- fallback path에서는 `runtime-context.js`의 active runtime stack 최상단이 setup phase
 
-`count`가 변경되면 다음 tick에서 `document.title`이 업데이트된다.
+다음 경우는 무시된다.
 
-### 여러 의존성 감시
+- 이벤트 핸들러 내부
+- 타이머/Promise 콜백 내부
+- render 함수 내부
 
-```jsx
-let firstName = "홍";
-let lastName = "길동";
-
-watch([firstName, lastName], () => {
-  console.log(`이름: ${firstName} ${lastName}`);
-});
-```
-
-`firstName` 또는 `lastName` 중 **하나라도** 변경되면 콜백이 실행된다.
-
-### 객체/배열 감시
-
-```jsx
-let items = [1, 2, 3];
-
-watch([items], () => {
-  console.log("목록 변경:", items.length);
-});
-```
-
-`items.push(4)`처럼 **직접 수정(mutation)**해도 변경이 감지된다. AEUI는 `_deepEqual`로 이전 스냅샷과 내용을 비교하므로, 참조가 같아도 내용이 다르면 변경으로 판단한다.
-
-### 의존성 없는 watch (매 tick 실행)
-
-```jsx
-watch([Date.now()], () => {
-  console.log("매 tick마다 실행");
-});
-```
-
-`Date.now()`는 호출될 때마다 항상 다른 값을 반환하므로, 매 tick마다 콜백이 실행된다.
+이 제약은 "등록은 setup, 실행은 render"라는 계약을 명시적으로 강제하기 위해 들어갔다.
 
 ---
 
-## 내부 동작 원리
+## 내부 동작
 
-### 1단계: 등록 (setup 시 1회)
+### 1. 등록
 
-`watch()`는 컴포넌트의 setup 단계에서 호출되어, 현재 component node의 `watchStates` 배열에 watcher 객체를 등록한다.
+`hook-registry.js`가 인자를 정규화하고 watcher 객체를 등록한다. compiled code는 `AEUI.__runtime.watch()`를 통해 여기로 들어오고, fallback `hooks.js`도 같은 helper를 재사용한다.
 
 ```javascript
-function normalizeWatchArgs(firstArg, secondArg) {
-  if (typeof firstArg === "function" && typeof secondArg !== "function") {
-    return { callback: firstArg, depsGetter: secondArg }; // 구버전 호환
-  }
-  return { depsGetter: firstArg, callback: secondArg };
-}
-
-export function watch(firstArg, secondArg) {
-  const runtime = getRuntimeContext();
-  if (!runtime) return;
-
-  const { depsGetter, callback } = normalizeWatchArgs(firstArg, secondArg);
-  if (typeof callback !== "function") return;
-
-  const node = runtime.getCurrentComponentNode();  // 현재 처리 중인 컴포넌트 node
-  if (node) {
-    const getDeps = () => {
-      const depsValue =
-        typeof depsGetter === "function" ? depsGetter() : depsGetter;
-      return Array.isArray(depsValue) ? depsValue : depsValue == null ? [] : [depsValue];
-    };
-
-    node.watchStates.push({
-      callback,
-      getDeps,
-      oldDeps: runtime.deepClone(getDeps()),  // 초기 값의 깊은 복사 스냅샷
-    });
-  }
+{
+  callback,
+  getDeps,
+  oldDeps: runtime.deepClone(getDeps()),
 }
 ```
 
-#### `runtime.js`를 통한 component node 접근
+각 필드의 의미:
 
-`watch()`가 호출되는 시점에는 `createNode()`가 component node를 생성하는 중이며, 그 안에서 `AEUI._currentComponentNode`가 현재 node로 설정되어 있다. `hooks.js`는 `runtime.js`를 통해 이 값에 간접 접근하므로, `core.js`를 직접 import하지 않아 순환 참조를 피한다.
+- `callback`: 변경 시 실행할 사용자 함수
+- `getDeps`: 현재 deps를 다시 읽는 함수
+- `oldDeps`: 마지막 스냅샷
 
-```
-createNode(component) 시작
-  → _currentComponentNode = node
-  → 컴포넌트 함수(setup) 실행
-    → watch() 호출 → node.watchStates.push(...)  ← 여기
-    → clean() 호출 → node.cleanups.push(...)
-  → _currentComponentNode = null
-```
+`deepClone`을 쓰는 이유는 배열/객체 deps의 mutation도 감지하기 위해서다.
 
-#### `deps`가 배열과 함수 양쪽을 처리하는 이유
+### 2. 실행
 
-사용자는 `watch([count], cb)`로 **배열**을 전달하지만, Babel 플러그인이 이를 `watch(() => [count], cb)`로 **함수**로 변환한다. 함수로 감싸야 하는 이유:
+실행 경로는 다음과 같다.
 
-```javascript
-// 배열을 직접 전달하면
-let count = 0;
-watch([count], cb);    // ← 이 시점에 [count]는 [0]으로 평가되어 고정됨
-
-// 이후 count = 5가 되어도 getDeps()는 항상 [0]을 반환
-// → 변경 감지 불가능
-
-// 함수로 감싸면
-let count = 0;
-watch(() => [count], cb);  // ← 매 호출 시 클로저에서 현재 count 값을 읽음
-
-// count = 5가 되면 getDeps()는 [5]를 반환
-// → [0] vs [5] 비교로 변경 감지 성공
+```text
+Babel plugin
+  → AEUI.__runtime.runRenderPhase(...)
+    → core.js bridge
+      → compiler-runtime.js
+        → component-lifecycle.js: runComponentRenderPhase(...)
+          → component-watchers.js: runComponentWatchers(...)
 ```
 
-그런데 Babel 변환 없이 직접 `watch`를 호출하는 경우(테스트 등)를 위해, 런타임 훅도 배열/함수 양쪽을 받아 내부적으로 함수 형태로 통일한다. 구버전 `watch(callback, deps)` 호출도 호환을 위해 함께 받아들인다.
+`runComponentRenderPhase()`는:
 
-#### `oldDeps` 초기화에 `_deepClone`을 사용하는 이유
+1. 최신 props를 동기화하고
+2. watcher를 실행한 뒤
+3. 실제 render 함수를 호출한다
 
-의존성 값이 객체나 배열이면 참조를 저장하면 원본이 수정될 때 oldDeps도 함께 변경되어 변화를 감지하지 못한다. `_deepClone`으로 **독립적 복사본**을 만들어 이 문제를 방지한다.
+따라서 watcher callback이 같은 tick 안에서 local state를 바꿔도, 그 결과가 바로 이어지는 JSX 계산에 반영된다.
 
-### 2단계: 실행 (렌더 함수 시작 시)
+### 3. deps snapshot 갱신
 
-등록된 watcher는 컴포넌트의 렌더 함수가 실행될 때, 시작부에서 `_runComponentWatchers`에 의해 실행된다. Babel 플러그인이 렌더 함수 시작부에 `updateProps()`와 `_runComponentWatchers()`를 주입하므로, watcher는 항상 **최신 props가 동기화된 뒤**, JSX가 평가되기 전에 실행된다. 상세 동작은 `docs/internals/core/watcher.md` 참조.
-
-요약:
-1. `getDeps()` 호출 → 현재 의존성 값 배열 획득
-2. `oldDeps`와 `_deepEqual`로 요소별 비교
-3. 변경 감지 시 → `callback()` 실행
-4. callback 종료 후 `getDeps()`를 다시 호출 → 최종 deps를 `oldDeps`로 저장
-
-### 실행 타이밍: JSX 평가보다 먼저
-
-watcher는 렌더 함수의 **시작부**에서 실행된다. watch callback이 상태를 변경할 수 있고, 그 변경이 같은 tick의 렌더 결과(JSX)에 즉시 반영되어야 하기 때문이다.
-
-```
-tick 시작
-  → instance.render(props) 시작
-    → updateProps(__props, props)
-    → _runComponentWatchers(instance)  ← watch callback이 상태를 변경할 수 있음
-    → JSX 평가                         ← 변경된 상태가 JSX에 반영됨
-  → _reconcile(...)                   ← DOM 업데이트
-```
+watch callback이 deps를 다시 바꿀 수 있으므로, callback 뒤에 `getDeps()`를 한 번 더 호출해 최종 deps를 `oldDeps`로 저장한다.
 
 ---
 
-## 주의사항
+## 사용 시 주의사항
 
-### watch는 setup에서만 호출 가능
-
-`watch()`는 컴포넌트의 setup 단계(함수 본문의 최상위)에서만 호출해야 한다. 이벤트 핸들러나 조건문 안에서 호출하면 `_currentComponentNode`가 `null`이므로 등록되지 않는다.
+### render 안에서 watch를 호출하면 등록되지 않는다
 
 ```jsx
-function Counter() {
+function BadCase() {
   let count = 0;
 
-  // ✅ setup에서 호출 — 정상 등록
-  watch([count], () => console.log(count));
-
-  return (
-    <button onClick={() => {
-      count++;
-      // ❌ 이벤트 핸들러에서 호출 — 등록되지 않음
-      watch([count], () => console.log("이건 실행 안 됨"));
-    }}>
-      {count}
-    </button>
-  );
+  return () => {
+    watch([count], () => console.log(count)); // 무시됨
+    return <button>{count}</button>;
+  };
 }
 ```
 
-### watch는 해제할 수 없다
+이는 버그가 아니라 계약이다. watcher 등록은 setup 한 번으로 끝나야 한다.
 
-한번 등록된 watcher는 컴포넌트가 언마운트될 때까지 유지된다. 동적으로 watcher를 추가/제거하는 기능은 없다.
+### deps getter는 현재 값을 읽을 수 있어야 한다
 
-### 콜백 내 에러는 격리된다
+배열 자체를 한번 계산해서 넘기면 값이 고정될 수 있으므로, Babel 플러그인이 deps를 함수로 감싸 준다. 테스트나 수동 호출에서는 런타임이 배열/함수 양쪽을 받아서 처리한다.
 
-하나의 watch callback에서 에러가 발생해도, 나머지 watcher와 렌더링은 정상 진행된다. 에러는 `console.error`로 로깅된다.
+### 에러는 격리된다
+
+watcher 하나가 실패해도 나머지 watcher와 render는 계속 진행된다. 에러는 `console.error`로만 기록된다.
 
 ---
 
 ## 관련 코드 위치
 
-- `watch` 함수: `packages/core/src/hooks.js` L3-L15
-- runtime bridge: `packages/core/src/runtime.js`
-- watcher 실행 로직: `packages/core/src/runtime.js` (`AEUI._runComponentWatchers` 통해 호출)
-- Babel 변환 (deps 함수 래핑): `packages/core/src/babel-plugin.js`
+- `packages/core/src/hook-registry.js`
+- `packages/core/src/hooks.js`
+- `packages/core/src/runtime-context.js`
+- `packages/core/src/app-runtime.js`
+- `packages/core/src/component-watchers.js`
+- `packages/core/src/component-lifecycle.js`
+- `packages/core/src/compiler-runtime.js`
+- `packages/core/src/babel-plugin.js`

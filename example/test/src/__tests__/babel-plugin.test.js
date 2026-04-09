@@ -25,7 +25,7 @@ describe('AEUI Babel Plugin', () => {
     `);
 
     expect(code).toMatch(/export default \(\) => \{/);
-    expect(code).toMatch(/return _newProps => AEUI\._runRenderPhase\(/);
+    expect(code).toMatch(/return _newProps => AEUI\.__runtime\.runRenderPhase\(/);
     expect(code).not.toMatch(/_runComponentWatchers/);
     expect(code).toMatch(/AEUI\.createElement\("div"/);
   });
@@ -60,7 +60,7 @@ describe('AEUI Babel Plugin', () => {
       const Greeting = ({ name }) => <p>{name}</p>;
     `);
 
-    expect(code).toMatch(/return _newProps => AEUI\._runRenderPhase\(/);
+    expect(code).toMatch(/return _newProps => AEUI\.__runtime\.runRenderPhase\(/);
     expect(code).toMatch(/resolvedProps\.name/);
   });
 
@@ -79,7 +79,23 @@ describe('AEUI Babel Plugin', () => {
       }
     `);
 
-    expect(code).toMatch(/AEUI\._runRenderPhase\(/);
+    expect(code).toMatch(/AEUI\.__runtime\.runRenderPhase\(/);
     expect(code).not.toMatch(/_runComponentWatchers/);
+  });
+
+  it('watch와 clean 호출은 runtime hook helper로 변환된다', () => {
+    const code = transform(`
+      import { AEUI, watch, clean } from 'aeui';
+      function App() {
+        let count = 0;
+        watch([count], () => {});
+        clean(() => {});
+        return <div>{count}</div>;
+      }
+    `);
+
+    expect(code).toMatch(/AEUI\.__runtime\.watch\(/);
+    expect(code).toMatch(/AEUI\.__runtime\.clean\(/);
+    expect(code).not.toMatch(/watch\(\[/);
   });
 });

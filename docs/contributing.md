@@ -90,7 +90,7 @@ npm test
 | 파일 | 대상 | 설명 |
 |------|------|------|
 | `unit.test.js` | `_deepEqual`, `_deepClone`, `createVNode` | 유틸리티 함수 단위 테스트 |
-| `dom.test.js` | `_updateDomProps`, `_reconcile`, `_unmount` | DOM 조작 통합 테스트 (jsdom) |
+| `dom.test.js` | `updateDomProps`, `reconcile`, `unmountNode` | DOM 조작 통합 테스트 (jsdom) |
 | `component.test.jsx` | 컴포넌트 마운트, 상태, props, hooks | 컴포넌트 수준 통합 테스트 |
 
 ### 테스트 환경
@@ -119,7 +119,7 @@ npm run dev
 
 - 컴포넌트: **PascalCase** (`Counter`, `TodoList`)
 - 일반 함수: **camelCase** (`handleClick`, `formatDate`)
-- 내부 함수: **underscore prefix** (`_reconcile`, `_tick`)
+- 내부 함수: 모듈 목적에 맞는 동사형 이름 사용 (`reconcile`, `tick`, `unmountNode`)
 
 ### JSX
 

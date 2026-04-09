@@ -256,7 +256,7 @@ function _deepClone(v, seen = new WeakMap()) {
 const obj = { name: "test" };
 obj.self = obj;             // ← 순환 참조
 
-const cloned = AEUI._deepClone(obj);
+const cloned = _deepClone(obj);
 cloned.self === cloned;     // ✅ true — 복제본도 자기 자신을 참조
 ```
 
@@ -280,14 +280,14 @@ cloned.self === cloned;     // ✅ true — 복제본도 자기 자신을 참조
 
 | 사용처 | 용도 | 설명 |
 |--------|------|------|
-| `_runComponentWatchers` | watcher 의존성 변경 감지 | `getDeps()` 결과와 `oldDeps`를 비교 |
-| `_updateDomProps` | DOM 속성 변경 감지 | 새 props와 이전 props의 각 속성을 비교하여, 실제로 변경된 속성만 DOM에 적용 |
+| `runComponentWatchers` | watcher 의존성 변경 감지 | `getDeps()` 결과와 `oldDeps`를 비교 |
+| `updateDomProps` | DOM 속성 변경 감지 | 새 props와 이전 props의 각 속성을 비교하여, 실제로 변경된 속성만 DOM에 적용 |
 
 ### `_deepClone` 사용처
 
 | 사용처 | 용도 | 설명 |
 |--------|------|------|
-| `_runComponentWatchers` | oldDeps 스냅샷 저장 | callback 실행 후, 현재 deps 값의 독립적 복사본을 oldDeps에 저장 |
+| `runComponentWatchers` | oldDeps 스냅샷 저장 | callback 실행 후, 현재 deps 값의 독립적 복사본을 oldDeps에 저장 |
 | `watch` 훅 (hooks.js) | 초기 deps 스냅샷 | watcher 등록 시 초기 의존성 값의 복사본을 oldDeps에 저장 |
 
 ---

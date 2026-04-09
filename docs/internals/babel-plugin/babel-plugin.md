@@ -14,7 +14,7 @@ AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은
 | **Props 반응화** | `function Comp(props)` | `function Comp(_initialProps)` + `__props` 객체 | props 변경 시 클로저 참조를 최신 상태로 유지 |
 | **Watch deps 래핑** | `watch([count], cb)` | `watch(() => [count], cb)` | 매 호출 시 현재 값을 읽도록 함수화 |
 
-플러그인은 render wrapper에서 **`AEUI._runRenderPhase()`를 호출**한다. props 동기화, watcher 실행, render context 설정은 이 runtime helper가 담당한다.
+플러그인은 render wrapper에서 **`AEUI.__runtime.runRenderPhase()`를 호출**한다. props 동기화, watcher 실행, render context 설정은 이 runtime helper가 담당한다.
 
 ### 전체 변환 흐름
 
@@ -47,7 +47,7 @@ function Counter(_initialProps) {
     }
   );
 
-  return (_newProps) => AEUI._runRenderPhase(
+  return (_newProps) => AEUI.__runtime.runRenderPhase(
     _newProps,
     __props,
     (_renderProps) => {
@@ -274,7 +274,7 @@ function UserCard(_initialProps) {
 render wrapper는 다음 helper를 호출한다.
 
 ```javascript
-return (_newProps) => AEUI._runRenderPhase(
+return (_newProps) => AEUI.__runtime.runRenderPhase(
   _newProps,
   __props,
   (_renderProps) => {
@@ -358,7 +358,7 @@ export function TodoItem(_initialProps) {
 
   clean(() => console.log("TodoItem 제거됨"));
 
-  return (_newProps) => AEUI._runRenderPhase(
+  return (_newProps) => AEUI.__runtime.runRenderPhase(
     _newProps,
     __props,
     (_renderProps) => {
@@ -380,7 +380,7 @@ export function TodoItem(_initialProps) {
 - `{ text, done }` → `_initialProps` + `__props` 생성
 - `_resolveProps()`가 현재 `__props`를 원래 구조 분해 패턴으로 다시 해석
 - `watch([done], cb)` → `watch(() => [done], cb)` 형태로 정규화
-- `return (JSX)` → render factory + `AEUI._runRenderPhase(...)`
+- `return (JSX)` → render factory + `AEUI.__runtime.runRenderPhase(...)`
 - render/watch 내부의 구조 분해 props 참조는 `_resolveProps()` 결과를 통해 최신값 사용
 - `editing`은 props가 아닌 로컬 상태이므로 변환하지 않음
 - `clean()`은 변환 대상이 아님

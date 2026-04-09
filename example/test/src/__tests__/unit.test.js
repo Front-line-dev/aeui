@@ -1,67 +1,68 @@
 import { describe, it, expect } from 'vitest';
 import { AEUI } from 'aeui';
+import { _deepClone, _deepEqual } from '../../../../packages/core/src/deep-compare.js';
 
-describe('AEUI._deepEqual', () => {
+describe('deepEqual', () => {
   it('원시값 비교', () => {
-    expect(AEUI._deepEqual(1, 1)).toBe(true);
-    expect(AEUI._deepEqual(1, 2)).toBe(false);
-    expect(AEUI._deepEqual('a', 'a')).toBe(true);
-    expect(AEUI._deepEqual('a', 'b')).toBe(false);
-    expect(AEUI._deepEqual(true, true)).toBe(true);
-    expect(AEUI._deepEqual(true, false)).toBe(false);
-    expect(AEUI._deepEqual(null, null)).toBe(true);
-    expect(AEUI._deepEqual(undefined, undefined)).toBe(true);
-    expect(AEUI._deepEqual(null, undefined)).toBe(false);
+    expect(_deepEqual(1, 1)).toBe(true);
+    expect(_deepEqual(1, 2)).toBe(false);
+    expect(_deepEqual('a', 'a')).toBe(true);
+    expect(_deepEqual('a', 'b')).toBe(false);
+    expect(_deepEqual(true, true)).toBe(true);
+    expect(_deepEqual(true, false)).toBe(false);
+    expect(_deepEqual(null, null)).toBe(true);
+    expect(_deepEqual(undefined, undefined)).toBe(true);
+    expect(_deepEqual(null, undefined)).toBe(false);
   });
 
   it('배열 비교', () => {
-    expect(AEUI._deepEqual([1, 2, 3], [1, 2, 3])).toBe(true);
-    expect(AEUI._deepEqual([1, 2], [1, 2, 3])).toBe(false);
-    expect(AEUI._deepEqual([1, [2, 3]], [1, [2, 3]])).toBe(true);
-    expect(AEUI._deepEqual([1, [2, 3]], [1, [2, 4]])).toBe(false);
+    expect(_deepEqual([1, 2, 3], [1, 2, 3])).toBe(true);
+    expect(_deepEqual([1, 2], [1, 2, 3])).toBe(false);
+    expect(_deepEqual([1, [2, 3]], [1, [2, 3]])).toBe(true);
+    expect(_deepEqual([1, [2, 3]], [1, [2, 4]])).toBe(false);
   });
 
   it('객체 비교', () => {
-    expect(AEUI._deepEqual({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(true);
-    expect(AEUI._deepEqual({ a: 1 }, { a: 2 })).toBe(false);
-    expect(AEUI._deepEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
-    expect(AEUI._deepEqual({ a: { b: 1 } }, { a: { b: 1 } })).toBe(true);
+    expect(_deepEqual({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(true);
+    expect(_deepEqual({ a: 1 }, { a: 2 })).toBe(false);
+    expect(_deepEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+    expect(_deepEqual({ a: { b: 1 } }, { a: { b: 1 } })).toBe(true);
   });
 
   it('Date 비교', () => {
     const d1 = new Date('2024-01-01');
     const d2 = new Date('2024-01-01');
     const d3 = new Date('2024-12-31');
-    expect(AEUI._deepEqual(d1, d2)).toBe(true);
-    expect(AEUI._deepEqual(d1, d3)).toBe(false);
+    expect(_deepEqual(d1, d2)).toBe(true);
+    expect(_deepEqual(d1, d3)).toBe(false);
   });
 
   it('Map 비교', () => {
     const m1 = new Map([['a', 1], ['b', 2]]);
     const m2 = new Map([['a', 1], ['b', 2]]);
     const m3 = new Map([['a', 1], ['b', 3]]);
-    expect(AEUI._deepEqual(m1, m2)).toBe(true);
-    expect(AEUI._deepEqual(m1, m3)).toBe(false);
+    expect(_deepEqual(m1, m2)).toBe(true);
+    expect(_deepEqual(m1, m3)).toBe(false);
   });
 
   it('Set 비교', () => {
     const s1 = new Set([1, 2, 3]);
     const s2 = new Set([1, 2, 3]);
     const s3 = new Set([1, 2, 4]);
-    expect(AEUI._deepEqual(s1, s2)).toBe(true);
-    expect(AEUI._deepEqual(s1, s3)).toBe(false);
+    expect(_deepEqual(s1, s2)).toBe(true);
+    expect(_deepEqual(s1, s3)).toBe(false);
   });
 
   it('Set 내부 객체를 순서와 무관하게 비교', () => {
     const s1 = new Set([{ a: 1 }, { b: 2 }]);
     const s2 = new Set([{ b: 2 }, { a: 1 }]);
-    expect(AEUI._deepEqual(s1, s2)).toBe(true);
+    expect(_deepEqual(s1, s2)).toBe(true);
   });
 
   it('Set 내부 deep-equal 중복 객체를 1:1로 매칭', () => {
     const s1 = new Set([{ a: 1 }, { a: 1 }]);
     const s2 = new Set([{ a: 1 }, { b: 2 }]);
-    expect(AEUI._deepEqual(s1, s2)).toBe(false);
+    expect(_deepEqual(s1, s2)).toBe(false);
   });
 
   it('순환 참조 객체 비교 시 크래시 없이 동작', () => {
@@ -71,11 +72,11 @@ describe('AEUI._deepEqual', () => {
     b.self = b;
 
     // 자기 자신을 참조하는 동일 구조 → true
-    expect(AEUI._deepEqual(a, b)).toBe(true);
+    expect(_deepEqual(a, b)).toBe(true);
 
     const c = { value: 2 };
     c.self = c;
-    expect(AEUI._deepEqual(a, c)).toBe(false);
+    expect(_deepEqual(a, c)).toBe(false);
   });
 
   it('순환 참조 배열 비교 시 크래시 없이 동작', () => {
@@ -84,20 +85,20 @@ describe('AEUI._deepEqual', () => {
     const b = [1, 2];
     b.push(b);
 
-    expect(AEUI._deepEqual(a, b)).toBe(true);
+    expect(_deepEqual(a, b)).toBe(true);
   });
 });
 
-describe('AEUI._deepClone', () => {
+describe('deepClone', () => {
   it('원시값 복제', () => {
-    expect(AEUI._deepClone(42)).toBe(42);
-    expect(AEUI._deepClone('hello')).toBe('hello');
-    expect(AEUI._deepClone(null)).toBe(null);
+    expect(_deepClone(42)).toBe(42);
+    expect(_deepClone('hello')).toBe('hello');
+    expect(_deepClone(null)).toBe(null);
   });
 
   it('배열 복제 (독립적)', () => {
     const original = [1, [2, 3]];
-    const cloned = AEUI._deepClone(original);
+    const cloned = _deepClone(original);
     expect(cloned).toEqual(original);
     cloned[1].push(4);
     expect(original[1]).toEqual([2, 3]); // 원본 변경 안 됨
@@ -105,7 +106,7 @@ describe('AEUI._deepClone', () => {
 
   it('객체 복제 (독립적)', () => {
     const original = { a: 1, b: { c: 2 } };
-    const cloned = AEUI._deepClone(original);
+    const cloned = _deepClone(original);
     expect(cloned).toEqual(original);
     cloned.b.c = 99;
     expect(original.b.c).toBe(2); // 원본 변경 안 됨
@@ -113,7 +114,7 @@ describe('AEUI._deepClone', () => {
 
   it('Date 복제', () => {
     const original = new Date('2024-01-01');
-    const cloned = AEUI._deepClone(original);
+    const cloned = _deepClone(original);
     expect(cloned.getTime()).toBe(original.getTime());
     expect(cloned).not.toBe(original);
   });
@@ -122,7 +123,7 @@ describe('AEUI._deepClone', () => {
     const original = { value: 1 };
     original.self = original;
 
-    const cloned = AEUI._deepClone(original);
+    const cloned = _deepClone(original);
 
     expect(cloned.value).toBe(1);
     expect(cloned).not.toBe(original);
@@ -134,7 +135,7 @@ describe('AEUI._deepClone', () => {
     const original = [1, 2];
     original.push(original);
 
-    const cloned = AEUI._deepClone(original);
+    const cloned = _deepClone(original);
 
     expect(cloned[0]).toBe(1);
     expect(cloned[1]).toBe(2);
@@ -183,11 +184,10 @@ describe('AEUI.Fragment', () => {
   });
 });
 
-describe('AEUI facade runtime proxies', () => {
-  it('exposes mutable runtime fields through accessors instead of owning the state directly', () => {
-    const descriptor = Object.getOwnPropertyDescriptor(AEUI, '_didMutate');
-
-    expect(typeof descriptor.get).toBe('function');
-    expect(typeof descriptor.set).toBe('function');
+describe('AEUI public surface', () => {
+  it('does not expose legacy underscore runtime helpers at top level', () => {
+    expect(AEUI._tick).toBeUndefined();
+    expect(AEUI._didMutate).toBeUndefined();
+    expect(AEUI.__runtime).toBeDefined();
   });
 });

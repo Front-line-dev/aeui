@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AEUI, watch, clean } from 'aeui';
+import { resetRuntimeState } from '../../../../packages/core/src/runtime-state.js';
 
 /**
  * 실제 AEUI 컴포넌트를 작성하고 DOM에 마운트하여 동작을 검증하는 통합 테스트.
- * Babel 플러그인이 JSX를 변환하고, _tick() 호출로 상태 변화를 반영합니다.
+ * Babel 플러그인이 JSX를 변환하고, public render() 또는 DOM 이벤트 fast path로 상태 변화를 반영한다.
  */
 
+const runtime = AEUI.__runtime;
 let container;
 
 beforeEach(() => {
@@ -15,15 +17,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  AEUI._stopScheduler();
-  AEUI._rafId = null;
-  AEUI._frameDelay = 1;
-  AEUI._framesUntilNextTick = 0;
-  AEUI._rootNode = null;
-  AEUI._RootComponent = null;
-  AEUI._containerElement = null;
-  AEUI._isRendering = false;
-  AEUI._currentComponentNode = null;
+  runtime.stopScheduler();
+  resetRuntimeState(runtime.state);
   container.remove();
 });
 
@@ -64,8 +59,8 @@ describe('lifecycle characterization', () => {
 
     AEUI.init(App, container);
     container.querySelector('#setup-once-btn').click();
-    AEUI._tick();
-    AEUI._tick();
+    AEUI.render();
+    AEUI.render();
 
     expect(calls).toEqual(['setup']);
   });
@@ -91,7 +86,7 @@ describe('lifecycle characterization', () => {
 
     AEUI.init(App, container);
     container.querySelector('#swap-child').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(cleanups).toEqual(['a']);
     expect(container.querySelector('#child-b').textContent).toBe('b');
@@ -124,7 +119,7 @@ describe('상태 변경 (let 변수)', () => {
     expect(container.querySelector('#count').textContent).toBe('0');
 
     // tick 강제 실행
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#count').textContent).toBe('1');
   });
@@ -136,9 +131,85 @@ describe('상태 변경 (let 변수)', () => {
     container.querySelector('#btn').click();
     container.querySelector('#btn').click();
 
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#count').textContent).toBe('3');
+  });
+});
+
+describe('DOM 이벤트 자동 렌더', () => {
+  it('클릭 이벤트 뒤 다음 프레임에 자동으로 다시 렌더된다', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', (callback) => setTimeout(() => callback(0), 16));
+    vi.stubGlobal('cancelAnimationFrame', (id) => clearTimeout(id));
+
+    try {
+      function AutoRenderApp() {
+        let count = 0;
+
+        return (
+          <div>
+            <span id="auto-count">{count}</span>
+            <button id="auto-btn" onClick={() => { count += 1; }}>+</button>
+          </div>
+        );
+      }
+
+      AEUI.init(AutoRenderApp, container);
+      expect(container.querySelector('#auto-count').textContent).toBe('0');
+
+      container.querySelector('#auto-btn').click();
+
+      expect(container.querySelector('#auto-count').textContent).toBe('0');
+
+      await vi.advanceTimersByTimeAsync(16);
+
+      expect(container.querySelector('#auto-count').textContent).toBe('1');
+    } finally {
+      runtime.stopScheduler();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('다음 프레임 전 여러 DOM 이벤트가 발생해도 한 번의 자동 렌더로 합쳐진다', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', (callback) => setTimeout(() => callback(0), 16));
+    vi.stubGlobal('cancelAnimationFrame', (id) => clearTimeout(id));
+
+    const tickSpy = vi.spyOn(runtime, 'tick');
+
+    try {
+      function CoalescedAutoRenderApp() {
+        let count = 0;
+
+        return (
+          <div>
+            <span id="coalesced-count">{count}</span>
+            <button id="coalesced-btn" onClick={() => { count += 1; }}>+</button>
+          </div>
+        );
+      }
+
+      AEUI.init(CoalescedAutoRenderApp, container);
+      expect(tickSpy).toHaveBeenCalledTimes(1);
+
+      const button = container.querySelector('#coalesced-btn');
+      button.click();
+      button.click();
+
+      expect(container.querySelector('#coalesced-count').textContent).toBe('0');
+
+      await vi.advanceTimersByTimeAsync(16);
+
+      expect(container.querySelector('#coalesced-count').textContent).toBe('2');
+      expect(tickSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      tickSpy.mockRestore();
+      runtime.stopScheduler();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -166,7 +237,7 @@ describe('Props 전달', () => {
     expect(container.querySelector('#msg').textContent).toBe('initial');
 
     container.querySelector('#change').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#msg').textContent).toBe('updated');
   });
@@ -208,7 +279,7 @@ describe('watch 훅', () => {
     expect(watchLog).toEqual([]);
 
     container.querySelector('#watch-btn').click();
-    AEUI._tick();
+    AEUI.render();
 
     // props value가 10→20으로 변경되어 watch callback 실행
     expect(watchLog).toEqual([20]);
@@ -216,7 +287,7 @@ describe('watch 훅', () => {
 
   it('props가 변하지 않으면 watch callback 미실행', () => {
     AEUI.init(WatchApp, container);
-    AEUI._tick();
+    AEUI.render();
     expect(watchLog).toEqual([]);
   });
 
@@ -239,11 +310,11 @@ describe('watch 훅', () => {
     expect(watchLog).toEqual([]);
 
     container.querySelector('#shrink-watch').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(watchLog).toEqual(['shrunk']);
 
-    AEUI._tick();
+    AEUI.render();
     expect(watchLog).toEqual(['shrunk']);
   });
 
@@ -263,7 +334,7 @@ describe('watch 훅', () => {
     expect(watchLog).toEqual([]);
 
     container.querySelector('#lbtn').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(watchLog).toEqual([1]);
     expect(container.querySelector('#lcount').textContent).toBe('1');
@@ -290,7 +361,7 @@ describe('watch 훅', () => {
     expect(watchLog).toEqual([]);
 
     container.querySelector('#named-btn').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(watchLog).toEqual([1]);
     expect(container.querySelector('#named-count').textContent).toBe('1');
@@ -336,7 +407,7 @@ describe('watch 훅', () => {
     expect(watchLog).toEqual([]);
 
     container.querySelector('#mixed-btn').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(watchLog).toEqual([[1, 1]]);
     expect(container.querySelector('#mixed-value').textContent).toBe('1:1');
@@ -363,15 +434,41 @@ describe('watch 훅', () => {
     expect(watchLog).toEqual([]);
 
     container.querySelector('#clamp-btn').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(watchLog).toEqual([1]);
     expect(container.querySelector('#clamp-count').textContent).toBe('1');
 
-    AEUI._tick();
+    AEUI.render();
 
     expect(watchLog).toEqual([1]);
     expect(container.querySelector('#clamp-count').textContent).toBe('1');
+  });
+
+  it('render phase에서 호출된 watch는 등록되지 않는다', () => {
+    function RenderPhaseWatch() {
+      let count = 0;
+
+      return () => {
+        watch([count], () => { watchLog.push(count); });
+
+        return (
+          <button id="render-phase-watch" onClick={() => { count += 1; }}>
+            {count}
+          </button>
+        );
+      };
+    }
+
+    AEUI.init(RenderPhaseWatch, container);
+    expect(watchLog).toEqual([]);
+
+    container.querySelector('#render-phase-watch').click();
+    AEUI.render();
+    AEUI.render();
+
+    expect(container.querySelector('#render-phase-watch').textContent).toBe('1');
+    expect(watchLog).toEqual([]);
   });
 });
 
@@ -403,7 +500,7 @@ describe('props 구조분해 반응성', () => {
     expect(aliasWatchLog).toEqual([]);
 
     container.querySelector('#alias-change').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#alias-label').textContent).toBe('second');
     expect(aliasWatchLog).toEqual(['second']);
@@ -429,7 +526,7 @@ describe('props 구조분해 반응성', () => {
     expect(container.querySelector('#default-count').textContent).toBe('0');
 
     container.querySelector('#default-change').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#default-count').textContent).toBe('5');
   });
@@ -454,7 +551,7 @@ describe('props 구조분해 반응성', () => {
     expect(container.querySelector('#nested-name').textContent).toBe('Kim');
 
     container.querySelector('#nested-change').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#nested-name').textContent).toBe('Lee');
   });
@@ -483,7 +580,7 @@ describe('props 구조분해 반응성', () => {
     expect(container.querySelector('#rest-id').textContent).toBe('Item:A');
 
     container.querySelector('#rest-change').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#rest-id').textContent).toBe('Item:B');
   });
@@ -508,7 +605,7 @@ describe('Babel 플러그인 변환 경계', () => {
     expect(container.querySelector('#expr-name').textContent).toBe('first');
 
     container.querySelector('#expr-change').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#expr-name').textContent).toBe('second');
   });
@@ -534,7 +631,7 @@ describe('Babel 플러그인 변환 경계', () => {
     expect(container.querySelector('#conditional-leaf').textContent).toBe('no');
 
     container.querySelector('#conditional-toggle').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#conditional-leaf').tagName).toBe('P');
     expect(container.querySelector('#conditional-leaf').textContent).toBe('yes');
@@ -561,11 +658,11 @@ describe('Babel 플러그인 변환 경계', () => {
     expect(container.querySelector('#logical-leaf')).toBeNull();
 
     container.querySelector('#logical-show').click();
-    AEUI._tick();
+    AEUI.render();
     expect(container.querySelector('#logical-leaf').textContent).toBe('visible');
 
     container.querySelector('#logical-hide').click();
-    AEUI._tick();
+    AEUI.render();
     expect(container.querySelector('#logical-leaf')).toBeNull();
   });
 
@@ -589,7 +686,7 @@ describe('Babel 플러그인 변환 경계', () => {
     expect(container.querySelector('#manual-render-value').textContent).toBe('alpha');
 
     container.querySelector('#manual-render-change').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#manual-render-value').textContent).toBe('beta');
   });
@@ -614,7 +711,7 @@ describe('Babel 플러그인 변환 경계', () => {
     expect(container.querySelector('#manual-render-default-value').textContent).toBe('alpha');
 
     container.querySelector('#manual-render-default-change').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#manual-render-default-value').textContent).toBe('beta');
   });
@@ -676,7 +773,7 @@ describe('clean 훅', () => {
     expect(childCleanups).toEqual([]);
 
     container.querySelector('#hide-btn').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(childCleanups).toEqual(['child-cleaned']);
   });
@@ -705,7 +802,7 @@ describe('조건부 렌더링', () => {
     expect(container.querySelector('#greeting')).toBeNull();
 
     container.querySelector('#login').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('#login')).toBeNull();
     expect(container.querySelector('#greeting')).not.toBeNull();
@@ -743,7 +840,7 @@ describe('리스트 렌더링', () => {
     AEUI.init(ListApp, container);
 
     container.querySelector('#add').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelectorAll('#list li').length).toBe(4);
   });
@@ -752,7 +849,7 @@ describe('리스트 렌더링', () => {
     AEUI.init(ListApp, container);
 
     container.querySelector('#remove').click();
-    AEUI._tick();
+    AEUI.render();
 
     const lis = container.querySelectorAll('#list li');
     expect(lis.length).toBe(2);
@@ -787,11 +884,11 @@ describe('key 기반 reconciliation', () => {
     AEUI.init(KeyedComponentListApp, container);
 
     container.querySelector('.counter-b').click();
-    AEUI._tick();
+    AEUI.render();
     expect(Array.from(container.querySelectorAll('#keyed-components button')).map(node => node.textContent)).toEqual(['a:0', 'b:1']);
 
     container.querySelector('#reverse-components').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(Array.from(container.querySelectorAll('#keyed-components button')).map(node => node.textContent)).toEqual(['b:1', 'a:0']);
     expect(container.querySelector('.counter-b').textContent).toBe('b:1');
@@ -826,11 +923,11 @@ describe('key 기반 reconciliation', () => {
     AEUI.init(KeyedWrapperApp, container);
 
     container.querySelector('.inner-b').click();
-    AEUI._tick();
+    AEUI.render();
     expect(Array.from(container.querySelectorAll('#wrapper-list button')).map(node => node.textContent)).toEqual(['a:0', 'b:1']);
 
     container.querySelector('#reverse-wrappers').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(Array.from(container.querySelectorAll('#wrapper-list li')).map(node => node.getAttribute('data-key'))).toEqual(['b', 'a']);
     expect(Array.from(container.querySelectorAll('#wrapper-list button')).map(node => node.textContent)).toEqual(['b:1', 'a:0']);
@@ -899,7 +996,7 @@ describe('Fragment', () => {
     expect(Array.from(appRoot.childNodes).map(node => node.textContent)).toEqual(['A', 'B', '0']);
 
     container.querySelector('#counter').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(Array.from(appRoot.childNodes).map(node => node.textContent)).toEqual(['A', 'B', '1']);
     expect(container.querySelector('.pair-2').textContent).toBe('B');
@@ -937,7 +1034,7 @@ describe('여러 컴포넌트 상태 독립성', () => {
     container.querySelector('.btn-a').click();
     container.querySelector('.btn-a').click();
     container.querySelector('.btn-a').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(container.querySelector('.count-a').textContent).toBe('3');
     expect(container.querySelector('.count-b').textContent).toBe('0'); // B는 안 바뀜
@@ -970,7 +1067,7 @@ describe('Reconcile Remove 시 컴포넌트 cleanup 실행', () => {
     expect(cleanups).toEqual([]);
 
     container.querySelector('#remove-btn').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(cleanups).toEqual(['removed']);
     expect(container.querySelector('span')).toBeNull();
@@ -999,7 +1096,7 @@ describe('Reconcile Remove 시 컴포넌트 cleanup 실행', () => {
     expect(cleanups).toEqual([]);
 
     container.querySelector('#remove-second').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(cleanups).toEqual(['second']);
     expect(container.querySelector('span[data-id="first"]')).not.toBeNull();
@@ -1036,7 +1133,7 @@ describe('DOM 타입 교체 시 내부 컴포넌트 cleanup 실행', () => {
     expect(cleanups).toEqual([]);
 
     container.querySelector('#switch-btn').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(cleanups).toEqual(['inner-cleaned']);
     expect(container.querySelector('span')).toBeNull();
@@ -1071,11 +1168,11 @@ describe('DOM 타입 교체 시 내부 컴포넌트 cleanup 실행', () => {
 
     const cButton = () => container.querySelector('button.C');
     cButton().click();
-    AEUI._tick();
+    AEUI.render();
     expect(cButton().textContent).toBe('C:1');
 
     container.querySelector('#switch-preserve').click();
-    AEUI._tick();
+    AEUI.render();
 
     expect(cButton().textContent).toBe('C:1');
   });

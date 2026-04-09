@@ -1,12 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AEUI, watch } from 'aeui';
+import { resetRuntimeState } from '../../../../packages/core/src/runtime-state.js';
+
+const runtime = AEUI.__runtime;
+
+function resetAeuiRuntime() {
+  runtime.stopScheduler();
+  resetRuntimeState(runtime.state);
+}
 
 function createRoot(container) {
-  return AEUI.createRootNode(container);
+  return runtime.createRootNode(container);
 }
 
 function reconcileRoot(container, root, previousNode, nextVNode) {
-  const nextNode = AEUI._reconcile(container, previousNode, nextVNode, null, root);
+  const nextNode = runtime.reconcile(container, previousNode, nextVNode, null, root);
   root.children = nextNode ? [nextNode] : [];
   root.firstDom = nextNode ? nextNode.firstDom : null;
   root.lastDom = nextNode ? nextNode.lastDom : null;
@@ -21,47 +29,47 @@ describe('_updateDomProps', () => {
   });
 
   it('children prop을 DOM에 설정하지 않음', () => {
-    AEUI._updateDomProps(div, { children: ['child1', 'child2'] });
+    runtime.updateDomProps(div, { children: ['child1', 'child2'] });
     expect(div.hasAttribute('children')).toBe(false);
   });
 
   it('key, ref prop을 DOM에 설정하지 않음', () => {
-    AEUI._updateDomProps(div, { key: 'k1', ref: {} });
+    runtime.updateDomProps(div, { key: 'k1', ref: {} });
     expect(div.hasAttribute('key')).toBe(false);
     expect(div.hasAttribute('ref')).toBe(false);
   });
 
   it('className을 class attribute로 설정', () => {
-    AEUI._updateDomProps(div, { className: 'my-class' });
+    runtime.updateDomProps(div, { className: 'my-class' });
     expect(div.className).toBe('my-class');
   });
 
   it('className 제거 시 빈 문자열로 설정', () => {
-    AEUI._updateDomProps(div, { className: 'my-class' });
-    AEUI._updateDomProps(div, { className: undefined }, { className: 'my-class' });
+    runtime.updateDomProps(div, { className: 'my-class' });
+    runtime.updateDomProps(div, { className: undefined }, { className: 'my-class' });
     expect(div.className).toBe('');
   });
 
   it('style 문자열 처리', () => {
-    AEUI._updateDomProps(div, { style: 'color: red' });
+    runtime.updateDomProps(div, { style: 'color: red' });
     expect(div.style.cssText).toContain('color');
   });
 
   it('style 객체 처리', () => {
-    AEUI._updateDomProps(div, { style: { color: 'red', fontSize: '16px' } });
+    runtime.updateDomProps(div, { style: { color: 'red', fontSize: '16px' } });
     expect(div.style.color).toBe('red');
     expect(div.style.fontSize).toBe('16px');
   });
 
   it('boolean attribute true 설정', () => {
-    AEUI._updateDomProps(div, { disabled: true });
+    runtime.updateDomProps(div, { disabled: true });
     expect(div.disabled).toBe(true);
     expect(div.hasAttribute('disabled')).toBe(true);
   });
 
   it('boolean attribute false 설정 (attribute 제거)', () => {
-    AEUI._updateDomProps(div, { disabled: true });
-    AEUI._updateDomProps(div, { disabled: false }, { disabled: true });
+    runtime.updateDomProps(div, { disabled: true });
+    runtime.updateDomProps(div, { disabled: false }, { disabled: true });
     expect(div.disabled).toBe(false);
     expect(div.hasAttribute('disabled')).toBe(false);
   });
@@ -70,15 +78,15 @@ describe('_updateDomProps', () => {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
 
-    AEUI._updateDomProps(checkbox, { checked: true });
-    AEUI._updateDomProps(checkbox, { checked: undefined }, { checked: true });
+    runtime.updateDomProps(checkbox, { checked: true });
+    runtime.updateDomProps(checkbox, { checked: undefined }, { checked: true });
 
     expect(checkbox.checked).toBe(false);
     expect(checkbox.hasAttribute('checked')).toBe(false);
   });
 
   it('일반 attribute 설정', () => {
-    AEUI._updateDomProps(div, { id: 'test', 'data-value': '42' });
+    runtime.updateDomProps(div, { id: 'test', 'data-value': '42' });
     expect(div.getAttribute('id')).toBe('test');
     expect(div.getAttribute('data-value')).toBe('42');
   });
@@ -87,10 +95,10 @@ describe('_updateDomProps', () => {
     const select = document.createElement('select');
     select.innerHTML = '<option value="PAID">결제 완료</option><option value="DELIVERED">배송 완료</option>';
 
-    AEUI._updateDomProps(select, { value: 'PAID' });
+    runtime.updateDomProps(select, { value: 'PAID' });
     expect(select.value).toBe('PAID');
 
-    AEUI._updateDomProps(select, { value: 'DELIVERED' }, { value: 'PAID' });
+    runtime.updateDomProps(select, { value: 'DELIVERED' }, { value: 'PAID' });
     expect(select.value).toBe('DELIVERED');
     expect(select.getAttribute('value')).toBe('DELIVERED');
   });
@@ -100,15 +108,15 @@ describe('_updateDomProps', () => {
     input.type = 'file';
 
     expect(() => {
-      AEUI._updateDomProps(input, { type: 'file', value: 'fake-path' });
+      runtime.updateDomProps(input, { type: 'file', value: 'fake-path' });
     }).not.toThrow();
 
     expect(input.getAttribute('value')).toBeNull();
   });
 
   it('attribute 제거 (undefined)', () => {
-    AEUI._updateDomProps(div, { id: 'test' });
-    AEUI._updateDomProps(div, { id: undefined }, { id: 'test' });
+    runtime.updateDomProps(div, { id: 'test' });
+    runtime.updateDomProps(div, { id: undefined }, { id: 'test' });
     expect(div.hasAttribute('id')).toBe(false);
   });
 
@@ -116,11 +124,11 @@ describe('_updateDomProps', () => {
     const handler1 = vi.fn();
     const handler2 = vi.fn();
 
-    AEUI._updateDomProps(div, { onClick: handler1 });
+    runtime.updateDomProps(div, { onClick: handler1 });
     div.click();
     expect(handler1).toHaveBeenCalledTimes(1);
 
-    AEUI._updateDomProps(div, { onClick: handler2 }, { onClick: handler1 });
+    runtime.updateDomProps(div, { onClick: handler2 }, { onClick: handler1 });
     div.click();
     expect(handler1).toHaveBeenCalledTimes(1); // 이전 핸들러 미호출
     expect(handler2).toHaveBeenCalledTimes(1);
@@ -129,11 +137,11 @@ describe('_updateDomProps', () => {
   it('이벤트 핸들러 제거 시 기존 리스너 해제', () => {
     const handler = vi.fn();
 
-    AEUI._updateDomProps(div, { onClick: handler });
+    runtime.updateDomProps(div, { onClick: handler });
     div.click();
     expect(handler).toHaveBeenCalledTimes(1);
 
-    AEUI._updateDomProps(div, { onClick: undefined }, { onClick: handler });
+    runtime.updateDomProps(div, { onClick: undefined }, { onClick: handler });
     div.click();
     expect(handler).toHaveBeenCalledTimes(1);
   });
@@ -141,11 +149,11 @@ describe('_updateDomProps', () => {
   it('이벤트 핸들러가 truthy 비함수로 바뀌면 기존 리스너 해제', () => {
     const handler = vi.fn();
 
-    AEUI._updateDomProps(div, { onClick: handler });
+    runtime.updateDomProps(div, { onClick: handler });
     div.click();
     expect(handler).toHaveBeenCalledTimes(1);
 
-    AEUI._updateDomProps(div, { onClick: 'invalid-handler' }, { onClick: handler });
+    runtime.updateDomProps(div, { onClick: 'invalid-handler' }, { onClick: handler });
     div.click();
     expect(handler).toHaveBeenCalledTimes(1);
   });
@@ -156,7 +164,7 @@ describe('_updateDomProps', () => {
       boundThis = this;
     }
 
-    AEUI._updateDomProps(div, { onClick: handler });
+    runtime.updateDomProps(div, { onClick: handler });
     div.click();
 
     expect(boundThis).toBe(div);
@@ -438,7 +446,7 @@ describe('_unmountNode', () => {
       lastDom: null,
     };
 
-    AEUI._unmountNode(node);
+    runtime.unmountNode(node);
 
     expect(node.isMounted).toBe(false);
     expect(node.firstDom).toBeNull();
@@ -457,7 +465,7 @@ describe('_unmountNode', () => {
       lastDom: null,
     };
 
-    AEUI._unmountNode(node);
+    runtime.unmountNode(node);
 
     expect(node.watchStates).toEqual([]);
   });
@@ -475,7 +483,7 @@ describe('_unmountNode', () => {
       lastDom: null,
     };
 
-    AEUI._unmountNode(node);
+    runtime.unmountNode(node);
 
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
@@ -496,7 +504,7 @@ describe('_unmountNode', () => {
       lastDom: null,
     };
 
-    AEUI._unmountNode(node);
+    runtime.unmountNode(node);
 
     expect(goodCleanup).toHaveBeenCalledTimes(1);
     expect(consoleSpy).toHaveBeenCalled();
@@ -526,7 +534,7 @@ describe('_unmountNode', () => {
       lastDom: null,
     };
 
-    AEUI._unmountNode(parent);
+    runtime.unmountNode(parent);
 
     expect(child.isMounted).toBe(false);
     expect(childCleanup).toHaveBeenCalledTimes(1);
@@ -542,30 +550,23 @@ describe('init 중복 호출 방어', () => {
   });
 
   afterEach(() => {
-    AEUI._stopScheduler();
-    AEUI._rafId = null;
-    AEUI._frameDelay = 1;
-    AEUI._framesUntilNextTick = 0;
-    AEUI._rootNode = null;
-    AEUI._RootComponent = null;
-    AEUI._containerElement = null;
-    AEUI._currentComponentNode = null;
+    resetAeuiRuntime();
     container.remove();
   });
 
   it('init 호출 시 RAF 스케줄러가 설정됨', () => {
     const App = () => () => AEUI.createVNode('div', null, 'hello');
     AEUI.init(App, container);
-    expect(AEUI._rafId).not.toBeNull();
+    expect(runtime.state.rafId).not.toBeNull();
   });
 
   it('init 재호출 시 새 RAF 요청이 등록됨', () => {
     const App = () => () => AEUI.createVNode('div', null, 'hello');
     AEUI.init(App, container);
-    const firstTimer = AEUI._rafId;
+    const firstTimer = runtime.state.rafId;
 
     AEUI.init(App, container);
-    const secondTimer = AEUI._rafId;
+    const secondTimer = runtime.state.rafId;
 
     expect(secondTimer).not.toBe(firstTimer);
   });
@@ -574,70 +575,63 @@ describe('init 중복 호출 방어', () => {
 describe('스케줄러 프레임 백오프', () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    AEUI._stopScheduler();
-    AEUI._rafId = null;
-    AEUI._frameDelay = 1;
-    AEUI._framesUntilNextTick = 0;
-    AEUI._rootNode = null;
-    AEUI._RootComponent = null;
-    AEUI._containerElement = null;
-    AEUI._currentComponentNode = null;
+    resetAeuiRuntime();
   });
 
   it('변화가 없으면 1 -> 2 -> 4 프레임으로 간격이 늘어남', () => {
-    const tickSpy = vi.spyOn(AEUI, '_tick').mockReturnValue(false);
-    const startSpy = vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => { });
+    const tickSpy = vi.spyOn(runtime, 'tick').mockReturnValue(false);
+    const startSpy = vi.spyOn(runtime, 'startScheduler').mockImplementation(() => { });
 
-    AEUI._RootComponent = () => { };
-    AEUI._containerElement = document.createElement('div');
-    AEUI._frameDelay = 1;
-    AEUI._framesUntilNextTick = 0;
+    runtime.state.RootComponent = () => { };
+    runtime.state.containerElement = document.createElement('div');
+    runtime.state.frameDelay = 1;
+    runtime.state.framesUntilNextTick = 0;
 
-    AEUI._onAnimationFrame();
+    runtime.onAnimationFrame();
     expect(tickSpy).toHaveBeenCalledTimes(1);
-    expect(AEUI._frameDelay).toBe(2);
-    expect(AEUI._framesUntilNextTick).toBe(1);
+    expect(runtime.state.frameDelay).toBe(2);
+    expect(runtime.state.framesUntilNextTick).toBe(1);
 
-    AEUI._onAnimationFrame();
+    runtime.onAnimationFrame();
     expect(tickSpy).toHaveBeenCalledTimes(1);
-    expect(AEUI._frameDelay).toBe(2);
-    expect(AEUI._framesUntilNextTick).toBe(0);
+    expect(runtime.state.frameDelay).toBe(2);
+    expect(runtime.state.framesUntilNextTick).toBe(0);
 
-    AEUI._onAnimationFrame();
+    runtime.onAnimationFrame();
     expect(tickSpy).toHaveBeenCalledTimes(2);
-    expect(AEUI._frameDelay).toBe(4);
-    expect(AEUI._framesUntilNextTick).toBe(3);
+    expect(runtime.state.frameDelay).toBe(4);
+    expect(runtime.state.framesUntilNextTick).toBe(3);
     expect(startSpy).toHaveBeenCalledTimes(3);
   });
 
   it('변화가 생기면 프레임 간격이 1로 즉시 리셋됨', () => {
-    vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => { });
-    vi.spyOn(AEUI, '_tick').mockReturnValue(true);
+    vi.spyOn(runtime, 'startScheduler').mockImplementation(() => { });
+    vi.spyOn(runtime, 'tick').mockReturnValue(true);
 
-    AEUI._RootComponent = () => { };
-    AEUI._containerElement = document.createElement('div');
-    AEUI._frameDelay = 16;
-    AEUI._framesUntilNextTick = 0;
+    runtime.state.RootComponent = () => { };
+    runtime.state.containerElement = document.createElement('div');
+    runtime.state.frameDelay = 16;
+    runtime.state.framesUntilNextTick = 0;
 
-    AEUI._onAnimationFrame();
+    runtime.onAnimationFrame();
 
-    expect(AEUI._frameDelay).toBe(1);
-    expect(AEUI._framesUntilNextTick).toBe(0);
+    expect(runtime.state.frameDelay).toBe(1);
+    expect(runtime.state.framesUntilNextTick).toBe(0);
   });
 
   it('프레임 간격은 최대 60까지 증가함', () => {
-    vi.spyOn(AEUI, '_startScheduler').mockImplementation(() => { });
-    vi.spyOn(AEUI, '_tick').mockReturnValue(false);
+    vi.spyOn(runtime, 'startScheduler').mockImplementation(() => { });
+    vi.spyOn(runtime, 'tick').mockReturnValue(false);
 
-    AEUI._RootComponent = () => { };
-    AEUI._containerElement = document.createElement('div');
-    AEUI._frameDelay = 48;
-    AEUI._framesUntilNextTick = 0;
+    runtime.state.RootComponent = () => { };
+    runtime.state.containerElement = document.createElement('div');
+    runtime.state.frameDelay = 48;
+    runtime.state.framesUntilNextTick = 0;
 
-    AEUI._onAnimationFrame();
+    runtime.onAnimationFrame();
 
-    expect(AEUI._frameDelay).toBe(60);
-    expect(AEUI._framesUntilNextTick).toBe(59);
+    expect(runtime.state.frameDelay).toBe(60);
+    expect(runtime.state.framesUntilNextTick).toBe(59);
   });
 });
 
@@ -651,14 +645,7 @@ describe('수동 렌더 API', () => {
   });
 
   afterEach(() => {
-    AEUI._stopScheduler();
-    AEUI._rafId = null;
-    AEUI._frameDelay = 1;
-    AEUI._framesUntilNextTick = 0;
-    AEUI._rootNode = null;
-    AEUI._RootComponent = null;
-    AEUI._containerElement = null;
-    AEUI._currentComponentNode = null;
+    resetAeuiRuntime();
     container.remove();
   });
 
@@ -679,23 +666,35 @@ describe('수동 렌더 API', () => {
 
     expect(didMutate).toBe(true);
     expect(container.querySelector('#count').textContent).toBe('1');
-    expect(AEUI._frameDelay).toBe(1);
+    expect(runtime.state.frameDelay).toBe(1);
   });
 });
 
 describe('에러 처리', () => {
-  it('createNode setup 에러가 발생해도 현재 컴포넌트 컨텍스트가 복구됨', () => {
+  it('createNode는 component shell만 만들고 setup은 바로 실행하지 않음', () => {
+    const component = vi.fn(() => () => 'ok');
+
+    const node = runtime.createNode({ tag: component, props: { value: 1 } }, null, null);
+
+    expect(component).not.toHaveBeenCalled();
+    expect(node.kind).toBe('component');
+    expect(node.renderFactory).toBeNull();
+  });
+
+  it('component setup 에러가 발생해도 현재 컴포넌트 컨텍스트가 복구됨', () => {
     let leakedNode = null;
     const BrokenComponent = () => {
-      leakedNode = AEUI._currentComponentNode;
+      leakedNode = runtime.state.currentComponentNode;
       throw new Error('setup boom');
     };
+    const parent = document.createElement('div');
+    const root = createRoot(parent);
 
     expect(() => {
-      AEUI.createNode({ tag: BrokenComponent, props: {} }, null, null);
+      runtime.reconcile(parent, null, { tag: BrokenComponent, props: {} }, null, root);
     }).toThrow('setup boom');
 
-    expect(AEUI._currentComponentNode).toBeNull();
+    expect(runtime.state.currentComponentNode).toBeNull();
 
     // setup 밖 watch 호출은 등록되지 않아야 함
     watch([], () => { });
@@ -711,10 +710,10 @@ describe('에러 처리', () => {
     };
 
     expect(() => {
-      AEUI._reconcile(parent, null, vnode, null, root);
+      runtime.reconcile(parent, null, vnode, null, root);
     }).toThrow('render boom');
 
-    expect(AEUI._currentComponentNode).toBeNull();
+    expect(runtime.state.currentComponentNode).toBeNull();
   });
 
   it('watcher 에러가 다른 watcher를 차단하지 않음', () => {
@@ -736,7 +735,7 @@ describe('에러 처리', () => {
       ],
     };
 
-    AEUI._runComponentWatchers(instance);
+    runtime.runComponentWatchers(instance);
 
     expect(watcherResults).toEqual(['ok']); // 두 번째 watcher 정상 실행
     expect(consoleSpy).toHaveBeenCalled();
@@ -757,7 +756,7 @@ describe('에러 처리', () => {
       ],
     };
 
-    AEUI._runComponentWatchers(instance);
+    runtime.runComponentWatchers(instance);
 
     expect(instance.watchStates[0].oldDeps).toEqual([1]);
   });

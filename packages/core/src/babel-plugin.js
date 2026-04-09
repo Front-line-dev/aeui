@@ -34,6 +34,26 @@ export default function aeuiTransform({ types: t }) {
     return functionPath.get('body');
   };
 
+  const createAeuiRuntimeMember = (name) => (
+    t.memberExpression(
+      t.memberExpression(t.identifier('AEUI'), t.identifier('__runtime')),
+      t.identifier(name)
+    )
+  );
+
+  const isAeuiHookCall = (callPath, hookName) => {
+    if (!t.isIdentifier(callPath.node.callee, { name: hookName })) {
+      return false;
+    }
+
+    const binding = callPath.scope.getBinding(hookName);
+    if (!binding) return true;
+    if (!binding.path.isImportSpecifier()) return false;
+
+    const parent = binding.path.parentPath;
+    return parent.isImportDeclaration() && parent.node.source.value === 'aeui';
+  };
+
   const containsRenderableExpression = (node) => {
     if (!node) return false;
     if (isJSX(node)) return true;
@@ -402,7 +422,12 @@ export default function aeuiTransform({ types: t }) {
     // 4. Transform watch() and Return
     path.traverse({
       CallExpression(callPath) {
-        if (!t.isIdentifier(callPath.node.callee, { name: "watch" })) return;
+        if (isAeuiHookCall(callPath, 'clean')) {
+          callPath.node.callee = createAeuiRuntimeMember('clean');
+          return;
+        }
+
+        if (!isAeuiHookCall(callPath, 'watch')) return;
 
         const args = callPath.node.arguments;
         if (args.length < 2) return;
@@ -446,6 +471,7 @@ export default function aeuiTransform({ types: t }) {
         }
 
         callPath.node.arguments = [depsArg, callbackArg];
+        callPath.node.callee = createAeuiRuntimeMember('watch');
 
         if (destructuredNames.size > 0 && propsId) {
           const depsPath = callPath.get('arguments.0');
@@ -497,7 +523,7 @@ export default function aeuiTransform({ types: t }) {
             returnPath.node.argument = t.arrowFunctionExpression(
               [renderPhaseParam],
               t.callExpression(
-                t.memberExpression(t.identifier("AEUI"), t.identifier("_runRenderPhase")),
+                createAeuiRuntimeMember("runRenderPhase"),
                 [
                   t.cloneNode(renderPhaseParam),
                   propsId ? t.cloneNode(propsId) : t.nullLiteral(),

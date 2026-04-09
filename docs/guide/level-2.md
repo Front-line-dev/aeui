@@ -146,7 +146,8 @@ AEUI가 `let` 변수의 직접 수정을 감지하기 위해 Polling을 사용�
 
 이 방식의 자연스러운 결과:
 - `count++`, `items.push()` 등 일반 JavaScript 코드가 그대로 동작
-- 변경 사항은 **다음 tick**에서 화면에 반영된다.
+- 비동기 변경은 여전히 **다음 polling tick**에서 화면에 반영된다.
+- AEUI가 소유한 DOM 이벤트 안의 동기 변경은 `requestRender()` fast path로 다음 프레임 렌더를 앞당길 수 있다.
 
 ---
 
@@ -159,9 +160,11 @@ AEUI가 `let` 변수의 직접 수정을 감지하기 위해 Polling을 사용�
    └→ onClick 핸들러 실행: count++
    └→ count가 0에서 1로 변경됨 (메모리상 변수만 변경, 화면은 아직 그대로)
 
-2. 다음 tick 시작 (상황에 따라 프레임 간격이 달라짐)
-   └→ 렌더 함수 시작
-      └→ _runComponentWatchers: count를 감시하는 watcher 의존성 체크
+2. AEUI DOM 이벤트 경로
+   └→ proxy listener가 이벤트 종료 후 requestRender() 예약
+   └→ 다음 animation frame에서 render phase 시작
+      └→ AEUI.__runtime.runRenderPhase(...)
+      └→ watcher 의존성 체크
       └→ [count]의 현재값 [1]과 이전 스냅샷 [0] 비교 → 변경 감지
       └→ watcher callback 실행 (있는 경우)
       └→ callback 이후 최종 deps를 oldDeps로 저장

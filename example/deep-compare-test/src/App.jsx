@@ -21,9 +21,8 @@ const WatchDedupeTest = () => {
   });
 
   // Periodic update with SAME content (new ref)
-  // This interval runs outside of component render scope but modifies captured variables
-  // In AEUI, component body runs once. 
-  // We need to set up the specialized test logic.
+  // This interval runs outside component render scope, so AEUI will observe it through
+  // the polling fallback path rather than the DOM event fast path.
   
   // Actually, to test, we can use a "tick" counter to sequence events.
   let tick = 0;

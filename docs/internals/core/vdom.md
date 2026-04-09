@@ -14,7 +14,7 @@ JSX 코드
 AEUI.createVNode() 호출
   ↓ 런타임 실행
 VNode 객체 생성
-  ↓ _reconcile에서 이전 RuntimeNode과 비교
+  ↓ reconcile에서 이전 RuntimeNode과 비교
 변경된 부분만 실제 DOM에 반영
 ```
 
@@ -30,7 +30,7 @@ AEUI는 **VNode**과 **RuntimeNode**를 명확히 분리한다.
 | 생명주기 | 매 render마다 새로 생성 | old/new 비교 과정에서 재사용 |
 | 소유하는 것 | tag, props, children | DOM 참조, lifecycle state, 자식 관계 |
 
-VNode은 `createVNode`이 매번 새로 만드는 가벼운 객체이고, RuntimeNode는 `_reconcile`이 VNode을 기반으로 생성하고 유지하는 실행 중 객체이다. RuntimeNode의 상세 구조는 `instance.md`를 참조한다.
+VNode은 `createVNode`이 매번 새로 만드는 가벼운 객체이고, RuntimeNode는 `reconcile`이 VNode을 기반으로 생성하고 유지하는 실행 중 객체이다. RuntimeNode의 상세 구조는 `instance.md`를 참조한다.
 
 ---
 
@@ -61,13 +61,13 @@ VNode은 `createVNode`이 매번 새로 만드는 가벼운 객체이고, Runtim
 
 `children`은 두 군데에 저장된다:
 - `props.children`: 컴포넌트 함수에서 `props.children`으로 자식에 접근할 수 있도록 하기 위함 (React의 관례와 동일)
-- `vnode.children`: `_reconcile`에서 자식을 순회할 때 빠르게 접근하기 위한 단축 참조
+- `vnode.children`: `reconcile`에서 자식을 순회할 때 빠르게 접근하기 위한 단축 참조
 
 두 값은 **같은 배열 참조**를 가리키므로 메모리 낭비는 없다.
 
 ### `key`의 위치
 
-`key`는 `props` 안에 그대로 남아 있으며, 컴포넌트에서는 `props.key`로 읽을 수 있다. 다만 `_updateDomProps`에서 `key`를 건너뛰므로 DOM attribute로는 렌더되지 않는다. reconcile 중 형제 노드 매칭에 사용된다.
+`key`는 `props` 안에 그대로 남아 있으며, 컴포넌트에서는 `props.key`로 읽을 수 있다. 다만 `updateDomProps`에서 `key`를 건너뛰므로 DOM attribute로는 렌더되지 않는다. reconcile 중 형제 노드 매칭에 사용된다.
 
 ---
 
@@ -121,7 +121,7 @@ AEUI.createVNode("ul", null,
 //                      ↑ 중첩 배열
 ```
 
-`.flat()`을 호출하면 1단계 중첩이 풀려서 `_reconcile`이 단일 배열로 순회할 수 있게 된다:
+`.flat()`을 호출하면 1단계 중첩이 풀려서 `reconcile`이 단일 배열로 순회할 수 있게 된다:
 
 ```
 flat 전: [VNode, [VNode, VNode]]
@@ -261,7 +261,7 @@ function List() {
 
 ### Fragment 감지 로직
 
-`runtime.js`의 `isFragmentVNode` 함수와 `reconciler.js`의 `isSameNodeType` 함수가 Fragment를 식별한다:
+Fragment 판별 규칙은 `vnode-helpers.js`의 `isFragmentVNode()`와 `reconciler.js`의 `isSameNodeType()`가 공유한다:
 
 ```javascript
 function isFragmentVNode(AEUI, vnode) {
@@ -269,7 +269,7 @@ function isFragmentVNode(AEUI, vnode) {
 }
 ```
 
-배열이거나 tag가 `AEUI.Fragment`인 VNode이면 fragment로 처리한다.
+배열이거나 tag가 `AEUI.Fragment`인 VNode이면 fragment로 처리한다. `node-factory.js`와 `reconciler.js`가 이 helper를 함께 사용하므로, fragment 규칙이 한곳에 모여 있다.
 
 ### 주의사항: Babel 플러그인과의 관계
 
@@ -282,4 +282,4 @@ Fragment는 함수이지만, Babel 플러그인이 이를 일반 컴포넌트로
 - `createVNode`: `packages/core/src/core.js` L30-L35
 - `createElement` alias: `packages/core/src/core.js` L68
 - `Fragment`: `packages/core/src/core.js` L69
-- `isFragmentVNode`: `packages/core/src/runtime.js` L16-L18, `packages/core/src/reconciler.js` L11-L13
+- `isFragmentVNode`: `packages/core/src/vnode-helpers.js`

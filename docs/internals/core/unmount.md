@@ -1,8 +1,8 @@
-# Unmount — `_unmountNode`
+# Unmount — `unmountNode`
 
 ## 개요
 
-`_unmountNode`는 RuntimeNode 서브트리를 **정리(cleanup)**하는 함수이다.
+`unmountNode`는 RuntimeNode 서브트리를 **정리(cleanup)**하는 함수이다.
 
 컴포넌트가 화면에서 제거될 때 (조건부 렌더링으로 사라지거나, 같은 위치에 다른 컴포넌트가 올 때, `init()`이 재호출될 때), 이 함수가 호출된다. node와 모든 하위 자식들의 cleanup 콜백을 실행하고, watcher를 해제하여 **메모리 누수를 방지**한다.
 
@@ -11,7 +11,7 @@
 ## 함수 시그니처
 
 ```javascript
-_unmountNode(node, removeDom = true)
+unmountNode(state, node, removeDom = true)
 ```
 
 | 파라미터 | 설명 |
@@ -24,7 +24,7 @@ _unmountNode(node, removeDom = true)
 ## 동작 과정
 
 ```
-_unmountNode(node, removeDom = true):
+unmountNode(state, node, removeDom = true):
   0. null 체크 (node가 없으면 리턴)
 
   1. node.isMounted = false
@@ -35,7 +35,7 @@ _unmountNode(node, removeDom = true):
      각 cleanup 함수를 try-catch로 감싸서 실행
      → 에러가 발생해도 다음 cleanup으로 계속 진행
 
-  3. children 배열 순회 → 각 자식에 대해 _unmountNode(child, false) 재귀 호출
+  3. children 배열 순회 → 각 자식에 대해 unmountNode(child, false) 재귀 호출
      removeDom=false: 부모가 DOM 범위를 통째로 제거하므로 자식은 개별 제거 불필요
 
   4. removeDom=true이면 firstDom..lastDom 범위를 실제 DOM에서 제거
@@ -54,7 +54,7 @@ _unmountNode(node, removeDom = true):
 ### 코드
 
 ```javascript
-export function _unmountNode(node, removeDom = true) {
+export function unmountNode(state, node, removeDom = true) {
   if (!node) return;
 
   node.isMounted = false;
@@ -66,11 +66,11 @@ export function _unmountNode(node, removeDom = true) {
   }
 
   (node.children || []).forEach((child) => {
-    this._unmountNode(child, false);
+    unmountNode(child, false);
   });
 
   if (removeDom && node.parentDom) {
-    removeDomRange.call(this, node.parentDom, node);
+    removeDomRange(node.parentDom, node);
   }
 
   if (node.kind === 'component') {
@@ -130,11 +130,11 @@ cleanup 함수에서 에러가 발생해도 나머지 cleanup과 자식 unmount�
 ```
 ParentApp unmount:
   1. ParentApp.cleanups 실행 (clearInterval 등)
-  2. ChildA._unmountNode()
+  2. ChildA.unmountNode()
      ├── ChildA.cleanups 실행
-     └── GrandchildX._unmountNode()
+     └── GrandchildX.unmountNode()
          └── GrandchildX.cleanups 실행
-  3. ChildB._unmountNode()
+  3. ChildB.unmountNode()
      └── ChildB.cleanups 실행
 ```
 
@@ -154,7 +154,7 @@ function removeDomRange(parentDom, node) {
   });
 
   if (nodes.length > 0) {
-    this._didMutate = true;
+    state.didMutate = true;
   }
 }
 ```
@@ -181,24 +181,24 @@ if (node.kind === 'component') {
 
 ## 호출 시점
 
-`_unmountNode`가 호출되는 경우들:
+`unmountNode`가 호출되는 경우들:
 
 | 상황 | 호출 위치 | 설명 |
 |------|-----------|------|
 | `init()` 재호출 | `init` 내부 | 이전 루트 node를 정리. 예: 테스트에서 매 테스트마다 `init` 호출 |
-| newVNode이 null/boolean | `_reconcile` 1단계 | old node가 제거되어야 할 때 |
-| 타입 불일치 | `_reconcile` 2단계 | 같은 위치에 다른 종류/태그의 VNode이 올 때, old node를 unmount하고 새로 생성 |
+| newVNode이 null/boolean | `reconcile` 1단계 | old node가 제거되어야 할 때 |
+| 타입 불일치 | `reconcile` 2단계 | 같은 위치에 다른 종류/태그의 VNode이 올 때, old node를 unmount하고 새로 생성 |
 | child diff에서 매칭 실패 | `reconcileChildren` | 이전 children 중 새 VNode과 매칭되지 않은 old child를 제거 |
 
 ### DOM 제거와 lifecycle 정리의 통합
 
-`_unmountNode`는 **DOM 제거와 lifecycle 정리를 같은 경로**에서 처리한다. keyed reorder와 subtree replacement에서 이 두 작업이 항상 동기화되므로, 리소스 누수가 발생할 가능성이 줄어든다.
+`unmountNode`는 **DOM 제거와 lifecycle 정리를 같은 경로**에서 처리한다. keyed reorder와 subtree replacement에서 이 두 작업이 항상 동기화되므로, 리소스 누수가 발생할 가능성이 줄어든다.
 
 ---
 
 ## 관련 코드 위치
 
-- `_unmountNode`: `packages/core/src/reconciler.js` L415-L443
+- `unmountNode`: `packages/core/src/reconciler.js` L415-L443
 - `removeDomRange`: `packages/core/src/reconciler.js` L311-L322
 - `getDomNodesInRange`: `packages/core/src/reconciler.js` L47-L61
 - `clean` 훅 (cleanup 등록): `packages/core/src/hooks.js`

@@ -64,7 +64,7 @@ export default function App() {
             <div className="brand__mark" />
             <div>
               <div className="brand__title">AEUI Commerce + Admin</div>
-              <div className="brand__sub">오프라인 쇼케이스 · tick 1초 · 현재 {formatShortTime(state.clockNow)}</div>
+              <div className="brand__sub">오프라인 쇼케이스 · DOM 이벤트 즉시 반영 · 현재 {formatShortTime(state.clockNow)}</div>
             </div>
           </div>
 

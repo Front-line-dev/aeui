@@ -2,18 +2,17 @@
 
 ## 개요
 
-`clean`은 컴포넌트가 **화면에서 제거(unmount)될 때 실행할 정리 함수를 등록**하는 훅이다. React의 `useEffect` 반환 함수(cleanup)와 유사한 역할이다.
-
-컴포넌트가 외부 리소스(타이머, 이벤트 리스너, 네트워크 연결 등)를 생성한 경우, 컴포넌트가 사라질 때 이 리소스를 해제하지 않으면 **메모리 누수**가 발생한다. `clean`은 이를 방지한다.
+`clean`은 컴포넌트가 언마운트될 때 실행할 정리 함수를 등록하는 훅이다.
 
 ```javascript
 function Timer() {
-  const id = setInterval(() => console.log("tick"), 1000);
-  clean(() => clearInterval(id));  // 컴포넌트 제거 시 타이머 해제
-
+  const id = setInterval(() => console.log('tick'), 1000);
+  clean(() => clearInterval(id));
   return <div>타이머 동작 중</div>;
 }
 ```
+
+타이머, 이벤트 리스너, 소켓 연결처럼 컴포넌트 수명과 함께 정리돼야 하는 리소스를 여기 등록한다.
 
 ---
 
@@ -25,171 +24,101 @@ clean(callback)
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
-| `callback` | `Function` | 컴포넌트가 언마운트될 때 실행할 정리 함수 |
+| `callback` | `Function` | 언마운트 시 실행할 정리 함수 |
 
 ---
 
-## 사용자 관점 사용법
+## 등록 규칙
 
-### setInterval 해제
+`clean()`도 `watch()`와 동일하게 **setup phase에서만 등록**된다.
 
-```jsx
-function Clock() {
-  let time = new Date().toLocaleTimeString();
+compiled main path에서는 Babel 플러그인이 `clean(...)`을 `AEUI.__runtime.clean(...)`으로 바꾼다. 이 helper는 현재 runtime state를 직접 보고 cleanup을 등록한다. `hooks.js`의 `clean()`은 fallback wrapper다.
 
-  const timerId = setInterval(() => {
-    time = new Date().toLocaleTimeString();
-  }, 1000);
+즉 다음만 허용된다.
 
-  clean(() => clearInterval(timerId));
+- 컴포넌트 setup 본문 최상위
+- compiled path에서는 현재 runtime state가 setup phase
+- fallback path에서는 `withComponentContext(..., 'setup')` 안
 
-  return <p>{time}</p>;
-}
-```
-
-`Clock` 컴포넌트가 화면에서 제거되면 `clearInterval`이 자동으로 호출된다. 이 코드가 없으면 컴포넌트가 사라진 후에도 타이머가 계속 실행되어 메모리와 CPU를 낭비한다.
-
-### 이벤트 리스너 해제
-
-```jsx
-function WindowSize() {
-  let width = window.innerWidth;
-
-  const handleResize = () => {
-    width = window.innerWidth;
-  };
-
-  window.addEventListener('resize', handleResize);
-  clean(() => window.removeEventListener('resize', handleResize));
-
-  return <p>너비: {width}px</p>;
-}
-```
-
-### WebSocket 연결 종료
-
-```jsx
-function Chat() {
-  const ws = new WebSocket('ws://localhost:8080');
-
-  ws.onmessage = (e) => { /* 메시지 처리 */ };
-
-  clean(() => ws.close());
-
-  return <div>채팅 중...</div>;
-}
-```
-
-### 여러 개의 clean 등록
-
-한 컴포넌트에서 `clean`을 여러 번 호출할 수 있다. 등록된 순서대로 실행된다.
-
-```jsx
-function MultiResource() {
-  const timer = setInterval(() => {}, 1000);
-  clean(() => clearInterval(timer));
-
-  window.addEventListener('resize', handleResize);
-  clean(() => window.removeEventListener('resize', handleResize));
-
-  // 언마운트 시: clearInterval → removeEventListener 순서로 실행
-  return <div>...</div>;
-}
-```
+render 함수나 이벤트 핸들러 안에서 호출한 `clean()`은 등록되지 않는다.
 
 ---
 
-## 내부 동작 원리
+## 내부 동작
 
-### 등록 과정
+### 등록
 
-```javascript
-export function clean(callback) {
-  const runtime = getRuntimeContext();
-  if (!runtime) return;
-
-  const node = runtime.getCurrentComponentNode(); // 현재 처리 중인 컴포넌트 node
-  if (!node) return;                              // setup 밖에서 호출되면 무시
-  node.cleanups.push(callback);                   // cleanups 배열에 추가
-}
-```
-
-`watch`와 동일하게, `runtime.js`를 통해 "현재 어떤 component node의 setup에서 호출되고 있는지"를 판단한다.
-
-`node.cleanups`는 단순한 함수 배열이다. 새 callback이 호출될 때마다 배열 끝에 추가된다.
-
-### 실행 과정 (unmount 시)
-
-`_unmountNode(node)`가 호출될 때 cleanups가 실행된다:
+등록된 cleanup은 component node의 `cleanups` 배열에 쌓인다.
 
 ```javascript
-_unmountNode(node) {
-  node.isMounted = false;
-  node.cleanups.forEach((cleanup) => {
-    try { cleanup(); } catch (e) { console.error('[AEUI] Cleanup error:', e); }
-  });
-  node.children.forEach(child => this._unmountNode(child));
-  node.cleanups = [];
-}
+node.cleanups.push(callback);
 ```
 
-**실행 순서**:
-1. 부모의 cleanups가 **등록 순서대로** 실행
-2. 자식 컴포넌트의 `_unmount`가 재귀적으로 호출
-3. cleanups 배열을 비워 참조 해제
+### 실행
+
+언마운트 경로는 다음과 같다.
+
+```text
+reconciler.js:unmountNode(state, node)
+  → component node면 cleanupComponentNode(state, node)
+  → 자식 subtree 재귀 unmount
+  → DOM range 제거
+```
+
+`cleanupComponentNode()`는:
+
+1. `cleanups`를 등록 순서대로 실행
+2. `watchStates`, `cleanups`, `renderedNode`, `renderFactory`를 비움
+3. 필요 시 children / DOM range bookkeeping을 정리
+
+현재 구현 기준 cleanup 순서는 **부모 component cleanup 먼저, 그 다음 자식 subtree unmount**다. 문서를 읽을 때 React의 effect cleanup 순서와 동일하다고 가정하면 안 된다.
 
 ### 에러 격리
 
-각 cleanup 함수는 개별 `try-catch`로 감싸져 있다. 하나의 cleanup에서 에러가 발생해도 나머지 cleanup과 자식 unmount는 정상 진행된다.
-
-```jsx
-clean(() => { throw new Error("에러1"); });  // 에러 출력 후 계속
-clean(() => clearInterval(id));              // 정상 실행됨
-```
+cleanup 하나가 실패해도 나머지 cleanup과 unmount 흐름은 계속 진행된다.
 
 ---
 
-## 주의사항
+## 사용 시 주의사항
 
-### clean은 setup에서만 호출 가능
+### 한 번 등록되면 component lifetime 동안 유지된다
 
-`watch`와 마찬가지로, 컴포넌트의 setup 단계에서만 호출해야 한다. 이벤트 핸들러나 타이머 콜백 안에서 호출하면 `_currentComponentNode`가 `null`이므로 등록되지 않는다.
+AEUI는 setup이 한 번만 실행되므로 cleanup도 한 번만 등록된다. 매 render마다 교체되거나 diff되지 않는다.
+
+### cleanup 안에서 DOM이나 외부 리소스를 정리해도 된다
+
+주요 용도:
+
+- `clearInterval`
+- `removeEventListener`
+- `WebSocket.close()`
+- 외부 store unsubscribe
+
+### setup 밖 호출은 무시된다
 
 ```jsx
 function Example() {
-  // ✅ setup에서 호출 — 정상 등록
-  clean(() => console.log("정리됨"));
+  clean(() => console.log('정리됨')); // 정상 등록
 
   return (
-    <button onClick={() => {
-      // ❌ 이벤트 핸들러에서 호출 — 등록되지 않음 (무시됨)
-      clean(() => console.log("이건 등록 안 됨"));
-    }}>
+    <button
+      onClick={() => {
+        clean(() => console.log('무시됨'));
+      }}
+    >
       클릭
     </button>
   );
 }
 ```
 
-### clean은 한 번만 실행된다
-
-cleanup 함수는 컴포넌트가 언마운트될 때 **딱 한 번** 실행된다. React의 `useEffect` cleanup처럼 매 렌더마다 실행되지 않는다.
-
-AEUI에서는 컴포넌트 함수(setup)가 한 번만 실행되므로, clean도 한 번만 등록되고 한 번만 실행된다.
-
-### clean vs React useEffect return
-
-| | AEUI `clean` | React `useEffect` return |
-|---|---|---|
-| 실행 시점 | 컴포넌트 unmount 시만 | 매 렌더 시 + unmount 시 |
-| 등록 방식 | `clean(() => ...)` 별도 호출 | `useEffect` 내부에서 `return () => ...` |
-| 등록 횟수 | 여러 번 가능 | effect당 1개 |
-| watch와의 관계 | 독립적 | 동일 함수 안에서 관리 |
-
 ---
 
 ## 관련 코드 위치
 
-- `clean` 함수: `packages/core/src/hooks.js`
-- runtime bridge: `packages/core/src/runtime.js`
-- cleanup 실행: `packages/core/src/reconciler.js` `_unmount`
+- `packages/core/src/hook-registry.js`
+- `packages/core/src/hooks.js`
+- `packages/core/src/runtime-context.js`
+- `packages/core/src/app-runtime.js`
+- `packages/core/src/component-lifecycle.js`
+- `packages/core/src/reconciler.js`

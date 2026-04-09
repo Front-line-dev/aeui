@@ -1,89 +1,21 @@
 /**
- * Stateful runtime internals: hooks bridge, node creation,
- * watcher execution, root reconciliation, and scheduler loop.
+ * Stateful runtime internals: root reconciliation, DOM event dispatch,
+ * and scheduler loop.
  */
-import { runComponentWatchers } from './component-watchers.js';
-import { createComponentNode, setupComponentNode } from './component-lifecycle.js';
-import { getVNodeKey, isFragmentVNode } from './vnode-helpers.js';
 
 const MAX_FRAME_DELAY = 60;
 
-let runtimeContext = null;
-
-export function setRuntimeContext(context) {
-  runtimeContext = context;
+function scheduleNextPollingTick(state, didMutate) {
+  state.frameDelay = didMutate ? 1 : Math.min(state.frameDelay * 2, MAX_FRAME_DELAY);
+  state.framesUntilNextTick = state.frameDelay - 1;
 }
 
-export function getRuntimeContext() {
-  return runtimeContext;
-}
-
-export function createRootNode(containerElement) {
-  return {
-    kind: 'root',
-    key: null,
-    vnode: null,
-    parent: null,
-    parentDom: containerElement,
-    children: [],
-    firstDom: null,
-    lastDom: null,
-    isMounted: true,
-  };
-}
-
-export function _runComponentWatchers(state, node) {
-  runComponentWatchers(state, node);
-}
-
-export function createNode(state, vnode, parentNode = null, parentDom = null) {
-  const node = {
-    kind: null,
-    key: getVNodeKey(vnode),
-    vnode,
-    parent: parentNode,
-    parentDom,
-    children: [],
-    firstDom: null,
-    lastDom: null,
-    isMounted: true,
-  };
-
-  if (vnode == null || typeof vnode === 'boolean') {
-    return null;
-  }
-
-  if (typeof vnode !== 'object') {
-    node.kind = 'text';
-    node.value = String(vnode);
-    node.dom = null;
-    return node;
-  }
-
-  if (isFragmentVNode(state.Fragment, vnode)) {
-    node.kind = 'fragment';
-    return node;
-  }
-
-  if (typeof vnode.tag === 'string') {
-    node.kind = 'host';
-    node.tag = vnode.tag;
-    node.dom = null;
-    node.props = vnode.props || {};
-    return node;
-  }
-
-  const componentNode = createComponentNode(vnode, parentNode, parentDom);
-  setupComponentNode(state, componentNode);
-  return componentNode;
-}
-
-export function _reconcileRoot(state) {
+export function reconcileRoot(state) {
   if (!state.rootNode || !state.containerElement || !state.RootComponent) return;
 
   const rootVNode = state.createVNode(state.RootComponent);
   const previousRootChild = state.rootNode.children[0] || null;
-  const nextRootChild = state._reconcile(
+  const nextRootChild = state.reconcile(
     state.containerElement,
     previousRootChild,
     rootVNode,
@@ -97,34 +29,63 @@ export function _reconcileRoot(state) {
 }
 
 export function init(state, RootComponent, containerElement) {
-  state._stopScheduler();
+  state.stopScheduler();
   if (state.rootNode && state.rootNode.children[0]) {
-    state._unmountNode(state.rootNode.children[0]);
+    state.unmountNode(state.rootNode.children[0]);
   }
 
   state.RootComponent = RootComponent;
   state.containerElement = containerElement;
-  state.rootNode = createRootNode(containerElement);
+  state.rootNode = state.createRootNode(containerElement);
   containerElement.innerHTML = '';
+  state.interactiveRenderRequested = false;
 
-  const didMutate = state._tick();
-  state.frameDelay = didMutate ? 1 : 2;
-  state.framesUntilNextTick = state.frameDelay - 1;
+  const didMutate = state.tick();
+  scheduleNextPollingTick(state, didMutate);
 
-  state._startScheduler();
+  state.startScheduler();
 }
 
 export function render(state) {
   if (!state.RootComponent || !state.containerElement) return false;
 
-  const didMutate = state._tick();
-  state.frameDelay = didMutate ? 1 : Math.min(state.frameDelay * 2, MAX_FRAME_DELAY);
-  state.framesUntilNextTick = state.frameDelay - 1;
-  state._startScheduler();
+  state.interactiveRenderRequested = false;
+  const didMutate = state.tick();
+  scheduleNextPollingTick(state, didMutate);
+  state.startScheduler();
   return didMutate;
 }
 
-export function _stopScheduler(state) {
+export function requestRender(state) {
+  if (!state.RootComponent || !state.containerElement || !state.rootNode) {
+    return false;
+  }
+
+  state.interactiveRenderRequested = true;
+  state.startScheduler();
+  return true;
+}
+
+export function dispatchDomEvent(state, domNode, eventName, event) {
+  state.domEventDepth += 1;
+
+  try {
+    const currentHandler = domNode?._aeuiHandlers?.[eventName];
+    if (typeof currentHandler === 'function') {
+      return currentHandler.call(domNode, event);
+    }
+
+    return undefined;
+  } finally {
+    state.domEventDepth -= 1;
+
+    if (state.domEventDepth === 0) {
+      requestRender(state);
+    }
+  }
+}
+
+export function stopScheduler(state) {
   if (state.rafId != null) {
     if (typeof cancelAnimationFrame === 'function') {
       cancelAnimationFrame(state.rafId);
@@ -136,40 +97,50 @@ export function _stopScheduler(state) {
   state.rafId = null;
 }
 
-export function _startScheduler(state) {
+export function startScheduler(state) {
   if (state.rafId != null) return;
 
   if (typeof requestAnimationFrame === 'function') {
-    state.rafId = requestAnimationFrame(() => _onAnimationFrame(state));
+    state.rafId = requestAnimationFrame(() => onAnimationFrame(state));
   } else {
-    state.rafId = setTimeout(() => _onAnimationFrame(state), 16);
+    state.rafId = setTimeout(() => onAnimationFrame(state), 16);
   }
 }
 
-export function _onAnimationFrame(state) {
+export function onAnimationFrame(state) {
   state.rafId = null;
   if (!state.RootComponent || !state.containerElement) return;
 
-  if (state.framesUntilNextTick <= 0) {
-    const didMutate = state._tick();
-    const hasManualRequestDuringTick = state.rafId != null;
-
-    if (hasManualRequestDuringTick) {
+  if (state.interactiveRenderRequested) {
+    state.interactiveRenderRequested = false;
+    const didMutate = state.tick();
+    if (state.interactiveRenderRequested) {
+      state.frameDelay = 1;
       state.framesUntilNextTick = 0;
     } else {
-      state.frameDelay = didMutate
-        ? 1
-        : Math.min(state.frameDelay * 2, MAX_FRAME_DELAY);
-      state.framesUntilNextTick = state.frameDelay - 1;
+      scheduleNextPollingTick(state, didMutate);
+    }
+    state.startScheduler();
+    return;
+  }
+
+  if (state.framesUntilNextTick <= 0) {
+    const didMutate = state.tick();
+
+    if (state.interactiveRenderRequested) {
+      state.frameDelay = 1;
+      state.framesUntilNextTick = 0;
+    } else {
+      scheduleNextPollingTick(state, didMutate);
     }
   } else {
     state.framesUntilNextTick -= 1;
   }
 
-  state._startScheduler();
+  state.startScheduler();
 }
 
-export function _tick(state) {
+export function tick(state) {
   if (!state.RootComponent || !state.containerElement || !state.rootNode) return false;
   if (state.isRendering) return false;
 
@@ -177,7 +148,7 @@ export function _tick(state) {
   state.didMutate = false;
 
   try {
-    _reconcileRoot(state);
+    reconcileRoot(state);
   } catch (e) {
     console.error('[AEUI] Render error:', e);
   } finally {

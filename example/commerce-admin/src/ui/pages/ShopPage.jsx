@@ -98,7 +98,7 @@ export default function ShopPage() {
       <div className="panel__head">
         <div>
           <h2 className="panel__title">스토어</h2>
-          <div className="panel__sub">실제 네트워크 없이 동작합니다. AEUI는 tick 기반(기본 1초)으로 렌더링합니다.</div>
+          <div className="panel__sub">실제 네트워크 없이 동작합니다. DOM 이벤트는 즉시 반영되고, 비동기 변경은 polling fallback이 감지합니다.</div>
         </div>
         <div className="pill">활성 상품 {activeCount()}개</div>
       </div>

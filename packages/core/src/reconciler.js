@@ -1,55 +1,18 @@
 /**
- * DOM operations, runtime node reconciliation, and unmounting
+ * Runtime node reconciliation, DOM range placement, and unmounting
  */
+import { cleanupComponentNode, renderComponentNode } from './component-lifecycle.js';
 import {
-  cleanupComponentNode,
-  commitRenderedNode,
-  invokeComponentRenderFactory,
-  setupComponentNode,
-} from './component-lifecycle.js';
+  cloneHostPropsSnapshot,
+  createDomNode,
+  syncHostControlledProps,
+  updateDomProps,
+} from './dom-host.js';
 import {
   getFragmentChildren,
   getVNodeKey,
   isFragmentVNode,
 } from './vnode-helpers.js';
-
-function cloneHostPropsSnapshot(AEUI, props = {}) {
-  const snapshot = {};
-
-  Object.entries(props).forEach(([key, value]) => {
-    if (key === 'children' || key === 'key' || key === 'ref') return;
-    snapshot[key] = AEUI._deepClone(value);
-  });
-
-  return snapshot;
-}
-
-function syncHostControlledProps(node) {
-  if (!node || node.kind !== 'host' || !node.dom || !node.props) return;
-
-  if (Object.prototype.hasOwnProperty.call(node.props, 'value')) {
-    const normalizedValue = node.props.value == null ? '' : String(node.props.value);
-
-    if (
-      node.tag === 'select' ||
-      node.tag === 'textarea' ||
-      (node.tag === 'input' && node.props.type !== 'file')
-    ) {
-      if (node.dom.value !== normalizedValue) {
-        node.dom.value = normalizedValue;
-        this._didMutate = true;
-      }
-    }
-  }
-
-  if (node.tag === 'input' && Object.prototype.hasOwnProperty.call(node.props, 'checked')) {
-    const normalizedChecked = !!node.props.checked;
-    if (node.dom.checked !== normalizedChecked) {
-      node.dom.checked = normalizedChecked;
-      this._didMutate = true;
-    }
-  }
-}
 
 function updateRangeFromChildren(node) {
   let firstDom = null;
@@ -84,23 +47,24 @@ function getDomNodesInRange(parentDom, node) {
   return nodes;
 }
 
-function placeNode(parentDom, node, beforeDom) {
+function placeNode(state, parentDom, node, beforeDom) {
   const nodes = getDomNodesInRange(parentDom, node);
   if (nodes.length === 0) return;
+
   const lastNode = nodes[nodes.length - 1];
   if (lastNode.nextSibling === beforeDom) return;
 
   nodes.forEach((domNode) => {
     parentDom.insertBefore(domNode, beforeDom);
   });
-  this._didMutate = true;
+  state.didMutate = true;
 }
 
 function warnDuplicateKey(key) {
   console.warn(`[AEUI] Duplicate key detected in sibling list: ${String(key)}`);
 }
 
-function isSameNodeType(AEUI, oldNode, newVNode) {
+function isSameNodeType(state, oldNode, newVNode) {
   if (!oldNode) return false;
   if (oldNode.key !== getVNodeKey(newVNode)) return false;
 
@@ -108,18 +72,18 @@ function isSameNodeType(AEUI, oldNode, newVNode) {
     case 'text':
       return typeof newVNode !== 'object' || newVNode == null;
     case 'fragment':
-      return isFragmentVNode(AEUI, newVNode);
+      return isFragmentVNode(state.Fragment, newVNode);
     case 'host':
       return !!newVNode && typeof newVNode === 'object' && !Array.isArray(newVNode) && oldNode.tag === newVNode.tag;
     case 'component':
       return !!newVNode && typeof newVNode === 'object' && typeof newVNode.tag === 'function' &&
-        newVNode.tag !== AEUI.Fragment && oldNode.component === newVNode.tag;
+        newVNode.tag !== state.Fragment && oldNode.component === newVNode.tag;
     default:
       return false;
   }
 }
 
-function reconcileChildren(parentDom, parentNode, newVNodes, beforeDom = null) {
+function reconcileChildren(state, parentDom, parentNode, newVNodes, beforeDom = null) {
   const oldChildren = parentNode.children || [];
   const keyedOld = new Map();
   const seenNewKeys = new Set();
@@ -165,7 +129,7 @@ function reconcileChildren(parentDom, parentNode, newVNodes, beforeDom = null) {
       matchedChild._matched = true;
     }
 
-    const nextChild = this._reconcile(parentDom, matchedChild, newVNode, beforeDom, parentNode);
+    const nextChild = state.reconcile(parentDom, matchedChild, newVNode, beforeDom, parentNode);
     if (nextChild) {
       nextChildren.push(nextChild);
     }
@@ -173,7 +137,7 @@ function reconcileChildren(parentDom, parentNode, newVNodes, beforeDom = null) {
 
   oldChildren.forEach((child) => {
     if (!child._matched) {
-      this._unmountNode(child);
+      state.unmountNode(child);
     }
     delete child._matched;
   });
@@ -181,7 +145,7 @@ function reconcileChildren(parentDom, parentNode, newVNodes, beforeDom = null) {
   let anchor = beforeDom;
   for (let i = nextChildren.length - 1; i >= 0; i--) {
     const child = nextChildren[i];
-    placeNode.call(this, parentDom, child, anchor);
+    placeNode(state, parentDom, child, anchor);
     if (child.firstDom) {
       anchor = child.firstDom;
     }
@@ -194,62 +158,58 @@ function reconcileChildren(parentDom, parentNode, newVNodes, beforeDom = null) {
   }
 }
 
-function mountTextNode(parentDom, node, beforeDom) {
+function mountTextNode(state, parentDom, node, beforeDom) {
   const dom = document.createTextNode(node.value);
   parentDom.insertBefore(dom, beforeDom);
   node.dom = dom;
   node.firstDom = dom;
   node.lastDom = dom;
-  this._didMutate = true;
+  state.didMutate = true;
   return node;
 }
 
-function mountHostNode(parentDom, node, beforeDom) {
-  const dom = this._createDomNode(node.vnode);
+function mountHostNode(state, parentDom, node, beforeDom) {
+  const dom = createDomNode(state, node.vnode);
   parentDom.insertBefore(dom, beforeDom);
   node.dom = dom;
-  node.props = cloneHostPropsSnapshot(this, node.vnode.props || {});
+  node.props = cloneHostPropsSnapshot(state, node.vnode.props || {});
   node.firstDom = dom;
   node.lastDom = dom;
-  this._didMutate = true;
+  state.didMutate = true;
 
-  reconcileChildren.call(this, dom, node, node.vnode.children || [], null);
-  syncHostControlledProps.call(this, node);
+  reconcileChildren(state, dom, node, node.vnode.children || [], null);
+  syncHostControlledProps(state, node);
   node.firstDom = dom;
   node.lastDom = dom;
   return node;
 }
 
-function mountFragmentNode(parentDom, node, beforeDom) {
-  reconcileChildren.call(this, parentDom, node, getFragmentChildren(this, node.vnode), beforeDom);
+function mountFragmentNode(state, parentDom, node, beforeDom) {
+  reconcileChildren(state, parentDom, node, getFragmentChildren(state.Fragment, node.vnode), beforeDom);
   updateRangeFromChildren(node);
   return node;
 }
 
-function mountComponentNode(parentDom, node, beforeDom) {
-  setupComponentNode(this, node);
-  const renderedVNode = invokeComponentRenderFactory(this, node, node.vnode.props || {});
-  const renderedNode = this._reconcile(parentDom, null, renderedVNode, beforeDom, node);
-  commitRenderedNode(node, renderedNode);
-  return node;
+function mountComponentNode(state, parentDom, node, beforeDom) {
+  return renderComponentNode(state, parentDom, node, node.vnode.props || {}, beforeDom);
 }
 
-function mountNode(parentDom, node, beforeDom) {
+function mountNode(state, parentDom, node, beforeDom) {
   switch (node.kind) {
     case 'text':
-      return mountTextNode.call(this, parentDom, node, beforeDom);
+      return mountTextNode(state, parentDom, node, beforeDom);
     case 'host':
-      return mountHostNode.call(this, parentDom, node, beforeDom);
+      return mountHostNode(state, parentDom, node, beforeDom);
     case 'fragment':
-      return mountFragmentNode.call(this, parentDom, node, beforeDom);
+      return mountFragmentNode(state, parentDom, node, beforeDom);
     case 'component':
-      return mountComponentNode.call(this, parentDom, node, beforeDom);
+      return mountComponentNode(state, parentDom, node, beforeDom);
     default:
       return null;
   }
 }
 
-function updateTextNode(node, newVNode) {
+function updateTextNode(state, node, newVNode) {
   const nextValue = String(newVNode);
   node.vnode = newVNode;
   node.key = null;
@@ -257,7 +217,7 @@ function updateTextNode(node, newVNode) {
   if (node.value !== nextValue) {
     node.value = nextValue;
     node.dom.nodeValue = nextValue;
-    this._didMutate = true;
+    state.didMutate = true;
   }
 
   node.firstDom = node.dom;
@@ -265,47 +225,35 @@ function updateTextNode(node, newVNode) {
   return node;
 }
 
-function updateHostNode(node, newVNode) {
-  this._updateDomProps(node.dom, newVNode.props, node.props || {});
+function updateHostNode(state, node, newVNode) {
+  updateDomProps(state, node.dom, newVNode.props, node.props || {});
   node.vnode = newVNode;
   node.key = getVNodeKey(newVNode);
   node.tag = newVNode.tag;
-  node.props = cloneHostPropsSnapshot(this, newVNode.props || {});
-  reconcileChildren.call(this, node.dom, node, newVNode.children || [], null);
-  syncHostControlledProps.call(this, node);
+  node.props = cloneHostPropsSnapshot(state, newVNode.props || {});
+  reconcileChildren(state, node.dom, node, newVNode.children || [], null);
+  syncHostControlledProps(state, node);
   node.firstDom = node.dom;
   node.lastDom = node.dom;
   return node;
 }
 
-function updateFragmentNode(parentDom, node, newVNode, beforeDom) {
+function updateFragmentNode(state, parentDom, node, newVNode, beforeDom) {
   node.vnode = newVNode;
   node.key = getVNodeKey(newVNode);
-  reconcileChildren.call(this, parentDom, node, getFragmentChildren(this, newVNode), beforeDom);
+  reconcileChildren(state, parentDom, node, getFragmentChildren(state.Fragment, newVNode), beforeDom);
   updateRangeFromChildren(node);
   return node;
 }
 
-function updateComponentNode(parentDom, node, newVNode, beforeDom) {
+function updateComponentNode(state, parentDom, node, newVNode, beforeDom) {
   node.vnode = newVNode;
   node.key = getVNodeKey(newVNode);
   node.component = newVNode.tag;
-  setupComponentNode(this, node);
-  const renderedVNode = invokeComponentRenderFactory(this, node, newVNode.props || {});
-
-  const renderedNode = this._reconcile(
-    parentDom,
-    node.renderedNode,
-    renderedVNode,
-    beforeDom,
-    node
-  );
-
-  commitRenderedNode(node, renderedNode);
-  return node;
+  return renderComponentNode(state, parentDom, node, newVNode.props || {}, beforeDom);
 }
 
-function removeDomRange(parentDom, node) {
+function removeDomRange(state, parentDom, node) {
   const nodes = getDomNodesInRange(parentDom, node);
   nodes.forEach((domNode) => {
     if (domNode.parentNode === parentDom) {
@@ -314,129 +262,28 @@ function removeDomRange(parentDom, node) {
   });
 
   if (nodes.length > 0) {
-    this._didMutate = true;
+    state.didMutate = true;
   }
 }
 
-export function _createDomNode(vnode) {
-  if (typeof vnode !== 'object') {
-    return document.createTextNode(String(vnode));
-  }
-
-  const domNode = document.createElement(vnode.tag);
-  this._updateDomProps(domNode, vnode.props);
-  return domNode;
-}
-
-export function updateProps(target, newProps) {
-  for (const key in target) delete target[key];
-  if (newProps) Object.assign(target, newProps);
-}
-
-export function _updateDomProps(domNode, props, oldProps = {}) {
-  const allProps = { ...oldProps, ...props };
-
-  for (const key in allProps) {
-    if (key === 'children' || key === 'key' || key === 'ref') continue;
-
-    const newValue = props ? props[key] : undefined;
-    const oldValue = oldProps ? oldProps[key] : undefined;
-
-    if (this._deepEqual(newValue, oldValue)) continue;
-
-    if (key.startsWith('on')) {
-      const eventName = key.substring(2).toLowerCase();
-
-      if (!domNode._aeuiHandlers) {
-        domNode._aeuiHandlers = {};
-      }
-      if (!domNode._aeuiProxyListeners) {
-        domNode._aeuiProxyListeners = {};
-      }
-
-      if (typeof newValue !== 'function') {
-        if (domNode._aeuiProxyListeners[eventName]) {
-          domNode.removeEventListener(eventName, domNode._aeuiProxyListeners[eventName]);
-          delete domNode._aeuiProxyListeners[eventName];
-        }
-        delete domNode._aeuiHandlers[eventName];
-        continue;
-      }
-
-      domNode._aeuiHandlers[eventName] = newValue;
-
-      if (!domNode._aeuiProxyListeners[eventName]) {
-        const proxyListener = (event) => {
-          const currentHandler = domNode._aeuiHandlers[eventName];
-          if (typeof currentHandler === 'function') {
-            currentHandler.call(domNode, event);
-          }
-        };
-        domNode.addEventListener(eventName, proxyListener);
-        domNode._aeuiProxyListeners[eventName] = proxyListener;
-      }
-    } else if (key === 'className') {
-      domNode.className = newValue ?? '';
-      this._didMutate = true;
-    } else if (key === 'style' && typeof newValue === 'object' && newValue !== null) {
-      domNode.style.cssText = '';
-      Object.assign(domNode.style, newValue);
-      this._didMutate = true;
-    } else if (key === 'style' && typeof newValue === 'string') {
-      domNode.style.cssText = newValue;
-      this._didMutate = true;
-    } else if (key === 'value') {
-      const isFileInput = domNode.tagName === 'INPUT' && domNode.type === 'file';
-      if (isFileInput) {
-        domNode.removeAttribute('value');
-        this._didMutate = true;
-        continue;
-      }
-
-      const normalizedValue = newValue == null ? '' : String(newValue);
-      domNode.value = normalizedValue;
-      if (newValue === undefined || newValue === null) {
-        domNode.removeAttribute('value');
-      } else {
-        domNode.setAttribute('value', normalizedValue);
-      }
-      this._didMutate = true;
-    } else if (typeof newValue === 'boolean') {
-      domNode[key] = newValue;
-      if (newValue) domNode.setAttribute(key, '');
-      else domNode.removeAttribute(key);
-      this._didMutate = true;
-    } else if (newValue === undefined || newValue === null) {
-      if (typeof oldValue === 'boolean' || typeof domNode[key] === 'boolean') {
-        domNode[key] = false;
-      }
-      domNode.removeAttribute(key);
-      this._didMutate = true;
-    } else {
-      domNode.setAttribute(key, newValue);
-      this._didMutate = true;
-    }
-  }
-}
-
-export function _unmountNode(node, removeDom = true) {
+export function unmountNode(state, node, removeDom = true) {
   if (!node) return;
 
   node.isMounted = false;
 
   if (node.kind === 'component') {
-    cleanupComponentNode(this, node, {
+    cleanupComponentNode(state, node, {
       preserveChildren: true,
       preserveDomRange: true,
     });
   }
 
   (node.children || []).forEach((child) => {
-    this._unmountNode(child, false);
+    state.unmountNode(child, false);
   });
 
   if (removeDom && node.parentDom) {
-    removeDomRange.call(this, node.parentDom, node);
+    removeDomRange(state, node.parentDom, node);
   }
 
   node.children = [];
@@ -444,22 +291,22 @@ export function _unmountNode(node, removeDom = true) {
   node.lastDom = null;
 }
 
-export function _reconcile(parentDom, oldNode, newVNode, beforeDom = null, parentNode = null) {
+export function reconcile(state, parentDom, oldNode, newVNode, beforeDom = null, parentNode = null) {
   if (newVNode == null || typeof newVNode === 'boolean') {
     if (oldNode) {
-      this._unmountNode(oldNode);
+      state.unmountNode(oldNode);
     }
     return null;
   }
 
-  if (oldNode && !isSameNodeType(this, oldNode, newVNode)) {
-    this._unmountNode(oldNode);
+  if (oldNode && !isSameNodeType(state, oldNode, newVNode)) {
+    state.unmountNode(oldNode);
     oldNode = null;
   }
 
   if (!oldNode) {
-    const node = this.createNode(newVNode, parentNode, parentDom);
-    return mountNode.call(this, parentDom, node, beforeDom);
+    const node = state.createNode(newVNode, parentNode, parentDom);
+    return mountNode(state, parentDom, node, beforeDom);
   }
 
   oldNode.parent = parentNode;
@@ -467,13 +314,13 @@ export function _reconcile(parentDom, oldNode, newVNode, beforeDom = null, paren
 
   switch (oldNode.kind) {
     case 'text':
-      return updateTextNode.call(this, oldNode, newVNode);
+      return updateTextNode(state, oldNode, newVNode);
     case 'host':
-      return updateHostNode.call(this, oldNode, newVNode);
+      return updateHostNode(state, oldNode, newVNode);
     case 'fragment':
-      return updateFragmentNode.call(this, parentDom, oldNode, newVNode, beforeDom);
+      return updateFragmentNode(state, parentDom, oldNode, newVNode, beforeDom);
     case 'component':
-      return updateComponentNode.call(this, parentDom, oldNode, newVNode, beforeDom);
+      return updateComponentNode(state, parentDom, oldNode, newVNode, beforeDom);
     default:
       return oldNode;
   }
