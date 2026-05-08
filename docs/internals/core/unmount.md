@@ -60,23 +60,18 @@ export function unmountNode(state, node, removeDom = true) {
   node.isMounted = false;
 
   if (node.kind === 'component') {
-    node.cleanups.forEach((cleanup) => {
-      try { cleanup(); } catch (e) { console.error('[AEUI] Cleanup error:', e); }
+    cleanupComponentNode(state, node, {
+      preserveChildren: true,
+      preserveDomRange: true,
     });
   }
 
   (node.children || []).forEach((child) => {
-    unmountNode(child, false);
+    state.unmountNode(child, false);
   });
 
   if (removeDom && node.parentDom) {
-    removeDomRange(node.parentDom, node);
-  }
-
-  if (node.kind === 'component') {
-    node.watchStates = [];
-    node.cleanups = [];
-    node.renderedNode = null;
+    removeDomRange(state, node.parentDom, node);
   }
 
   node.children = [];
@@ -84,6 +79,8 @@ export function unmountNode(state, node, removeDom = true) {
   node.lastDom = null;
 }
 ```
+
+component node의 cleanup은 `component-lifecycle.js`의 `cleanupComponentNode()`에 위임되었다. `preserveChildren: true`, `preserveDomRange: true` 옵션을 사용하여 cleanup은 watchStates/cleanups/renderFactory만 정리하고, children과 DOM range는 `unmountNode`의 후속 단계에서 처리한다.
 
 ---
 
@@ -115,13 +112,7 @@ clean(() => ws.close());
 
 ### 에러 격리
 
-```javascript
-node.cleanups.forEach((cleanup) => {
-  try { cleanup(); } catch (e) { console.error('[AEUI] Cleanup error:', e); }
-});
-```
-
-cleanup 함수에서 에러가 발생해도 나머지 cleanup과 자식 unmount가 **정상적으로 진행**된다. 예를 들어 3개의 cleanup이 등록되어 있고 2번째에서 에러가 발생하면, 1번째와 3번째는 정상 실행되고 에러는 콘솔에 로깅된다.
+`cleanupComponentNode()`는 cleanups를 등록 순서대로 실행하고 watchStates, cleanups, renderedNode, renderFactory를 비운다. 에러가 발생해도 나머지 cleanup과 자식 unmount가 **정상적으로 진행**된다.
 
 ### 재귀적 자식 unmount
 
@@ -167,15 +158,16 @@ function removeDomRange(parentDom, node) {
 
 ```javascript
 if (node.kind === 'component') {
-  node.watchStates = [];
-  node.cleanups = [];
-  node.renderedNode = null;
+  cleanupComponentNode(state, node, {
+    preserveChildren: true,
+    preserveDomRange: true,
+  });
 }
 ```
 
-배열을 빈 배열로 교체하여, watcher의 `callback`, `getDeps` 함수와 cleanup 함수에 대한 **참조를 해제**한다. 이 함수들이 클로저로 참조하는 변수들이 가비지 컬렉션되어 메모리가 회수될 수 있게 한다.
+`cleanupComponentNode()`가 배열을 빈 배열로 교체하여, watcher의 `callback`, `getDeps` 함수와 cleanup 함수에 대한 **참조를 해제**한다. 이 함수들이 클로저로 참조하는 변수들이 가비지 컬렉션되어 메모리가 회수될 수 있게 한다.
 
-`renderedNode = null`로 설정하여 이전 렌더 결과의 subtree 참조도 해제한다.
+`renderedNode = null`과 `renderFactory = null`로 설정하여 이전 렌더 결과의 subtree 참조도 해제한다.
 
 ---
 
@@ -198,7 +190,8 @@ if (node.kind === 'component') {
 
 ## 관련 코드 위치
 
-- `unmountNode`: `packages/core/src/reconciler.js` L415-L443
-- `removeDomRange`: `packages/core/src/reconciler.js` L311-L322
-- `getDomNodesInRange`: `packages/core/src/reconciler.js` L47-L61
-- `clean` 훅 (cleanup 등록): `packages/core/src/hooks.js`
+- `unmountNode`: `packages/core/src/reconciler.js`
+- `cleanupComponentNode`: `packages/core/src/component-lifecycle.js`
+- `removeDomRange`: `packages/core/src/reconciler.js`
+- `getDomNodesInRange`: `packages/core/src/reconciler.js`
+- `clean` 훅 (cleanup 등록): `packages/core/src/hook-registry.js`

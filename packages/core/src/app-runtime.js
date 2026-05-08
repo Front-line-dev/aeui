@@ -29,11 +29,11 @@ function bindRuntimeState(state, internalRuntime, shared) {
   state.createElement = shared.createElement;
   state.createRootNode = createRootNode;
   state.updateProps = updateProps;
-  state.createNode = (...args) => createNode(state, ...args);
-  state.reconcile = (...args) => reconcile(state, ...args);
-  state.unmountNode = (...args) => unmountNode(state, ...args);
-  state.dispatchDomEvent = (...args) => dispatchDomEvent(state, ...args);
-  state.requestRender = (...args) => requestRender(state, ...args);
+  state.createNode = (...args) => internalRuntime.createNode(...args);
+  state.reconcile = (...args) => internalRuntime.reconcile(...args);
+  state.unmountNode = (...args) => internalRuntime.unmountNode(...args);
+  state.dispatchDomEvent = (...args) => internalRuntime.dispatchDomEvent(...args);
+  state.requestRender = (...args) => internalRuntime.requestRender(...args);
   state.runRenderPhase = (...args) => internalRuntime.runRenderPhase(...args);
   state.stopScheduler = (...args) => internalRuntime.stopScheduler(...args);
   state.startScheduler = (...args) => internalRuntime.startScheduler(...args);

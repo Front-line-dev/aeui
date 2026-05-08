@@ -5,7 +5,7 @@
 
 const MAX_FRAME_DELAY = 60;
 
-function scheduleNextPollingTick(state, didMutate) {
+function computeNextPollingDelay(state, didMutate) {
   state.frameDelay = didMutate ? 1 : Math.min(state.frameDelay * 2, MAX_FRAME_DELAY);
   state.framesUntilNextTick = state.frameDelay - 1;
 }
@@ -41,7 +41,7 @@ export function init(state, RootComponent, containerElement) {
   state.interactiveRenderRequested = false;
 
   const didMutate = state.tick();
-  scheduleNextPollingTick(state, didMutate);
+  computeNextPollingDelay(state, didMutate);
 
   state.startScheduler();
 }
@@ -51,7 +51,7 @@ export function render(state) {
 
   state.interactiveRenderRequested = false;
   const didMutate = state.tick();
-  scheduleNextPollingTick(state, didMutate);
+  computeNextPollingDelay(state, didMutate);
   state.startScheduler();
   return didMutate;
 }
@@ -118,7 +118,7 @@ export function onAnimationFrame(state) {
       state.frameDelay = 1;
       state.framesUntilNextTick = 0;
     } else {
-      scheduleNextPollingTick(state, didMutate);
+      computeNextPollingDelay(state, didMutate);
     }
     state.startScheduler();
     return;
@@ -131,7 +131,7 @@ export function onAnimationFrame(state) {
       state.frameDelay = 1;
       state.framesUntilNextTick = 0;
     } else {
-      scheduleNextPollingTick(state, didMutate);
+      computeNextPollingDelay(state, didMutate);
     }
   } else {
     state.framesUntilNextTick -= 1;

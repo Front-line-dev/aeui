@@ -48,12 +48,12 @@ export function init(state, RootComponent, containerElement) {
 
   state.RootComponent = RootComponent;
   state.containerElement = containerElement;
-  state.rootNode = createRootNode(containerElement);
+  state.rootNode = state.createRootNode(containerElement);
   containerElement.innerHTML = '';
+  state.interactiveRenderRequested = false;
 
   const didMutate = state.tick();
-  state.frameDelay = didMutate ? 1 : 2;
-  state.framesUntilNextTick = state.frameDelay - 1;
+  computeNextPollingDelay(state, didMutate);
 
   state.startScheduler();
 }
@@ -239,7 +239,7 @@ export function onAnimationFrame(state) {
       state.frameDelay = 1;
       state.framesUntilNextTick = 0;
     } else {
-      scheduleNextPollingTick(state, didMutate);
+      computeNextPollingDelay(state, didMutate);
     }
     state.startScheduler();
     return;
@@ -251,7 +251,7 @@ export function onAnimationFrame(state) {
       state.frameDelay = 1;
       state.framesUntilNextTick = 0;
     } else {
-      scheduleNextPollingTick(state, didMutate);
+      computeNextPollingDelay(state, didMutate);
     }
   } else {
     state.framesUntilNextTick -= 1;
@@ -277,9 +277,9 @@ export function onAnimationFrame(state) {
 export function render(state) {
   if (!state.RootComponent || !state.containerElement) return false;
 
+  state.interactiveRenderRequested = false;
   const didMutate = state.tick();
-  state.frameDelay = didMutate ? 1 : Math.min(state.frameDelay * 2, MAX_FRAME_DELAY);
-  state.framesUntilNextTick = state.frameDelay - 1;
+  computeNextPollingDelay(state, didMutate);
   state.startScheduler();
   return didMutate;
 }

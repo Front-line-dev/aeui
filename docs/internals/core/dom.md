@@ -133,11 +133,19 @@ if (key.startsWith("on")) {
 
   // 이벤트 타입별 프록시 리스너는 1회만 등록
   if (!domNode._aeuiProxyListeners[eventName]) {
-    const proxy = (event) => {
-      state.dispatchDomEvent(domNode, eventName, event);
+    const proxyListener = (event) => {
+      if (typeof state.dispatchDomEvent === 'function') {
+        state.dispatchDomEvent(domNode, eventName, event);
+        return;
+      }
+
+      const currentHandler = domNode._aeuiHandlers[eventName];
+      if (typeof currentHandler === 'function') {
+        currentHandler.call(domNode, event);
+      }
     };
-    domNode.addEventListener(eventName, proxy);
-    domNode._aeuiProxyListeners[eventName] = proxy;
+    domNode.addEventListener(eventName, proxyListener);
+    domNode._aeuiProxyListeners[eventName] = proxyListener;
   }
 }
 ```
@@ -289,5 +297,7 @@ delete로 모든 key를 먼저 삭제하므로, 이전에 `{ name: "A", count: 1
 ## 관련 코드 위치
 
 - `createDomNode`: `packages/core/src/dom-host.js`
-- `updateDomProps`: `packages/core/src/reconciler.js` L25-L96
-- `updateProps`: `packages/core/src/reconciler.js` L20-L23
+- `updateDomProps`: `packages/core/src/dom-host.js`
+- `updateProps`: `packages/core/src/dom-host.js`
+- `cloneHostPropsSnapshot`: `packages/core/src/dom-host.js`
+- `syncHostControlledProps`: `packages/core/src/dom-host.js`

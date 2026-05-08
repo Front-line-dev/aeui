@@ -279,7 +279,7 @@ Fragment는 함수이지만, Babel 플러그인이 이를 일반 컴포넌트로
 
 ## 관련 코드 위치
 
-- `createVNode`: `packages/core/src/core.js` L30-L35
-- `createElement` alias: `packages/core/src/core.js` L68
-- `Fragment`: `packages/core/src/core.js` L69
+- `createVNode`: `packages/core/src/core.js`
+- `createElement` alias: `packages/core/src/core.js`
+- `Fragment`: `packages/core/src/core.js`
 - `isFragmentVNode`: `packages/core/src/vnode-helpers.js`
