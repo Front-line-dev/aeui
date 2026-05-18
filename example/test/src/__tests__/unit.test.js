@@ -87,6 +87,52 @@ describe('deepEqual', () => {
 
     expect(_deepEqual(a, b)).toBe(true);
   });
+
+  it('서로 다른 순환 구조를 구분', () => {
+    const a = {};
+    a.x = { name: 'x' };
+    a.y = { name: 'x' };
+    a.x.next = a.y;
+    a.y.next = a.x;
+
+    const b = {};
+    b.x = { name: 'x' };
+    b.y = { name: 'x' };
+    b.x.next = b.x;
+    b.y.next = b.y;
+
+    expect(_deepEqual(a, b)).toBe(false);
+  });
+
+  it('순환 참조 Set 비교 시 크래시 없이 동작', () => {
+    const a = new Set();
+    a.add(a);
+    const b = new Set();
+    b.add(b);
+
+    expect(_deepEqual(a, b)).toBe(true);
+  });
+
+  it('VNode는 같은 참조일 때만 동일하게 취급', () => {
+    const vnode = AEUI.createVNode('div', { id: 'same' }, 'hello');
+    const equivalentVNode = AEUI.createVNode('div', { id: 'same' }, 'hello');
+
+    expect(_deepEqual(vnode, vnode)).toBe(true);
+    expect(_deepEqual(vnode, equivalentVNode)).toBe(false);
+    expect(_deepEqual([vnode], _deepClone([equivalentVNode]))).toBe(false);
+  });
+
+  it('tag props children 형태의 일반 객체를 VNode로 오탐하지 않음', () => {
+    const data = { tag: 'product', props: { price: 1 }, children: [] };
+    const cloned = _deepClone([data]);
+
+    expect(cloned[0]).not.toBe(data);
+    expect(cloned[0]).toEqual(data);
+
+    data.props.price = 2;
+
+    expect(_deepEqual([data], cloned)).toBe(false);
+  });
 });
 
 describe('deepClone', () => {
@@ -117,6 +163,15 @@ describe('deepClone', () => {
     const cloned = _deepClone(original);
     expect(cloned.getTime()).toBe(original.getTime());
     expect(cloned).not.toBe(original);
+  });
+
+  it('VNode는 복제하지 않고 참조를 유지', () => {
+    const vnode = AEUI.createVNode('span', null, 'label');
+    const original = [vnode];
+    const cloned = _deepClone(original);
+
+    expect(cloned).not.toBe(original);
+    expect(cloned[0]).toBe(vnode);
   });
 
   it('순환 참조 객체 복제 시 크래시 없이 동작', () => {
@@ -150,6 +205,13 @@ describe('AEUI.createVNode', () => {
     expect(vnode.tag).toBe('div');
     expect(vnode.props.id).toBe('test');
     expect(vnode.children).toEqual(['hello']);
+  });
+
+  it('VNode marker는 열거 가능한 VNode 필드로 노출되지 않음', () => {
+    const vnode = AEUI.createVNode('div', null, 'hello');
+
+    expect(Object.keys(vnode)).toEqual(['tag', 'props', 'children']);
+    expect(Object.getOwnPropertySymbols(vnode).length).toBe(1);
   });
 
   it('children이 props에 포함됨', () => {

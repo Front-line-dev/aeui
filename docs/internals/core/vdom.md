@@ -49,6 +49,8 @@ VNode은 `createVNode`이 매번 새로 만드는 가벼운 객체이고, Runtim
 }
 ```
 
+실제 객체에는 위의 enumerable 필드 외에 AEUI 내부용 non-enumerable `Symbol` marker가 함께 붙는다. 이 marker는 `_deepEqual`, `_deepClone`이 일반 사용자 데이터와 VNode를 구분하기 위한 내부 식별자이며, `Object.keys(vnode)`나 일반 직렬화 결과에는 나타나지 않는다.
+
 각 필드의 의미:
 
 | 필드 | 타입 | 설명 |
@@ -94,8 +96,17 @@ createVNode(tag, props, ...children) {
   // 3. children을 props에도 저장
   finalProps.children = validChildren;
   
-  // 4. VNode 객체 반환
-  return { tag, props: finalProps, children: validChildren };
+  // 4. VNode 객체 생성
+  const vnode = { tag, props: finalProps, children: validChildren };
+
+  // 5. 내부 VNode marker를 non-enumerable Symbol로 부여
+  Object.defineProperty(vnode, VNODE_MARKER, {
+    value: true,
+    enumerable: false,
+  });
+
+  // 6. VNode 객체 반환
+  return vnode;
 }
 ```
 

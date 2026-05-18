@@ -36,13 +36,14 @@ user.name = "B";  // ← 같은 객체 참조를 직접 수정
 ```
 1. Object.is(a, b)         → 같은 참조이거나 같은 원시값이면 바로 true
 2. 둘 다 object 타입인지   → 아니면 false (타입이 다름)
-3. 순환 참조 체크 (seen)   → 이미 비교 중인 쌍이면 동일 구조로 간주
-4. Array.isArray(a)        → 배열 비교
-5. a instanceof Date       → Date 비교
-6. a instanceof RegExp     → RegExp 비교
-7. a instanceof Map        → Map 비교
-8. a instanceof Set        → Set 비교
-9. (나머지)                → 일반 Object 비교
+3. VNode marker 확인       → 같은 참조가 아닌 VNode는 deep compare 대상에서 제외
+4. 순환 참조 체크 (seen)   → 이미 비교 중인 쌍이면 동일 구조로 간주
+5. Array.isArray(a)        → 배열 비교
+6. a instanceof Date       → Date 비교
+7. a instanceof RegExp     → RegExp 비교
+8. a instanceof Map        → Map 비교
+9. a instanceof Set        → Set 비교
+10. (나머지)               → 일반 Object 비교
 ```
 
 ### 타입별 비교 전략
@@ -65,6 +66,14 @@ seen.set(a, b);
 ```
 
 `seen`은 `Map<object, object>`로, 이미 비교를 시작한 `(a, b)` 쌍을 기록한다. 같은 `a`를 다시 만나면 대응하는 `b`가 동일한지만 확인하고 재귀를 중단한다. 이를 통해 `obj.self = obj` 같은 순환 참조 구조에서도 무한 루프 없이 비교가 완료된다.
+
+#### VNode
+
+```javascript
+if (isVNode(a) || isVNode(b)) return false;
+```
+
+VNode는 매 렌더마다 새로 생성되는 프레임워크 입력 객체이다. 따라서 VNode는 구조적으로 같은지 깊게 비교하지 않는다. 같은 참조인지 여부는 이미 1단계 `Object.is(a, b)`가 처리하므로, 서로 다른 VNode 객체는 내용이 같아 보여도 `false`로 판단한다. 이 규칙은 watcher 의존성 배열 안에 VNode가 들어왔을 때 프레임워크 객체를 사용자 상태 스냅샷처럼 취급하지 않기 위한 방어선이다.
 
 #### 배열
 
@@ -145,6 +154,11 @@ if (a instanceof Set) {
     used[matchedIndex] = true;
     activeSeen = matchedSeen;
   }
+  if (activeSeen !== seen) {
+    for (const [key, val] of activeSeen) {
+      seen.set(key, val);
+    }
+  }
   return true;
 }
 ```
@@ -196,13 +210,14 @@ watcher의 `oldDeps`에 이전 의존성 값을 저장할 때, 참조 복사(얕
 
 ```
 1. null 또는 원시값       → 그대로 반환 (원시값은 복사가 불필요)
-2. 순환 참조 체크 (seen)  → 이미 복제한 객체면 복제본을 반환
-3. Array                 → 빈 배열 생성 → seen에 등록 → 각 요소를 재귀 복사
-4. Date                  → new Date(getTime())으로 같은 시각의 새 Date
-5. RegExp                → new RegExp(source, flags)으로 같은 패턴의 새 RegExp
-6. Map                   → 빈 Map 생성 → seen에 등록 → 각 key-value를 재귀 복사
-7. Set                   → 빈 Set 생성 → seen에 등록 → 각 요소를 재귀 복사
-8. 일반 Object           → 빈 Object 생성 → seen에 등록 → 각 key-value를 재귀 복사
+2. Date                  → new Date(getTime())으로 같은 시각의 새 Date
+3. RegExp                → new RegExp(source, flags)으로 같은 패턴의 새 RegExp
+4. VNode                 → 복제하지 않고 참조 그대로 반환
+5. 순환 참조 체크 (seen)  → 이미 복제한 객체면 복제본을 반환
+6. Array                 → 빈 배열 생성 → seen에 등록 → 각 요소를 재귀 복사
+7. Map                   → 빈 Map 생성 → seen에 등록 → 각 key-value를 재귀 복사
+8. Set                   → 빈 Set 생성 → seen에 등록 → 각 요소를 재귀 복사
+9. 일반 Object           → 빈 Object 생성 → seen에 등록 → 각 key-value를 재귀 복사
 ```
 
 ### 코드
@@ -210,6 +225,9 @@ watcher의 `oldDeps`에 이전 의존성 값을 저장할 때, 참조 복사(얕
 ```javascript
 function _deepClone(v, seen = new WeakMap()) {
   if (v === null || typeof v !== 'object') return v;   // 원시값
+  if (v instanceof Date) return new Date(v.getTime());
+  if (v instanceof RegExp) return new RegExp(v.source, v.flags);
+  if (isVNode(v)) return v;
 
   // 순환 참조 방어: 이미 복제한 객체면 그 복제본을 반환
   if (seen.has(v)) return seen.get(v);
@@ -220,9 +238,6 @@ function _deepClone(v, seen = new WeakMap()) {
     v.forEach(item => cloned.push(_deepClone(item, seen)));
     return cloned;
   }
-
-  if (v instanceof Date) return new Date(v.getTime());
-  if (v instanceof RegExp) return new RegExp(v.source, v.flags);
 
   if (v instanceof Map) {
     const cloned = new Map();
@@ -262,6 +277,8 @@ cloned.self === cloned;     // ✅ true — 복제본도 자기 자신을 참조
 
 `Date`와 `RegExp`는 내부에 순환 참조를 가질 수 없으므로 `seen` 등록 없이 바로 반환한다.
 
+VNode도 복제하지 않고 참조 그대로 반환한다. VNode marker는 `createVNode`가 non-enumerable `Symbol`로 직접 부여하므로, `{ tag, props, children }` 형태의 일반 객체와 충돌하지 않는다.
+
 ### 복제되지 않는/잘못 처리되는 타입
 
 | 타입 | 동작 | 이유 |
@@ -294,5 +311,6 @@ cloned.self === cloned;     // ✅ true — 복제본도 자기 자신을 참조
 
 ## 관련 코드 위치
 
-- `_deepEqual`: `packages/core/src/deep-compare.js` L5-L78
-- `_deepClone`: `packages/core/src/deep-compare.js` L80-L116
+- `_deepEqual`: `packages/core/src/deep-compare.js`
+- `_deepClone`: `packages/core/src/deep-compare.js`
+- VNode marker: `packages/core/src/vnode-marker.js`, `packages/core/src/core.js`
