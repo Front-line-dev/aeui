@@ -2,180 +2,129 @@
  * Deep comparison & cloning utilities
  */
 
+/**
+ * Robust VNode identification.
+ * AEUI VNodes are objects with tag, props, and children.
+ */
 function isVNode(v) {
-  return v !== null && typeof v === 'object' && 'tag' in v && 'props' in v;
+  return v !== null &&
+         typeof v === 'object' &&
+         'tag' in v &&
+         'props' in v &&
+         'children' in v &&
+         (typeof v.tag === 'string' || typeof v.tag === 'function');
 }
 
-export function _deepEqual(a, b) {
+export function _deepEqual(a, b, seen = new Map()) {
   if (Object.is(a, b)) return true;
   if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
 
-  // VNode는 프레임워크가 관리하는 특수 객체이므로 깊은 비교 대상에서 제외합니다. (오류 방지)
-  if (isVNode(a) || isVNode(b)) return false;
+  // Circular reference protection
+  if (seen.has(a)) return seen.get(a) === b;
+  seen.set(a, b);
 
-  const stack = [[a, b, new Map()]];
-
-  while (stack.length > 0) {
-    const [currA, currB, seen] = stack.pop();
-
-    if (Object.is(currA, currB)) continue;
-    if (typeof currA !== 'object' || currA === null || typeof currB !== 'object' || currB === null) return false;
-
-    if (seen.has(currA)) {
-      if (seen.get(currA) !== currB) return false;
-      continue;
-    }
-    seen.set(currA, currB);
-
-    if (Array.isArray(currA)) {
-      if (!Array.isArray(currB) || currA.length !== currB.length) return false;
-      for (let i = currA.length - 1; i >= 0; i--) {
-        stack.push([currA[i], currB[i], seen]);
+  try {
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (!_deepEqual(a[i], b[i], seen)) return false;
       }
-      continue;
+      return true;
     }
 
-    if (currA instanceof Date) {
-      if (!(currB instanceof Date) || currA.getTime() !== currB.getTime()) return false;
-      continue;
+    if (a instanceof Date) {
+      return b instanceof Date && a.getTime() === b.getTime();
     }
 
-    if (currA instanceof RegExp) {
-      if (!(currB instanceof RegExp) || currA.source !== currB.source || currA.flags !== currB.flags) return false;
-      continue;
+    if (a instanceof RegExp) {
+      return b instanceof RegExp && a.source === b.source && a.flags === b.flags;
     }
 
-    if (currA instanceof Map) {
-      if (!(currB instanceof Map) || currA.size !== currB.size) return false;
-      for (const [key, val] of currA) {
-        if (!currB.has(key)) return false;
-        stack.push([val, currB.get(key), seen]);
+    if (a instanceof Map) {
+      if (!(b instanceof Map) || a.size !== b.size) return false;
+      for (const [key, val] of a) {
+        if (!b.has(key) || !_deepEqual(val, b.get(key), seen)) return false;
       }
-      continue;
+      return true;
     }
 
-    if (currA instanceof Set) {
-      if (!(currB instanceof Set) || currA.size !== currB.size) return false;
-      const bValues = [...currB];
-      const matchedB = new Array(bValues.length).fill(false);
-      for (const aVal of currA) {
-        let found = false;
+    if (a instanceof Set) {
+      if (!(b instanceof Set) || a.size !== b.size) return false;
+
+      const bValues = [...b];
+      const used = new Array(bValues.length).fill(false);
+
+      for (const valA of a) {
+        let matched = false;
         for (let i = 0; i < bValues.length; i++) {
-          if (!matchedB[i] && _deepEqual(aVal, bValues[i])) {
-            matchedB[i] = true;
-            found = true;
+          // Set 요소 비교 시 circularity 정보를 전달합니다.
+          // 매번 Map을 복사하는 것은 무거우나, 원본 로직의 안정성을 위해 유지합니다.
+          if (!used[i] && _deepEqual(valA, bValues[i], new Map(seen))) {
+            used[i] = true;
+            matched = true;
             break;
           }
         }
-        if (!found) return false;
+        if (!matched) return false;
       }
-      continue;
+      return true;
     }
 
-    const keysA = Object.keys(currA);
-    const keysB = Object.keys(currB);
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
     if (keysA.length !== keysB.length) return false;
 
     for (const key of keysA) {
-      if (!Object.prototype.hasOwnProperty.call(currB, key)) return false;
-      stack.push([currA[key], currB[key], seen]);
+      // Intended heavy O(N^2) comparison style
+      if (!keysB.includes(key) || !_deepEqual(a[key], b[key], seen)) return false;
     }
-  }
 
-  return true;
+    return true;
+  } finally {
+    // Backtracking: 현재 탐색 경로가 끝나면 제거하여 메모리 누수를 방지하고 DAG 비교를 허용합니다.
+    seen.delete(a);
+  }
 }
 
-export function _deepClone(v) {
+export function _deepClone(v, seen = new WeakMap()) {
   if (v === null || typeof v !== 'object') return v;
   if (v instanceof Date) return new Date(v.getTime());
   if (v instanceof RegExp) return new RegExp(v.source, v.flags);
-  
-  // VNode는 매 렌더링마다 새로 생성되므로 깊은 복제 대상에서 제외합니다. (메모리 폭증 오류 방지)
+
+  // VNode 보호 로직: VNode는 깊은 복제 대상에서 제외합니다. (메모리 폭증 오류 방지)
+  // VNode는 매 렌더링마다 새로 생성되는 일시적인 객체이므로 참조를 유지해도 안전합니다.
   if (isVNode(v)) return v;
 
-  const seen = new WeakMap();
-  const rootClone = Array.isArray(v) ? [] : (v instanceof Map ? new Map() : (v instanceof Set ? new Set() : {}));
-  
-  const stack = [[v, rootClone]];
-  seen.set(v, rootClone);
+  if (seen.has(v)) return seen.get(v);
 
-  while (stack.length > 0) {
-    const [curr, clone] = stack.pop();
-
-    if (Array.isArray(curr)) {
-      for (let i = 0; i < curr.length; i++) {
-        const val = curr[i];
-        if (val === null || typeof val !== 'object' || isVNode(val)) {
-          clone[i] = val;
-        } else if (val instanceof Date) {
-          clone[i] = new Date(val.getTime());
-        } else if (val instanceof RegExp) {
-          clone[i] = new RegExp(val.source, val.flags);
-        } else if (seen.has(val)) {
-          clone[i] = seen.get(val);
-        } else {
-          const childClone = Array.isArray(val) ? [] : (val instanceof Map ? new Map() : (val instanceof Set ? new Set() : {}));
-          clone[i] = childClone;
-          seen.set(val, childClone);
-          stack.push([val, childClone]);
-        }
-      }
-    } else if (curr instanceof Map) {
-      curr.forEach((val, key) => {
-        if (val === null || typeof val !== 'object' || isVNode(val)) {
-          clone.set(key, val);
-        } else if (val instanceof Date) {
-          clone.set(key, new Date(val.getTime()));
-        } else if (val instanceof RegExp) {
-          clone.set(key, new RegExp(val.source, val.flags));
-        } else if (seen.has(val)) {
-          clone.set(key, seen.get(val));
-        } else {
-          const childClone = Array.isArray(val) ? [] : (val instanceof Map ? new Map() : (val instanceof Set ? new Set() : {}));
-          clone.set(key, childClone);
-          seen.set(val, childClone);
-          stack.push([val, childClone]);
-        }
-      });
-    } else if (curr instanceof Set) {
-      curr.forEach(val => {
-        if (val === null || typeof val !== 'object' || isVNode(val)) {
-          clone.add(val);
-        } else if (val instanceof Date) {
-          clone.add(new Date(val.getTime()));
-        } else if (val instanceof RegExp) {
-          clone.add(new RegExp(val.source, val.flags));
-        } else if (seen.has(val)) {
-          clone.add(seen.get(val));
-        } else {
-          const childClone = Array.isArray(val) ? [] : (val instanceof Map ? new Map() : (val instanceof Set ? new Set() : {}));
-          clone.add(childClone);
-          seen.set(val, childClone);
-          stack.push([val, childClone]);
-        }
-      });
-    } else {
-      const keys = Object.keys(curr);
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        const val = curr[key];
-        if (val === null || typeof val !== 'object' || isVNode(val)) {
-          clone[key] = val;
-        } else if (val instanceof Date) {
-          clone[key] = new Date(val.getTime());
-        } else if (val instanceof RegExp) {
-          clone[key] = new RegExp(val.source, val.flags);
-        } else if (seen.has(val)) {
-          clone[key] = seen.get(val);
-        } else {
-          const childClone = Array.isArray(val) ? [] : (val instanceof Map ? new Map() : (val instanceof Set ? new Set() : {}));
-          clone[key] = childClone;
-          seen.set(val, childClone);
-          stack.push([val, childClone]);
-        }
-      }
+  if (Array.isArray(v)) {
+    const cloned = [];
+    seen.set(v, cloned);
+    for (let i = 0; i < v.length; i++) {
+      cloned.push(_deepClone(v[i], seen));
     }
+    return cloned;
   }
 
-  return rootClone;
+  if (v instanceof Map) {
+    const cloned = new Map();
+    seen.set(v, cloned);
+    v.forEach((val, k) => cloned.set(k, _deepClone(val, seen)));
+    return cloned;
+  }
+
+  if (v instanceof Set) {
+    const cloned = new Set();
+    seen.set(v, cloned);
+    v.forEach(item => cloned.add(_deepClone(item, seen)));
+    return cloned;
+  }
+
+  const cloned = {};
+  seen.set(v, cloned);
+  for (const [k, val] of Object.entries(v)) {
+    cloned[k] = _deepClone(val, seen);
+  }
+  return cloned;
 }
