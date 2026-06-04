@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AEUI, watch } from 'aeui';
+import { cloneHostPropsSnapshot } from '../../../../packages/core/src/dom-host.js';
 import { resetRuntimeState } from '../../../../packages/core/src/runtime-state.js';
 
 const runtime = AEUI.__runtime;
@@ -37,6 +38,35 @@ describe('_updateDomProps', () => {
     runtime.updateDomProps(div, { key: 'k1', ref: {} });
     expect(div.hasAttribute('key')).toBe(false);
     expect(div.hasAttribute('ref')).toBe(false);
+  });
+
+  it('JSX 개발 metadata prop을 DOM에 설정하지 않음', () => {
+    runtime.updateDomProps(div, {
+      __self: { component: 'node' },
+      __source: { fileName: 'App.jsx', lineNumber: 1, columnNumber: 1 },
+    });
+
+    expect(div.hasAttribute('__self')).toBe(false);
+    expect(div.hasAttribute('__source')).toBe(false);
+  });
+
+  it('JSX 개발 metadata prop은 host props snapshot에서 제외', () => {
+    const deepClone = vi.fn((value) => value);
+    const self = { kind: 'component' };
+    self.parent = self;
+
+    const snapshot = cloneHostPropsSnapshot(
+      { deepClone },
+      {
+        id: 'ok',
+        __self: self,
+        __source: { fileName: 'App.jsx', lineNumber: 1, columnNumber: 1 },
+      }
+    );
+
+    expect(snapshot).toEqual({ id: 'ok' });
+    expect(deepClone).toHaveBeenCalledTimes(1);
+    expect(deepClone).toHaveBeenCalledWith('ok');
   });
 
   it('className을 class attribute로 설정', () => {

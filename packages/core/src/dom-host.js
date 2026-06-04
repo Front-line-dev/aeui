@@ -1,8 +1,12 @@
+function isInternalJsxMetadataProp(key) {
+  return key === '__self' || key === '__source';
+}
+
 export function cloneHostPropsSnapshot(state, props = {}) {
   const snapshot = {};
 
   Object.entries(props).forEach(([key, value]) => {
-    if (key === 'children' || key === 'key' || key === 'ref') return;
+    if (key === 'children' || key === 'key' || key === 'ref' || isInternalJsxMetadataProp(key)) return;
     snapshot[key] = state.deepClone(value);
   });
 
@@ -55,7 +59,7 @@ export function updateDomProps(state, domNode, props, oldProps = {}) {
   const allProps = { ...oldProps, ...props };
 
   for (const key in allProps) {
-    if (key === 'children' || key === 'key' || key === 'ref') continue;
+    if (key === 'children' || key === 'key' || key === 'ref' || isInternalJsxMetadataProp(key)) continue;
 
     const newValue = props ? props[key] : undefined;
     const oldValue = oldProps ? oldProps[key] : undefined;

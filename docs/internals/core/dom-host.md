@@ -22,6 +22,14 @@
 
 host node의 props를 deepClone으로 독립적 스냅샷을 만든다. `children`, `key`, `ref`는 DOM 속성이 아니므로 스냅샷에 포함하지 않는다.
 
+JSX transform이 개발용 metadata로 주입하는 `__self`, `__source`도 스냅샷에서 제외한다. 특히 `__self`는 컴포넌트 인스턴스 노드 전체를 가리킬 수 있으므로 deepClone 대상에 포함되면 인스턴스 트리와 DOM 참조를 따라가며 메모리 폭증을 일으킬 수 있다.
+
+---
+
+## `updateDomProps(state, domNode, props, oldProps)`
+
+DOM 속성 diff를 수행하고 실제 DOM에 반영한다. `children`, `key`, `ref`, `__self`, `__source`는 실제 DOM attribute로 내려보내지 않는다.
+
 ---
 
 ## `syncHostControlledProps(state, node)`

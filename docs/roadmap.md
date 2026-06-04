@@ -10,6 +10,40 @@
 - nested destructuring props + render param 조합
 - cleanup/watch ordering regression
 
+### watch API 개선 (DX 향상)
+
+- 공식 시그니처를 `watch(callback, deps?, options?)`로 정리.
+- 기존 `watch([deps], callback)`은 하위 호환으로 유지하되 문서에서는 구버전 호환 API로 낮춘다.
+- `watch`의 `deps`는 최적화를 위한 부분이고, 기본적으로는 `deps`를 아예 설정하지 않더라도 작동하도록 지원하여 개발자 경험(DX) 개선.
+- `immediate`, `flush` 같은 옵션 도입 여부 검토.
+
+### 입력 바인딩 문법 추가 (DX 향상)
+
+반복되는 `value + onInput`, `checked + onChange` 패턴을 줄이기 위한 컴파일러 기반 바인딩 문법을 검토한다.
+
+- `bindValue={name}`: 문자열 입력 바인딩
+- `bindNumber={age}`: 숫자 입력 바인딩
+- `bindChecked={enabled}`: checkbox/radio checked 바인딩
+- JSX namespace 충돌 가능성이 낮은 camelCase prop 문법을 우선 검토.
+
+### 컴포넌트 판별 및 return 규칙 개선
+
+Babel 플러그인의 컴포넌트 판별 휴리스틱과 renderable return 감지 범위를 개선한다.
+
+- PascalCase 함수가 JSX를 직접 반환하지 않는 경우의 오인/누락 케이스 점검.
+- JSX를 담은 지역 변수를 반환하는 패턴 지원 검토.
+- 감지할 수 없는 컴포넌트 패턴에 대한 dev warning 추가.
+- 명시적 컴포넌트 표시를 위한 annotation 또는 helper API 검토.
+
+### JSX import 및 빌드 설정 간소화
+
+JSX 사용을 위해 모든 파일에서 `AEUI`를 import하거나 Vite Babel 설정을 직접 작성해야 하는 부담을 줄인다.
+
+- `aeui/jsx-runtime` 제공 검토.
+- Babel 플러그인의 자동 import 주입 검토.
+- `aeui/vite` 플러그인 제공으로 Babel 플러그인 순서와 JSX pragma 설정을 자동화.
+- `create-aeui-app` 템플릿에 간소화된 설정 반영.
+
 ### Fragment 삭제
 
 JSX 특성상 Fragment가 필요한 부분에 트랜스파일 단계에서 자동으로 Fragment를 추가한다.
