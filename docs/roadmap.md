@@ -26,6 +26,26 @@
 - `bindChecked={enabled}`: checkbox/radio checked 바인딩
 - JSX namespace 충돌 가능성이 낮은 camelCase prop 문법을 우선 검토.
 
+### DOM attribute 및 이벤트 보강
+
+JSX에서 자주 사용하는 DOM prop과 HTML attribute의 매핑 규칙을 정리하고, 런타임/컴파일러 지원 범위를 확장한다.
+
+- `attribute`, `class`, `for`, `ref`, `event` 등 DOM prop 처리 보강.
+- `class`/`className`, `for`/`htmlFor`처럼 HTML 표준 명칭과 JS 친화 명칭의 alias 정책 정리.
+- `ref`를 DOM attribute로 내려보내지 않고 실제 DOM node 또는 component 노드에 접근할 수 있는 API 검토.
+- 이벤트 prop의 이름 규칙, listener 교체/해제, 중복 등록 방지 규칙 보강.
+- boolean attribute, dataset, aria 속성 등 기존 처리와 충돌하지 않도록 테스트 케이스 확장.
+
+### 컴포넌트 스토리 및 상태 저장 시스템
+
+Storybook과 비슷하게 컴포넌트를 독립적으로 실행, 확인, 공유할 수 있는 개발용 시스템을 검토한다.
+
+- `dev` 실행 시 컴포넌트별 상태를 로컬에 저장하고 다시 불러올 수 있는 기능 추가.
+- 컴포넌트 요소에서 제공되는 함수를 호출해 현재 상태 snapshot을 로컬 저장소에 저장하는 API 검토.
+- Fragment로 렌더링되는 컴포넌트는 fragment 하위 요소들에서도 같은 저장 함수를 호출할 수 있게 context 전달 방식 검토.
+- 저장된 상태를 스토리/케이스 단위로 관리하고, UI에서 선택해 재현할 수 있는 구조 검토.
+- 로컬 개발 기능이 production bundle에 포함되지 않도록 dev-only 빌드 경계 설계.
+
 ### 컴포넌트 판별 및 return 규칙 개선
 
 Babel 플러그인의 컴포넌트 판별 휴리스틱과 renderable return 감지 범위를 개선한다.
