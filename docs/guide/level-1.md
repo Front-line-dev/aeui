@@ -252,7 +252,9 @@ watch(callback, deps)
 ```
 
 - `callback`: 의존성이 변경되었을 때 실행할 함수
-- `deps`: 감시할 값들의 배열
+- `deps`: 감시할 값들의 배열 또는 배열을 반환하는 함수
+
+`deps`는 필수다. `watch([deps], callback)`, `watch(callback)`, `watch(callback, deps, options)` 형태는 지원하지 않는다.
 
 ### 여러 의존성
 

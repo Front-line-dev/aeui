@@ -10,14 +10,6 @@
 - nested destructuring props + render param 조합
 - cleanup/watch ordering regression
 
-### watch API 개선 (DX 향상)
-
-- 공식 시그니처를 `watch(callback, deps)`로 고정.
-- `deps`는 필수이며 배열 또는 deps getter 함수만 허용.
-- 기존 `watch([deps], callback)` 하위 호환, deps 생략, `immediate`/`flush` 같은 options는 지원하지 않음.
-- Babel 플러그인은 `watch(callback, [deps])`를 `AEUI.__runtime.watch(callback, () => [deps])`로 변환.
-- Babel을 거치지 않은 public `watch()` 호출은 runtime fallback 등록 없이 명시적으로 실패.
-
 ### 입력 바인딩 문법 추가 (DX 향상)
 
 반복되는 `value + onInput`, `checked + onChange` 패턴을 줄이기 위한 컴파일러 기반 바인딩 문법을 검토한다.
