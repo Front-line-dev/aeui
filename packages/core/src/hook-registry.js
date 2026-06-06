@@ -1,25 +1,3 @@
-function normalizeWatchArgs(firstArg, secondArg) {
-  if (typeof firstArg === 'function' && typeof secondArg !== 'function') {
-    return { callback: firstArg, depsGetter: secondArg };
-  }
-
-  if (typeof firstArg !== 'function' && typeof secondArg === 'function') {
-    return { depsGetter: firstArg, callback: secondArg };
-  }
-
-  if (typeof firstArg === 'function' && typeof secondArg === 'function') {
-    return { depsGetter: firstArg, callback: secondArg };
-  }
-
-  return { depsGetter: firstArg, callback: secondArg };
-}
-
-function normalizeDepsValue(depsValue) {
-  if (Array.isArray(depsValue)) return depsValue;
-  if (depsValue == null) return [];
-  return [depsValue];
-}
-
 function getSetupComponentNode(runtime) {
   const node = runtime.currentComponentNode;
   if (!node) return null;
@@ -27,18 +5,29 @@ function getSetupComponentNode(runtime) {
   return node;
 }
 
-export function registerWatch(runtime, firstArg, secondArg) {
+function readDeps(deps) {
+  const value = typeof deps === 'function' ? deps() : deps;
+  if (!Array.isArray(value)) {
+    throw new TypeError('[AEUI] watch(callback, deps) requires deps to be an array or a function that returns an array.');
+  }
+  return value;
+}
+
+export function registerWatch(runtime, callback, deps) {
   if (!runtime) return;
-
-  const { depsGetter, callback } = normalizeWatchArgs(firstArg, secondArg);
-  if (typeof callback !== 'function') return;
-
-  const getDeps = () => normalizeDepsValue(
-    typeof depsGetter === 'function' ? depsGetter() : depsGetter
-  );
 
   const node = getSetupComponentNode(runtime);
   if (!node) return;
+
+  if (typeof callback !== 'function') {
+    throw new TypeError('[AEUI] watch(callback, deps) requires callback to be a function.');
+  }
+
+  if (deps === undefined) {
+    throw new TypeError('[AEUI] watch(callback, deps) requires deps.');
+  }
+
+  const getDeps = () => readDeps(deps);
 
   node.watchStates.push({
     callback,

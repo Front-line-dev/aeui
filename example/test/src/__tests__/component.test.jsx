@@ -249,9 +249,9 @@ let watchLog = [];
 
 // watch는 props 기반 deps를 감지하는 데 설계됨
 function WatchChild({ value }) {
-  watch([value], () => {
+  watch(() => {
     watchLog.push(value);
-  });
+  }, [value]);
 
   return <span id="watch-value">{value}</span>;
 }
@@ -295,9 +295,9 @@ describe('watch 훅', () => {
     function ShrinkingDepsWatch() {
       let includeExtra = true;
 
-      watch(() => (includeExtra ? [1, 2] : [1]), () => {
+      watch(() => {
         watchLog.push(includeExtra ? 'full' : 'shrunk');
-      });
+      }, () => (includeExtra ? [1, 2] : [1]));
 
       return (
         <button id="shrink-watch" onClick={() => { includeExtra = false; }}>
@@ -321,7 +321,7 @@ describe('watch 훅', () => {
   it('local let 변수 변경도 watch deps getter가 감지함', () => {
     function LocalWatch() {
       let count = 0;
-      watch([count], () => { watchLog.push(count); });
+      watch(() => { watchLog.push(count); }, [count]);
       return (
         <div>
           <span id="lcount">{count}</span>
@@ -340,14 +340,14 @@ describe('watch 훅', () => {
     expect(container.querySelector('#lcount').textContent).toBe('1');
   });
 
-  it('named callback을 사용하는 watch(deps, callback)도 deps를 함수화해 감지한다', () => {
+  it('named callback을 사용하는 watch(callback, deps)도 deps를 함수화해 감지한다', () => {
     function NamedCallbackWatch() {
       let count = 0;
       const syncCount = () => {
         watchLog.push(count);
       };
 
-      watch([count], syncCount);
+      watch(syncCount, [count]);
 
       return (
         <div>
@@ -377,9 +377,9 @@ describe('watch 훅', () => {
         localCount += 1;
       };
 
-      watch([value, localCount], () => {
+      watch(() => {
         watchLog.push([value, localCount]);
-      });
+      }, [value, localCount]);
 
       return <span id="mixed-value">{value}:{localCount}</span>;
     }
@@ -417,10 +417,10 @@ describe('watch 훅', () => {
     function ClampWatch() {
       let count = 0;
 
-      watch([count], () => {
+      watch(() => {
         if (count > 1) count = 1;
         watchLog.push(count);
-      });
+      }, [count]);
 
       return (
         <div>
@@ -450,7 +450,7 @@ describe('watch 훅', () => {
       let count = 0;
 
       return () => {
-        watch([count], () => { watchLog.push(count); });
+        watch(() => { watchLog.push(count); }, [count]);
 
         return (
           <button id="render-phase-watch" onClick={() => { count += 1; }}>
@@ -470,6 +470,27 @@ describe('watch 훅', () => {
     expect(container.querySelector('#render-phase-watch').textContent).toBe('1');
     expect(watchLog).toEqual([]);
   });
+
+  it('watch(deps, callback) 구버전 순서는 등록되지 않고 guard 에러를 기록한다', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
+    function LegacyOrderWatch() {
+      let count = 0;
+      watch([count], () => { watchLog.push(count); });
+      return <span>{count}</span>;
+    }
+
+    AEUI.init(LegacyOrderWatch, container);
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[AEUI] Render error:',
+      expect.objectContaining({
+        message: expect.stringMatching(/must be compiled by the AEUI Babel plugin/),
+      })
+    );
+    expect(watchLog).toEqual([]);
+    consoleSpy.mockRestore();
+  });
 });
 
 describe('props 구조분해 반응성', () => {
@@ -477,9 +498,9 @@ describe('props 구조분해 반응성', () => {
     const aliasWatchLog = [];
 
     function AliasChild({ title: label }) {
-      watch([label], () => {
+      watch(() => {
         aliasWatchLog.push(label);
-      });
+      }, [label]);
 
       return <span id="alias-label">{label}</span>;
     }

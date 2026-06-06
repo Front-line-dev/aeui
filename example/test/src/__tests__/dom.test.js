@@ -726,8 +726,9 @@ describe('에러 처리', () => {
 
     expect(runtime.state.currentComponentNode).toBeNull();
 
-    // setup 밖 watch 호출은 등록되지 않아야 함
-    watch([], () => { });
+    expect(() => {
+      watch(() => { }, []);
+    }).toThrow(/must be compiled by the AEUI Babel plugin/);
     expect(leakedNode.watchStates.length).toBe(0);
   });
 

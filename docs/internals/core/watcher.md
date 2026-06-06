@@ -2,13 +2,13 @@
 
 ## 개요
 
-watcher는 `watch()` 훅으로 등록된 의존성 감시 엔트리다. 실제 실행 엔진은 `component-watchers.js`와 `component-lifecycle.js`가 맡고, 등록 경로는 compiled helper와 fallback wrapper로 나뉜다.
+watcher는 `watch()` 훅으로 등록된 의존성 감시 엔트리다. 실제 실행 엔진은 `component-watchers.js`와 `component-lifecycle.js`가 맡고, 등록은 Babel 플러그인이 만든 compiled helper 경로로 들어온다.
 
 책임 분리는 다음과 같다.
 
 - `app-runtime.js` / `AEUI.__runtime.watch`: compiled path watcher 등록
-- `hooks.js`: fallback watcher 등록
-- `hook-registry.js`: 공통 watcher 등록 helper
+- `hooks.js`: public `watch()` compile guard
+- `hook-registry.js`: watcher 등록 helper
 - `component-watchers.js`: deps 비교와 callback 실행
 - `component-lifecycle.js`: render phase 안에서 watcher 실행 순서 보장
 - `compiler-runtime.js`: Babel plugin이 호출하는 얇은 bridge
@@ -72,9 +72,9 @@ watch callback이 같은 tick 안에서 local state를 바꿀 수 있기 때문�
 let count = 0;
 let label = '';
 
-watch([count], () => {
+watch(() => {
   label = `카운트: ${count}`;
-});
+}, [count]);
 
 return <p>{label}</p>;
 ```

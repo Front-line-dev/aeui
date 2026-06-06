@@ -17,7 +17,7 @@ packages/core/src/
 ├── component-lifecycle.js component setup / render / cleanup orchestration
 ├── component-watchers.js  watcher 실행 엔진
 ├── compiler-runtime.js    Babel plugin이 호출하는 작은 런타임 ABI
-├── hooks.js               watch, clean fallback 훅
+├── hooks.js               watch compile guard, clean fallback 훅
 ├── babel-plugin.js        Babel 변환 플러그인
 └── index.js               re-export
 ```
@@ -29,7 +29,7 @@ packages/core/src/
 - `component` node의 setup은 `createNode()` 시점이 아니라 `component-lifecycle.js`에서 지연 실행된다.
 - `core.js`는 default runtime instance 자체를 `AEUI`로 export한다.
 - `app-runtime.js`가 public `AEUI`와 internal `AEUI.__runtime`을 조립한다.
-- compiled `watch/clean`은 runtime helper(`AEUI.__runtime.watch`, `AEUI.__runtime.clean`)를 타고, `runtime-context.js`는 fallback 경로에서만 active runtime stack을 제공한다.
+- compiled `watch/clean`은 runtime helper(`AEUI.__runtime.watch`, `AEUI.__runtime.clean`)를 탄다. `runtime-context.js`는 public `clean()` fallback에서 active runtime stack을 제공하고, public `watch()`는 fallback 등록 없이 실패한다.
 - hook state는 component node에만 존재하고, `watch/clean`은 `setup` phase에서만 등록된다.
 - 실제 DOM 조작은 `dom-host.js`와 `reconciler.js`가 담당한다.
 

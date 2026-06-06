@@ -70,10 +70,10 @@ function Counter() {
 
 ```jsx
 // 사용자 코드
-watch([count], () => console.log(count));
+watch(() => console.log(count), [count]);
 
 // 변환 후
-watch(() => [count], () => console.log(count));
+AEUI.__runtime.watch(() => console.log(count), () => [count]);
 ```
 
 배열 `[count]`는 작성 시점에 한 번 평가되면 고정되지만, 함수 `() => [count]`는 호출될 때마다 **현재** `count` 값을 읽어 새 배열을 생성한다.

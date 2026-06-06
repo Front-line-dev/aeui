@@ -20,11 +20,11 @@ function Counter(_initialProps) {
   };
   let count = 0;
   AEUI.__runtime.watch(() => {
-    const _resolvedProps = _resolveProps();
-    return [count];
-  }, () => {
     const _resolvedProps2 = _resolveProps();
     console.log(`Counter ${_resolvedProps2.title} changed to:`, count);
+  }, () => {
+    const _resolvedProps = _resolveProps();
+    return [count];
   });
   return _newProps => AEUI.__runtime.runRenderPhase(_newProps, __props, _renderProps => {
     const _resolvedProps3 = _resolveProps();
@@ -55,11 +55,11 @@ function DestructuredCounter(_initialProps2) {
     };
   };
   AEUI.__runtime.watch(() => {
-    const _resolvedProps4 = _resolveProps2();
-    return [_resolvedProps4.count];
-  }, () => {
     const _resolvedProps5 = _resolveProps2();
     console.log("Destructured Watch:", _resolvedProps5.count);
+  }, () => {
+    const _resolvedProps4 = _resolveProps2();
+    return [_resolvedProps4.count];
   });
   return _newProps2 => AEUI.__runtime.runRenderPhase(_newProps2, __props, _renderProps2 => {
     const _resolvedProps6 = _resolveProps2();
@@ -75,9 +75,9 @@ function AliasedCounter(_initialProps3) {
     ..._initialProps3
   };
   const p = __props;
-  AEUI.__runtime.watch(() => [p.count], () => {
+  AEUI.__runtime.watch(() => {
     console.log("Aliased Watch:", p.count);
-  });
+  }, () => [p.count]);
   return _newProps3 => AEUI.__runtime.runRenderPhase(_newProps3, __props, _renderProps3 => {
     return AEUI.createElement("div", {
       style: "border: 1px solid #ddd; padding: 10px; margin: 10px 0;"
@@ -91,9 +91,9 @@ function DirectCounter(_initialProps4) {
     ..._initialProps4
   };
   const props = __props;
-  AEUI.__runtime.watch(() => [props.count], () => {
+  AEUI.__runtime.watch(() => {
     console.log("Direct Watch:", props.count);
-  });
+  }, () => [props.count]);
   return _newProps4 => AEUI.__runtime.runRenderPhase(_newProps4, __props, _renderProps4 => {
     return AEUI.createElement("div", {
       style: "border: 1px solid #ddd; padding: 10px; margin: 10px 0;"

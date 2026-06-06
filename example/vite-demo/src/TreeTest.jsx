@@ -4,9 +4,9 @@ function Child({ name }) {
   console.log(`[TreeTest] Rendering Child ${name}`);
   let count = 0;
 
-  watch([count], () => {
+  watch(() => {
     console.log(`[TreeTest] Child ${name} state changed:`, count);
-  });
+  }, [count]);
 
   return (
     <div style="border: 1px solid green; padding: 5px; margin: 5px;">

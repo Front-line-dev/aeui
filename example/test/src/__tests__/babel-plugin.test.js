@@ -88,7 +88,7 @@ describe('AEUI Babel Plugin', () => {
       import { AEUI, watch, clean } from 'aeui';
       function App() {
         let count = 0;
-        watch([count], () => {});
+        watch(() => {}, [count]);
         clean(() => {});
         return <div>{count}</div>;
       }
@@ -96,6 +96,55 @@ describe('AEUI Babel Plugin', () => {
 
     expect(code).toMatch(/AEUI\.__runtime\.watch\(/);
     expect(code).toMatch(/AEUI\.__runtime\.clean\(/);
-    expect(code).not.toMatch(/watch\(\[/);
+    expect(code).not.toMatch(/\n\s*watch\(/);
+  });
+
+  it('named callback watch(callback, deps)는 runtime helper로 변환된다', () => {
+    const code = transform(`
+      import { AEUI, watch } from 'aeui';
+      function App() {
+        let count = 0;
+        const syncCount = () => count;
+        watch(syncCount, [count]);
+        return <div>{count}</div>;
+      }
+    `);
+
+    expect(code).toMatch(/AEUI\.__runtime\.watch\(syncCount, \(\) => \[count\]\)/);
+  });
+
+  it('배열을 반환하는 callback도 callback-first watch로 변환한다', () => {
+    const code = transform(`
+      import { AEUI, watch } from 'aeui';
+      function App() {
+        let count = 0;
+        watch(() => [count], [count]);
+        return <div>{count}</div>;
+      }
+    `);
+
+    expect(code).toMatch(/AEUI\.__runtime\.watch\(\(\) => \[count\], \(\) => \[count\]\)/);
+  });
+
+  it('deps 생략과 options 인자는 watch helper로 변환하지 않는다', () => {
+    const withoutDeps = transform(`
+      import { AEUI, watch } from 'aeui';
+      function App() {
+        watch(() => {});
+        return <div />;
+      }
+    `);
+
+    const withOptions = transform(`
+      import { AEUI, watch } from 'aeui';
+      function App() {
+        let count = 0;
+        watch(() => {}, [count], { immediate: true });
+        return <div>{count}</div>;
+      }
+    `);
+
+    expect(withoutDeps).not.toMatch(/AEUI\.__runtime\.watch\(/);
+    expect(withOptions).not.toMatch(/AEUI\.__runtime\.watch\(/);
   });
 });

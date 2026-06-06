@@ -124,9 +124,9 @@ watch callback이 **상태를 변경**할 수 있다. 변경된 상태가 이번
 let count = 0;
 let label = "";
 
-watch([count], () => {
+watch(() => {
   label = count > 10 ? "많음" : "적음";  // ← 상태 변경
-});
+}, [count]);
 
 return <p>{label}</p>;  // ← label이 최신이어야 정확한 렌더
 ```
@@ -147,10 +147,10 @@ React도 동일한 패턴을 사용한다 (`ReactCurrentDispatcher`). 훅 함수
 
 ```javascript
 // ❌ 현재 node를 명시적으로 전달하면
-watch(node, [count], () => { ... });  // 사용자가 불편
+watch(node, () => { ... }, [count]);  // 사용자가 불편
 
 // ✅ 전역 변수로 암묵적 전달
-watch([count], () => { ... });            // 깔끔한 API
+watch(() => { ... }, [count]);            // 깔끔한 API
 ```
 
 현재 AEUI의 모든 코드는 여전히 동기 중심으로 실행되지만, nested component setup/render 복구를 위해 컨텍스트는 stack으로 관리한다.

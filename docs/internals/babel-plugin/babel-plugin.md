@@ -12,7 +12,7 @@ AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은
 |------|------|------|------|
 | **Return 래핑** | `return <div />` | `return () => <div />` | setup 1회 실행 + render 반복 실행 구조 생성 |
 | **Props 반응화** | `function Comp(props)` | `function Comp(_initialProps)` + `__props` 객체 | props 변경 시 클로저 참조를 최신 상태로 유지 |
-| **Watch deps 래핑** | `watch([count], cb)` | `watch(() => [count], cb)` | 매 호출 시 현재 값을 읽도록 함수화 |
+| **Watch deps 래핑** | `watch(cb, [count])` | `AEUI.__runtime.watch(cb, () => [count])` | 매 호출 시 현재 값을 읽도록 함수화 |
 
 플러그인은 render wrapper에서 **`AEUI.__runtime.runRenderPhase()`를 호출**한다. props 동기화, watcher 실행, render context 설정은 이 runtime helper가 담당한다.
 
@@ -22,7 +22,7 @@ AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은
 // 사용자 코드
 function Counter({ name }) {
   let count = 0;
-  watch([name, count], () => console.log(name, count));
+  watch(() => console.log(name, count), [name, count]);
   return <div>{name}: {count}</div>;
 }
 
@@ -36,14 +36,14 @@ function Counter(_initialProps) {
   };
 
   let count = 0;
-  watch(
-    () => {
-      const _resolvedProps = _resolveProps();
-      return [_resolvedProps.name, count];
-    },
+  AEUI.__runtime.watch(
     () => {
       const _resolvedProps2 = _resolveProps();
       return console.log(_resolvedProps2.name, count);
+    },
+    () => {
+      const _resolvedProps = _resolveProps();
+      return [_resolvedProps.name, count];
     }
   );
 
@@ -233,17 +233,17 @@ function UserCard(_initialProps) {
 
 이 방식 덕분에 alias/default/nested/rest 패턴도 원래 JS semantics에 가깝게 유지할 수 있다.
 
-### 3-2. Watch deps 래핑 및 시그니처 정규화
+### 3-2. Watch deps 래핑
 
 ```javascript
 // 입력
-watch([count], () => console.log(count));
+watch(() => console.log(count), [count]);
 
 // 출력
-watch(() => [count], () => console.log(count));
+AEUI.__runtime.watch(() => console.log(count), () => [count]);
 ```
 
-플러그인은 `watch(deps, callback)` 형태를 기준으로 다룬다. 구버전 순서인 `watch(callback, deps)`를 만나도 내부적으로 정규화한 뒤 deps 표현식을 함수로 감싼다. 이렇게 해야 매 실행 시점에 현재 deps를 다시 읽을 수 있다.
+플러그인은 `watch(callback, deps)` 형태만 다룬다. deps 배열 표현식을 함수로 감싸야 매 실행 시점에 현재 deps를 다시 읽을 수 있다.
 
 ### 3-3. 구조 분해된 props의 재해석
 
@@ -251,7 +251,7 @@ watch(() => [count], () => console.log(count));
 
 ```javascript
 function UserCard({ title: label, count = 0 }) {
-  watch([label, count], () => console.log(label, count));
+  watch(() => console.log(label, count), [label, count]);
   return <p>{label}: {count}</p>;
 }
 ```
@@ -318,9 +318,9 @@ render parameter 처리는 내부적으로 별도 render param을 만들고, 원
 export function TodoItem({ text, done }) {
   let editing = false;
 
-  watch([done], () => {
+  watch(() => {
     if (done) editing = false;
-  });
+  }, [done]);
 
   clean(() => console.log("TodoItem 제거됨"));
 
@@ -345,14 +345,14 @@ export function TodoItem(_initialProps) {
 
   let editing = false;
 
-  watch(
-    () => {
-      const _resolvedProps = _resolveProps();
-      return [_resolvedProps.done];
-    },
+  AEUI.__runtime.watch(
     () => {
       const _resolvedProps2 = _resolveProps();
       if (_resolvedProps2.done) editing = false;
+    },
+    () => {
+      const _resolvedProps = _resolveProps();
+      return [_resolvedProps.done];
     }
   );
 
@@ -379,7 +379,7 @@ export function TodoItem(_initialProps) {
 
 - `{ text, done }` → `_initialProps` + `__props` 생성
 - `_resolveProps()`가 현재 `__props`를 원래 구조 분해 패턴으로 다시 해석
-- `watch([done], cb)` → `watch(() => [done], cb)` 형태로 정규화
+- `watch(cb, [done])` → `AEUI.__runtime.watch(cb, () => [done])` 형태로 변환
 - `return (JSX)` → render factory + `AEUI.__runtime.runRenderPhase(...)`
 - render/watch 내부의 구조 분해 props 참조는 `_resolveProps()` 결과를 통해 최신값 사용
 - `editing`은 props가 아닌 로컬 상태이므로 변환하지 않음

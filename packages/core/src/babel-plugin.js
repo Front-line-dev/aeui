@@ -264,17 +264,6 @@ export default function aeuiTransform({ types: t }) {
     let destructuredNames = new Set();
     let resolvePropsId = null;
 
-    const looksLikeDepsGetter = (node) => {
-      if (!isFunctionLike(node)) return false;
-      if (t.isArrayExpression(node.body)) return true;
-      if (!t.isBlockStatement(node.body)) return false;
-
-      const bodyStatements = node.body.body.filter((statement) => !t.isDirective(statement));
-      if (bodyStatements.length !== 1) return false;
-
-      return t.isReturnStatement(bodyStatements[0]) && t.isArrayExpression(bodyStatements[0].argument);
-    };
-
     const rewriteResolvedPropsReferences = (targetPath, resolvedPropsId) => {
       if (!resolvedPropsId) return;
 
@@ -430,61 +419,33 @@ export default function aeuiTransform({ types: t }) {
         if (!isAeuiHookCall(callPath, 'watch')) return;
 
         const args = callPath.node.arguments;
-        if (args.length < 2) return;
+        if (args.length !== 2) return;
 
-        const [firstArg, secondArg] = args;
-        let depsArg = null;
-        let callbackArg = null;
-
-        const firstLooksLikeDeps = t.isArrayExpression(firstArg) || looksLikeDepsGetter(firstArg);
-        const secondLooksLikeDeps = t.isArrayExpression(secondArg) || looksLikeDepsGetter(secondArg);
-
-        if (firstLooksLikeDeps && !secondLooksLikeDeps) {
-          depsArg = firstArg;
-          callbackArg = secondArg;
-        } else if (!firstLooksLikeDeps && secondLooksLikeDeps) {
-          callbackArg = firstArg;
-          depsArg = secondArg;
-        } else if (isFunctionLike(firstArg) && !isFunctionLike(secondArg)) {
-          callbackArg = firstArg;
-          depsArg = secondArg;
-        } else if (!isFunctionLike(firstArg) && isFunctionLike(secondArg)) {
-          depsArg = firstArg;
-          callbackArg = secondArg;
-        } else if (isFunctionLike(firstArg) && isFunctionLike(secondArg)) {
-          if (firstLooksLikeDeps && !secondLooksLikeDeps) {
-            depsArg = firstArg;
-            callbackArg = secondArg;
-          } else if (!firstLooksLikeDeps && secondLooksLikeDeps) {
-            callbackArg = firstArg;
-            depsArg = secondArg;
-          } else {
-            depsArg = firstArg;
-            callbackArg = secondArg;
-          }
-        } else {
+        const [callbackArg, secondArg] = args;
+        if (t.isArrayExpression(callbackArg)) {
           return;
         }
 
+        let depsArg = secondArg;
         if (!isFunctionLike(depsArg)) {
           depsArg = t.arrowFunctionExpression([], t.cloneNode(depsArg, true));
         }
 
-        callPath.node.arguments = [depsArg, callbackArg];
+        callPath.node.arguments = [callbackArg, depsArg];
         callPath.node.callee = createAeuiRuntimeMember('watch');
 
         if (destructuredNames.size > 0 && propsId) {
-          const depsPath = callPath.get('arguments.0');
-          const callbackPath = callPath.get('arguments.1');
-
-          const preparedDeps = prepareResolvedProps(depsPath);
-          if (preparedDeps) {
-            ensureBlockBody(depsPath).unshiftContainer('body', preparedDeps.declaration);
-          }
+          const callbackPath = callPath.get('arguments.0');
+          const depsPath = callPath.get('arguments.1');
 
           const preparedCallback = prepareResolvedProps(callbackPath);
           if (preparedCallback) {
             ensureBlockBody(callbackPath).unshiftContainer('body', preparedCallback.declaration);
+          }
+
+          const preparedDeps = prepareResolvedProps(depsPath);
+          if (preparedDeps) {
+            ensureBlockBody(depsPath).unshiftContainer('body', preparedDeps.declaration);
           }
         }
       },

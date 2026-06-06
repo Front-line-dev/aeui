@@ -34,13 +34,13 @@ export default function ComplexExample() {
   });
 
   // 3. Reactivity (Watch)
-  watch([count], () => {
+  watch(() => {
     console.log(`[ComplexExample] Count updated: ${count}`);
-  });
+  }, [count]);
 
-  watch([items], () => {
+  watch(() => {
     console.log(`[ComplexExample] List updated, length: ${items.length}`);
-  });
+  }, [items]);
 
   // 4. Methods
   const handleAdd = () => {

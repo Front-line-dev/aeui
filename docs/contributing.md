@@ -30,7 +30,7 @@ aeui/
 │   │   │   ├── deep-compare.js  깊은 비교/복사 유틸리티
 │   │   │   ├── reconciler.js    DOM 조작, reconcile, unmount
 │   │   │   ├── runtime.js       hooks 브릿지, watcher, 인스턴스, 스케줄러
-│   │   │   ├── hooks.js         watch, clean 훅
+│   │   │   ├── hooks.js         watch guard, clean 훅
 │   │   │   ├── babel-plugin.js  Babel 변환 플러그인
 │   │   │   └── index.js         진입점
 │   │   ├── dist/                빌드 결과물

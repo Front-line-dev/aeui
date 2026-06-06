@@ -71,7 +71,7 @@ export function getRuntimeContext() {
 }
 ```
 
-이 함수는 `hooks.js`의 fallback `watch()`/`clean()`에서 사용된다. Babel 플러그인이 변환하지 않은 코드에서 훅이 호출되면, `getRuntimeContext()`로 현재 runtime state를 가져와 등록을 진행한다.
+이 함수는 `hooks.js`의 public `clean()` fallback에서 사용된다. public `watch()`는 fallback 등록을 하지 않고, Babel 플러그인이 변환하지 않은 호출이면 compile guard 에러를 던진다.
 
 ---
 

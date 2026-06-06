@@ -15,10 +15,10 @@ const WatchDedupeTest = () => {
   let triggers = 0;
   let status = "Waiting...";
 
-  watch([state], () => {
+  watch(() => {
     triggers++;
     console.log(`[WatchDedupe] Triggered! Total: ${triggers}`);
-  });
+  }, [state]);
 
   // Periodic update with SAME content (new ref)
   // This interval runs outside component render scope, so AEUI will observe it through
@@ -40,14 +40,10 @@ const WatchDedupeTest = () => {
       state = { count: 1 }; // New Ref, Same Content
     }
     if (tick === 4) {
-      if (triggers === 0) { // Should trigger 0 times (initial watch might trigger if immediate? usually watch triggers on change)
-         // Wait, watch usually triggers if deps change. 
-         // Initial setup: oldDeps starts undefined. default implementation typically doesn't fire immediately unless specified?
-         // In core.js: !watcher.oldDeps -> triggers is TRUE initially?
-         // Let's check core.js lines 123: !watcher.oldDeps || ...
-         // Yes, it triggers initially.
-         // So triggers should be 1 (initial).
-         // After update: triggers should STILL be 1.
+      if (triggers === 0) { // Should trigger 0 times because initial deps are snapshotted.
+         // Watch triggers only after deps change.
+         // Initial setup stores oldDeps without firing the callback.
+         // After updating with equivalent content, triggers should still be 0.
          status = "PASS: Watch did not re-trigger";
       } else if (triggers > 1) {
          status = "FAIL: Watch re-triggered!";
@@ -71,10 +67,10 @@ const InPlaceSetTest = () => {
   let triggers = 0;
   let status = "Waiting...";
 
-  watch([mySet], () => {
+  watch(() => {
     triggers++;
     console.log(`[InPlaceSet] Triggered! Total: ${triggers}`);
-  });
+  }, [mySet]);
 
   let tick = 0;
   setInterval(() => {
@@ -107,10 +103,10 @@ const InPlaceObjectTest = () => {
   let triggers = 0;
   let status = "Waiting...";
 
-  watch([myObj], () => {
+  watch(() => {
     triggers++;
     console.log(`[InPlaceObj] Triggered! Total: ${triggers}`);
-  });
+  }, [myObj]);
 
   let tick = 0;
   setInterval(() => {

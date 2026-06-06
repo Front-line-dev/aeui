@@ -305,7 +305,7 @@ VNode도 복제하지 않고 참조 그대로 반환한다. VNode marker는 `cre
 | 사용처 | 용도 | 설명 |
 |--------|------|------|
 | `runComponentWatchers` | oldDeps 스냅샷 저장 | callback 실행 후, 현재 deps 값의 독립적 복사본을 oldDeps에 저장 |
-| `watch` 훅 (hooks.js) | 초기 deps 스냅샷 | watcher 등록 시 초기 의존성 값의 복사본을 oldDeps에 저장 |
+| `watch` 등록 (`hook-registry.js`) | 초기 deps 스냅샷 | watcher 등록 시 초기 의존성 값의 복사본을 oldDeps에 저장 |
 
 ---
 

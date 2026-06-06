@@ -12,10 +12,11 @@
 
 ### watch API 개선 (DX 향상)
 
-- 공식 시그니처를 `watch(callback, deps?, options?)`로 정리.
-- 기존 `watch([deps], callback)`은 하위 호환으로 유지하되 문서에서는 구버전 호환 API로 낮춘다.
-- `watch`의 `deps`는 최적화를 위한 부분이고, 기본적으로는 `deps`를 아예 설정하지 않더라도 작동하도록 지원하여 개발자 경험(DX) 개선.
-- `immediate`, `flush` 같은 옵션 도입 여부 검토.
+- 공식 시그니처를 `watch(callback, deps)`로 고정.
+- `deps`는 필수이며 배열 또는 deps getter 함수만 허용.
+- 기존 `watch([deps], callback)` 하위 호환, deps 생략, `immediate`/`flush` 같은 options는 지원하지 않음.
+- Babel 플러그인은 `watch(callback, [deps])`를 `AEUI.__runtime.watch(callback, () => [deps])`로 변환.
+- Babel을 거치지 않은 public `watch()` 호출은 runtime fallback 등록 없이 명시적으로 실패.
 
 ### 입력 바인딩 문법 추가 (DX 향상)
 
@@ -63,6 +64,25 @@ JSX 사용을 위해 모든 파일에서 `AEUI`를 import하거나 Vite Babel �
 - Babel 플러그인의 자동 import 주입 검토.
 - `aeui/vite` 플러그인 제공으로 Babel 플러그인 순서와 JSX pragma 설정을 자동화.
 - `create-aeui-app` 템플릿에 간소화된 설정 반영.
+
+### Router 기능
+
+AEUI 애플리케이션에서 기본적인 페이지 전환과 URL 상태 관리를 지원하는 router 기능을 검토한다.
+
+- `path`, `params`, `query` 기반 라우팅 API 설계.
+- 브라우저 History API 기반 client-side navigation 지원.
+- 중첩 라우트, fallback route, redirect 같은 기본 라우팅 패턴 검토.
+- 컴포넌트의 1회 실행 모델과 render function 재실행 모델에 맞는 route state 전달 방식 설계.
+- `create-aeui-app` 템플릿에서 router 포함 여부를 선택할 수 있는 옵션 검토.
+
+### GitHub Pages 배포 기능
+
+정적 빌드 결과물을 GitHub Pages에 쉽게 배포할 수 있는 공식 경로를 제공한다.
+
+- GitHub Pages용 base path 설정 가이드와 템플릿 제공.
+- `npm run deploy` 또는 CLI 명령으로 정적 빌드와 배포를 자동화하는 방식 검토.
+- GitHub Actions workflow 예시 제공.
+- SPA fallback, asset path, repository project page 배포 케이스 문서화.
 
 ### Fragment 삭제
 

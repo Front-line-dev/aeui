@@ -11,9 +11,9 @@
 ```javascript
 let count = 0;
 
-watch([count], () => {
+watch(() => {
   console.log('count 변경됨:', count);
-});
+}, [count]);
 ```
 
 ---
@@ -21,16 +21,15 @@ watch([count], () => {
 ## 함수 시그니처
 
 ```javascript
-watch(deps, callback)
-watch(callback, deps) // 구버전 호환
+watch(callback, deps)
 ```
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
-| `deps` | `Array` 또는 `() => Array` | 감시할 값 또는 값을 반환하는 함수 |
 | `callback` | `Function` | 변경 시 실행할 함수 |
+| `deps` | `Array` 또는 `() => Array` | 감시할 값 배열 또는 배열을 반환하는 함수 |
 
-Babel 플러그인은 일반적으로 `watch([count], cb)`를 deps getter 형태로 바꾸고, 호출 지점도 `AEUI.__runtime.watch(...)` helper로 옮긴다.
+Babel 플러그인은 `watch(callback, [count])`의 deps 배열을 getter 형태로 바꾸고, 호출 지점도 `AEUI.__runtime.watch(...)` helper로 옮긴다.
 
 ---
 
@@ -38,13 +37,12 @@ Babel 플러그인은 일반적으로 `watch([count], cb)`를 deps getter 형태
 
 `watch()`는 **setup phase에서만 등록**된다.
 
-compiled main path에서는 `AEUI.__runtime.watch(...)`가 현재 runtime state를 직접 사용한다. `hooks.js`의 `watch()`는 Babel 변환을 거치지 않은 호출을 위한 fallback wrapper다.
+compiled main path에서는 `AEUI.__runtime.watch(...)`가 현재 runtime state를 직접 사용한다. `hooks.js`의 public `watch()` export는 import 호환을 위해 남아 있지만, Babel 변환 없이 직접 실행되면 명시적으로 실패한다.
 
 즉 다음 경우만 유효하다.
 
 - 컴포넌트 setup 본문 최상위에서 호출
 - compiled path에서는 현재 runtime state가 setup phase
-- fallback path에서는 `runtime-context.js`의 active runtime stack 최상단이 setup phase
 
 다음 경우는 무시된다.
 
@@ -60,7 +58,7 @@ compiled main path에서는 `AEUI.__runtime.watch(...)`가 현재 runtime state�
 
 ### 1. 등록
 
-`hook-registry.js`가 인자를 정규화하고 watcher 객체를 등록한다. compiled code는 `AEUI.__runtime.watch()`를 통해 여기로 들어오고, fallback `hooks.js`도 같은 helper를 재사용한다.
+`hook-registry.js`가 callback-first 인자를 검증하고 watcher 객체를 등록한다. compiled code는 `AEUI.__runtime.watch()`를 통해 여기로 들어온다.
 
 ```javascript
 {
@@ -114,7 +112,7 @@ function BadCase() {
   let count = 0;
 
   return () => {
-    watch([count], () => console.log(count)); // 무시됨
+    watch(() => console.log(count), [count]); // 무시됨
     return <button>{count}</button>;
   };
 }
@@ -124,7 +122,7 @@ function BadCase() {
 
 ### deps getter는 현재 값을 읽을 수 있어야 한다
 
-배열 자체를 한번 계산해서 넘기면 값이 고정될 수 있으므로, Babel 플러그인이 deps를 함수로 감싸 준다. 테스트나 수동 호출에서는 런타임이 배열/함수 양쪽을 받아서 처리한다.
+배열 자체를 한번 계산해서 넘기면 값이 고정될 수 있으므로, Babel 플러그인이 deps를 함수로 감싸 준다. 내부 runtime helper는 배열과 deps getter를 모두 받지만, getter가 반환하는 값은 배열이어야 한다.
 
 ### 에러는 격리된다
 
