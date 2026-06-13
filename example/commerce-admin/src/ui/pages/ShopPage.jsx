@@ -72,11 +72,6 @@ export default function ShopPage() {
     sort = e.target.value;
   };
 
-  const onView = (productId) => {
-    if (!productId) return;
-    actions.goProduct(productId);
-  };
-
   const onAdd = (productId) => {
     if (!productId) return;
     actions.addToCart(productId, 1);
@@ -115,7 +110,7 @@ export default function ShopPage() {
           onSortChange={onSortChange}
         />
 
-        <ProductGrid items={visibleProducts()} onView={onView} onAdd={onAdd} />
+        <ProductGrid items={visibleProducts()} onAdd={onAdd} />
       </div>
     </div>
   );

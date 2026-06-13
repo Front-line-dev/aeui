@@ -21,39 +21,30 @@ npm run dev
 npm install aeui
 ```
 
-`vite.config.js`에서 AEUI Babel 플러그인을 설정:
+`vite.config.js`에서 AEUI Vite 플러그인을 설정:
 
 ```javascript
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-const aeuiBabelPlugins = [
-  ['aeui/babel-plugin'],
-  ['@babel/plugin-transform-react-jsx', {
-    pragma: 'AEUI.createElement',
-    pragmaFrag: 'AEUI.Fragment'
-  }]
-];
+import aeui from 'aeui/vite';
 
 export default defineConfig({
-  plugins: [
-    react({
-      include: /\.[jt]sx$/,
-      jsxRuntime: 'classic',
-      babel: {
-        babelrc: false,
-        configFile: false,
-        plugins: aeuiBabelPlugins
-      }
-    })
-  ]
+  plugins: [aeui()]
 });
 ```
 
 ### 앱 진입점
 
+`aeui/vite` 플러그인은 앱 진입점을 자동으로 주입한다. `index.html`에는 `#root`만 두면 된다.
+
+```html
+<div id="root"></div>
+```
+
+기본 앱은 `src/App.jsx`를 루트 컴포넌트로 부팅한다.
+
+기존 방식처럼 직접 초기화해야 하는 특수한 앱에서는 아래처럼 `AEUI.init`을 사용할 수 있다.
+
 ```javascript
-// main.js
 import { AEUI } from 'aeui';
 import App from './App.jsx';
 

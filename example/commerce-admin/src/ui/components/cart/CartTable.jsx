@@ -1,15 +1,15 @@
 import { AEUI } from "aeui";
 import { formatKRW } from "../../../lib/money.js";
 
-function CartEmptyState({ onGoShop }) {
+function CartEmptyState() {
   return (
     <div className="card">
       <div style="font-weight: 900; letter-spacing: -0.02em;">장바구니가 비어있습니다.</div>
       <div className="help">스토어에서 상품을 담아보세요.</div>
       <div style="margin-top: 10px;">
-        <button className="btn btn--primary" type="button" onClick={onGoShop}>
+        <a className="btn btn--primary" href="/">
           스토어로 이동
-        </button>
+        </a>
       </div>
     </div>
   );
@@ -57,7 +57,7 @@ function CartLineRow({
   );
 }
 
-export default function CartTable({ rows, onGoShop, onInc, onDec, onRemove }) {
+export default function CartTable({ rows, onInc, onDec, onRemove }) {
   return (
     <>
       {Array.isArray(rows) && rows.length > 0 ? (
@@ -91,7 +91,7 @@ export default function CartTable({ rows, onGoShop, onInc, onDec, onRemove }) {
           </tbody>
         </table>
       ) : (
-        <CartEmptyState onGoShop={onGoShop} />
+        <CartEmptyState />
       )}
     </>
   );

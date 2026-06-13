@@ -227,11 +227,16 @@ button, input, select, textarea { font: inherit; }
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--faint);
   background: white;
+  color: inherit;
   padding: 8px 10px;
   border-radius: 999px;
   cursor: pointer;
+  text-decoration: none;
   box-shadow: 0 4px 12px rgba(30, 26, 20, 0.08);
   transition: transform 120ms ease, background 120ms ease, border-color 120ms ease, opacity 120ms ease;
 }
@@ -392,4 +397,3 @@ button, input, select, textarea { font: inherit; }
   from { transform: translateY(6px) scale(0.99); opacity: 0; }
   to { transform: translateY(0px) scale(1); opacity: 1; }
 }
-

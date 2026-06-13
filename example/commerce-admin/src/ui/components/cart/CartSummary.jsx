@@ -1,7 +1,7 @@
 import { AEUI } from "aeui";
 import { formatKRW } from "../../../lib/money.js";
 
-export default function CartSummary({ totals, couponDraft, onCouponInput, onApplyCoupon, onGoCheckout, canCheckout }) {
+export default function CartSummary({ totals, couponDraft, onCouponInput, onApplyCoupon, canCheckout }) {
   return (
     <div className="card" style="align-self: start;">
       <div className="card__kicker">요약</div>
@@ -38,11 +38,16 @@ export default function CartSummary({ totals, couponDraft, onCouponInput, onAppl
           <div className="help">쿠폰 `AEUI10`은 소계의 10% 할인입니다. (데모)</div>
         </div>
 
-        <button className="btn btn--primary" type="button" onClick={onGoCheckout} disabled={!canCheckout}>
-          체크아웃
-        </button>
+        {canCheckout ? (
+          <a className="btn btn--primary" href="/checkout">
+            체크아웃
+          </a>
+        ) : (
+          <button className="btn btn--primary" type="button" disabled>
+            체크아웃
+          </button>
+        )}
       </div>
     </div>
   );
 }
-

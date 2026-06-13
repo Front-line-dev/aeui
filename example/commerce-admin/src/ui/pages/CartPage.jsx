@@ -36,9 +36,6 @@ export default function CartPage() {
     actions.removeFromCart(productId);
   };
 
-  const onGoShop = () => actions.goShop();
-  const onGoCheckout = () => actions.goCheckout();
-
   const items = () => asArray(state.cart.items);
   const totals = () => calcCartTotals({ cart: state.cart, products: asArray(state.products) });
   const rows = () => {
@@ -76,16 +73,15 @@ export default function CartPage() {
             아이템 {select.cartCount()}개 · 쿠폰 {totals().coupon || "없음"}
           </div>
         </div>
-        <button className="btn" type="button" onClick={onGoShop}>
+        <a className="btn" href="/">
           계속 쇼핑하기
-        </button>
+        </a>
       </div>
       <div className="panel__body">
         <div className="split">
           <div>
             <CartTable
               rows={rows()}
-              onGoShop={onGoShop}
               onInc={onInc}
               onDec={onDec}
               onRemove={onRemove}
@@ -97,7 +93,6 @@ export default function CartPage() {
               couponDraft={couponDraft}
               onCouponInput={onCouponInput}
               onApplyCoupon={onApplyCoupon}
-              onGoCheckout={onGoCheckout}
               canCheckout={items().length > 0}
             />
           </div>

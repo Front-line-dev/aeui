@@ -33,8 +33,6 @@ export default function CheckoutPage() {
   const totals = () => calcCartTotals({ cart: state.cart, products: state.products });
   const coupon = () => normalizeCoupon(state.cart?.couponCode || "");
 
-  const goBack = () => actions.goCart();
-
   const onNameInput = (e) => (name = e.target.value);
   const onEmailInput = (e) => (email = e.target.value);
   const onAddress1Input = (e) => (address1 = e.target.value);
@@ -113,15 +111,20 @@ export default function CheckoutPage() {
             <div className="panel__sub">장바구니가 비어있습니다.</div>
           )}
         </div>
-        <button className="btn" type="button" onClick={goBack} disabled={processing}>
+        <a className="btn" href="/cart" style={processing ? "pointer-events:none; opacity:0.6;" : ""}>
           장바구니로
-        </button>
+        </a>
       </div>
       <div className="panel__body">
         {!hasItems() ? (
           <div className="card">
             <div style="font-weight: 900; letter-spacing: -0.02em;">장바구니가 비어있습니다.</div>
             <div className="help">스토어에서 상품을 담아주세요.</div>
+            <div style="margin-top: 10px;">
+              <a className="btn btn--primary" href="/orders">
+                주문 내역 보기
+              </a>
+            </div>
           </div>
         ) : (
           <div className="split">

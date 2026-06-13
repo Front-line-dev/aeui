@@ -17,8 +17,6 @@ export const state = {
   orders: initial.orders,
   activity: initial.activity,
 
-  route: "shop",
-  selectedProductId: null,
   selectedOrderId: initial.orders[0]?.id || null,
 
   modal: null, // { type: "productEditor" | "confirm", ... }
@@ -30,9 +28,6 @@ export const state = {
 };
 
 export const select = {
-  isAdmin() {
-    return String(state.route).startsWith("admin.");
-  },
   cartCount() {
     return asArray(state.cart?.items).reduce((acc, it) => acc + (it?.qty || 0), 0);
   },
@@ -42,51 +37,9 @@ export const select = {
   order(orderId) {
     return findOrder(state, orderId);
   },
-  currentProduct() {
-    if (state.route !== "product" || !state.selectedProductId) return null;
-    const p = findProduct(state, state.selectedProductId);
-    if (!p || !p.active) return null;
-    return p;
-  },
 };
 
 export const actions = {
-  // navigation
-  goShop() {
-    state.modal = null;
-    state.route = "shop";
-    state.selectedProductId = null;
-  },
-  goProduct(productId) {
-    state.modal = null;
-    state.selectedProductId = productId;
-    state.route = "product";
-  },
-  goCart() {
-    state.modal = null;
-    state.route = "cart";
-  },
-  goCheckout() {
-    state.modal = null;
-    state.route = "checkout";
-  },
-  goOrders() {
-    state.modal = null;
-    state.route = "orders";
-  },
-  goAdminDashboard() {
-    state.modal = null;
-    state.route = "admin.dashboard";
-  },
-  goAdminProducts() {
-    state.modal = null;
-    state.route = "admin.products";
-  },
-  goAdminOrders() {
-    state.modal = null;
-    state.route = "admin.orders";
-  },
-
   // cart
   addToCart(productId, qty) {
     cartModel.addToCart(state, productId, qty);
@@ -170,8 +123,6 @@ export const actions = {
     state.orders = s.orders;
     state.activity = s.activity;
 
-    state.route = "shop";
-    state.selectedProductId = null;
     state.selectedOrderId = state.orders[0]?.id || null;
     state.modal = null;
     state.toasts = [];

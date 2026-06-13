@@ -1,7 +1,7 @@
 import { AEUI } from "aeui";
 import { formatKRW } from "../../../lib/money.js";
 
-function ProductCard({ product, onView, onAdd }) {
+function ProductCard({ product, onAdd }) {
   return (
     <div className="card card--product">
       <div className="card__kicker">
@@ -20,9 +20,9 @@ function ProductCard({ product, onView, onAdd }) {
         {product.description}
       </div>
       <div className="card__actions">
-        <button className="btn btn--tab" type="button" onClick={() => onView(product.id)}>
+        <a className="btn btn--tab" href={`/products/${product.id}`}>
           상세
-        </button>
+        </a>
         <button
           className="btn btn--primary"
           type="button"
@@ -43,7 +43,7 @@ function ProductCard({ product, onView, onAdd }) {
   );
 }
 
-export default function ProductGrid({ items, onView, onAdd }) {
+export default function ProductGrid({ items, onAdd }) {
   return (
     <div className="grid grid--cards" style="margin-top: 14px;">
       {!Array.isArray(items) || items.length === 0 ? (
@@ -52,7 +52,7 @@ export default function ProductGrid({ items, onView, onAdd }) {
           <div className="help">필터를 조정하거나, 어드민에서 상품을 활성화해보세요.</div>
         </div>
       ) : (
-        items.map((p) => <ProductCard product={p} onView={onView} onAdd={onAdd} />)
+        items.map((p) => <ProductCard product={p} onAdd={onAdd} />)
       )}
     </div>
   );

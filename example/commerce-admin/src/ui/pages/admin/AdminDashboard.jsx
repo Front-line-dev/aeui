@@ -14,10 +14,7 @@ function sumRevenue(orders) {
 
 export default function AdminDashboard() {
   const onNewProduct = () => actions.openProductCreate();
-  const onGoProducts = () => actions.goAdminProducts();
-  const onGoOrders = () => actions.goAdminOrders();
   const onExport = () => actions.exportData();
-  const onGoShop = () => actions.goShop();
 
   return () => {
     const ps = asArray(state.products);
@@ -49,9 +46,9 @@ export default function AdminDashboard() {
             <div className="panel__sub">요약 통계 + 최근 activity</div>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-            <button className="btn" type="button" onClick={onGoShop}>
+            <a className="btn" href="/">
               스토어 보기
-            </button>
+            </a>
             <button className="btn" type="button" onClick={onExport}>
               데이터 내보내기
             </button>
@@ -92,12 +89,12 @@ export default function AdminDashboard() {
                   <div className="card__kicker">빠른 이동</div>
                   <div style="font-weight: 900; letter-spacing: -0.01em; margin-bottom: 8px;">Admin</div>
                   <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button className="btn btn--primary" type="button" onClick={onGoProducts}>
+                    <a className="btn btn--primary" href="/admin/products">
                       상품 관리
-                    </button>
-                    <button className="btn btn--primary" type="button" onClick={onGoOrders}>
+                    </a>
+                    <a className="btn btn--primary" href="/admin/orders">
                       주문 관리
-                    </button>
+                    </a>
                   </div>
                   <div className="help" style="margin-top: 10px;">
                     상품/주문 데이터는 localStorage에 저장됩니다.

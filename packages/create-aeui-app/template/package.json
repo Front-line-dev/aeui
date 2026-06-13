@@ -12,9 +12,6 @@
     "aeui": "^0.0.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.23.0",
-    "@babel/plugin-transform-react-jsx": "^7.23.0",
-    "@vitejs/plugin-react": "^5.1.2",
     "vite": "^5.0.0"
   }
 }

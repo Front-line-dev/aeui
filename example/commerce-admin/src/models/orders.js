@@ -33,7 +33,6 @@ export function completeCheckout(state, { customer, payment }) {
   const items = asArray(state.cart?.items);
   if (!items.length) {
     pushToast(state, { tone: "danger", title: "체크아웃", message: "장바구니가 비어있습니다." });
-    state.route = "cart";
     return;
   }
 
@@ -42,12 +41,10 @@ export function completeCheckout(state, { customer, payment }) {
     const p = findProduct(state, it.productId);
     if (!p || !p.active) {
       pushToast(state, { tone: "danger", title: "체크아웃", message: "상품이 변경되어 결제를 완료할 수 없습니다." });
-      state.route = "cart";
       return;
     }
     if (p.stock < it.qty) {
       pushToast(state, { tone: "danger", title: "체크아웃", message: `재고가 부족합니다: ${p.name} (재고 ${p.stock})` });
-      state.route = "cart";
       return;
     }
   }
@@ -92,7 +89,6 @@ export function completeCheckout(state, { customer, payment }) {
   pushActivity(state, "ORDER", `주문 생성: ${orderId} (결제 ${payment?.paymentId || "n/a"})`);
   pushToast(state, { tone: "ok", title: "주문 완료", message: `주문이 생성되었습니다: ${orderId}` });
 
-  state.route = "orders";
   state.selectedOrderId = orderId;
 }
 
@@ -127,4 +123,3 @@ export function openOrderCancel(state, orderId) {
     },
   };
 }
-

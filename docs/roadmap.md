@@ -1,14 +1,5 @@
 # 로드맵 (Roadmap)
 
-## ✅ 완료된 개선
-
-### 테스트·패키징·타입·Vite 설정 정리
-
-- 루트 `package.json`에 테스트, core 빌드, 예제 빌드, 타입 검증, 패키징 dry-run 스크립트 추가.
-- `aeui` 패키지의 CJS entry를 `.cjs`로 분리해 `require('aeui')` 경로 수정.
-- `packages/core/types/` 기반 초기 TypeScript 선언과 smoke typecheck 추가.
-- `create-aeui-app` 템플릿과 예제 Vite 설정을 AEUI Babel plugin 순서 기준으로 통일.
-
 ## 🟡 중간 우선순위
 
 ### 테스트 coverage 확장
@@ -63,18 +54,6 @@ JSX 사용을 위해 모든 파일에서 `AEUI`를 import하거나 Vite Babel �
 
 - `aeui/jsx-runtime` 제공 검토.
 - Babel 플러그인의 자동 import 주입 검토.
-- `aeui/vite` 플러그인 제공으로 Babel 플러그인 순서와 JSX pragma 설정을 자동화.
-- `create-aeui-app` 템플릿에 간소화된 설정 반영.
-
-### Router 기능
-
-AEUI 애플리케이션에서 기본적인 페이지 전환과 URL 상태 관리를 지원하는 router 기능을 검토한다.
-
-- `path`, `params`, `query` 기반 라우팅 API 설계.
-- 브라우저 History API 기반 client-side navigation 지원.
-- 중첩 라우트, fallback route, redirect 같은 기본 라우팅 패턴 검토.
-- 컴포넌트의 1회 실행 모델과 render function 재실행 모델에 맞는 route state 전달 방식 설계.
-- `create-aeui-app` 템플릿에서 router 포함 여부를 선택할 수 있는 옵션 검토.
 
 ### GitHub Pages 배포 기능
 
@@ -93,8 +72,8 @@ JSX 특성상 Fragment가 필요한 부분에 트랜스파일 단계에서 자�
 
 - guide level1의 목적: 처음 AEUI를 접하는 사람들에게 AEUI가 어떤 역할을 하는지 설명하고 기존 React, Next.js 보다 간결함을 느끼게 해서 사용하고 싶어지게 함
 - guide level2의 목적: 기존 React, Svelte 에서 하지 못 했던 문법들이 어떻게 가능한지 궁금한 사람들을 위해 개념적으로 설명해서 이해시킴
-- guide level3의 목적: 실제로 AEUI 코드레벨에서 어떻게 구현했는지 설명한다.
-- internals의 목적: AI가 코드를 수정하거나 프로젝트에 기여하고 싶은 사람들을 위한 문서. 어떤 목적으로 코드가 구성되었는지 설명한다.
+- guide level3의 목적: AEUI 사용자가 내부 모델을 이해해 앱 코드를 더 잘 작성할 수 있게 설명한다.
+- internals의 목적: AEUI를 개발하거나 수정하는 사람을 위한 구현 문서. 모듈 경계, 런타임 흐름, 컴파일러 변환, 테스트 기준을 설명한다.
 
 ## 🟢 장기 계획
 

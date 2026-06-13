@@ -213,6 +213,67 @@ describe('DOM 이벤트 자동 렌더', () => {
   });
 });
 
+describe('directory router runtime', () => {
+  it('renders matching pages, delegates internal anchors, and handles popstate', () => {
+    window.history.replaceState({}, '', '/');
+
+    function Layout({ route, children }) {
+      return (
+        <section id="layout" data-path={route.pathname}>
+          {children}
+        </section>
+      );
+    }
+
+    function Home({ route }) {
+      return (
+        <div>
+          <h1 id="page-title">Home {route.pathname}</h1>
+          <a id="product-link" href="/products/42?tab=details">Product 42</a>
+        </div>
+      );
+    }
+
+    function Product({ route }) {
+      return (
+        <div>
+          <h1 id="page-title">Product {route.params.id}</h1>
+          <span id="query-tab">{route.query.tab}</span>
+          <a id="home-link" href="/">Home</a>
+        </div>
+      );
+    }
+
+    function NotFound({ route }) {
+      return <h1 id="page-title">Missing {route.pathname}</h1>;
+    }
+
+    AEUI.__runtime.initDirectoryRouter({
+      '/src/router/_layout.jsx': { default: Layout },
+      '/src/router/index.jsx': { default: Home },
+      '/src/router/products/[id].jsx': { default: Product },
+      '/src/router/404.jsx': { default: NotFound },
+    }, container, { rootDir: '/src/router' });
+
+    expect(container.querySelector('#layout').getAttribute('data-path')).toBe('/');
+    expect(container.querySelector('#page-title').textContent).toBe('Home /');
+
+    container.querySelector('#product-link').dispatchEvent(new MouseEvent('click', { button: 0, bubbles: true, cancelable: true }));
+    AEUI.render();
+
+    expect(window.location.pathname).toBe('/products/42');
+    expect(container.querySelector('#layout').getAttribute('data-path')).toBe('/products/42');
+    expect(container.querySelector('#page-title').textContent).toBe('Product 42');
+    expect(container.querySelector('#query-tab').textContent).toBe('details');
+
+    window.history.pushState({}, '', '/unknown');
+    window.dispatchEvent(new Event('popstate'));
+    AEUI.render();
+
+    expect(container.querySelector('#page-title').textContent).toBe('Missing /unknown');
+  });
+});
+
 // ─── Props 전달 ───
 
 function Display({ message }) {

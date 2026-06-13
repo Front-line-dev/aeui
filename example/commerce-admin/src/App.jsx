@@ -5,41 +5,40 @@ import { savePersistedState } from "./lib/storage.js";
 import { formatShortTime } from "./lib/util.js";
 
 import ToastHost from "./ui/components/ToastHost.jsx";
-import ShopPage from "./ui/pages/ShopPage.jsx";
-import ProductPage from "./ui/pages/ProductPage.jsx";
-import CartPage from "./ui/pages/CartPage.jsx";
-import CheckoutPage from "./ui/pages/CheckoutPage.jsx";
-import OrdersPage from "./ui/pages/OrdersPage.jsx";
-import AdminDashboard from "./ui/pages/admin/AdminDashboard.jsx";
-import AdminProducts from "./ui/pages/admin/AdminProducts.jsx";
-import AdminOrders from "./ui/pages/admin/AdminOrders.jsx";
 import ProductEditorModal from "./ui/modals/ProductEditorModal.jsx";
 import ConfirmModal from "./ui/modals/ConfirmModal.jsx";
 
-function NavItem({ active, onClick, children, className = "" }) {
+function NavItem({ active, href, children, className = "" }) {
   return (
-    <button
+    <a
       className={`btn btn--tab ${active ? "is-active" : ""} ${className}`}
-      type="button"
-      onClick={onClick}
+      href={href}
     >
       {children}
-    </button>
+    </a>
   );
 }
 
-export default function App() {
+export default function App({ route, children }) {
+  let lastPathname = route?.pathname || "/";
+
   const clockTimer = setInterval(() => {
     state.clockNow = Date.now();
   }, 1000);
   clean(() => clearInterval(clockTimer));
 
-  const syncAdminMode = () => {
-    const admin = select.isAdmin();
+  const pathname = () => route?.pathname || "/";
+  const syncPageShell = () => {
+    if (pathname() !== lastPathname) {
+      state.modal = null;
+      lastPathname = pathname();
+    }
+
+    const admin = pathname().startsWith("/admin");
     if (document?.body?.classList) document.body.classList.toggle("mode--admin", admin);
   };
-  syncAdminMode();
-  watch(syncAdminMode, [state.route]);
+  syncPageShell();
+  watch(syncPageShell, [pathname()]);
 
   watch(() => {
     try {
@@ -51,10 +50,11 @@ export default function App() {
     }
   }, [state.products, state.cart, state.orders, state.activity]);
 
-  const layoutClass = () => `layout ${select.isAdmin() ? "layout--admin" : ""}`;
-  const sidebarStyle = () => (select.isAdmin() ? "" : "display:none;");
+  const isAdminPath = () => pathname().startsWith("/admin");
+  const layoutClass = () => `layout ${isAdminPath() ? "layout--admin" : ""}`;
+  const sidebarStyle = () => (isAdminPath() ? "" : "display:none;");
   const adminTab = () =>
-    state.route === "admin.products" ? "products" : state.route === "admin.orders" ? "orders" : "dashboard";
+    pathname() === "/admin/products" ? "products" : pathname() === "/admin/orders" ? "orders" : "dashboard";
 
   return (
     <div className="app">
@@ -69,16 +69,16 @@ export default function App() {
           </div>
 
           <div className="nav">
-            <NavItem active={state.route === "shop" || state.route === "product"} onClick={() => actions.goShop()}>
+            <NavItem active={pathname() === "/" || pathname().startsWith("/products/")} href="/">
               스토어
             </NavItem>
-            <NavItem active={state.route === "cart"} onClick={() => actions.goCart()}>
+            <NavItem active={pathname() === "/cart"} href="/cart">
               장바구니 <span className="pill">{select.cartCount()}</span>
             </NavItem>
-            <NavItem active={state.route === "orders"} onClick={() => actions.goOrders()}>
+            <NavItem active={pathname() === "/orders"} href="/orders">
               주문
             </NavItem>
-            <NavItem active={select.isAdmin()} onClick={() => actions.goAdminDashboard()}>
+            <NavItem active={isAdminPath()} href="/admin">
               Admin
             </NavItem>
 
@@ -97,13 +97,13 @@ export default function App() {
           <div className="sidebar" style={sidebarStyle()}>
             <div className="sidebar__title">Admin</div>
             <div className="sidebar__items">
-              <NavItem active={adminTab() === "dashboard"} onClick={() => actions.goAdminDashboard()}>
+              <NavItem active={adminTab() === "dashboard"} href="/admin">
                 대시보드
               </NavItem>
-              <NavItem active={adminTab() === "products"} onClick={() => actions.goAdminProducts()}>
+              <NavItem active={adminTab() === "products"} href="/admin/products">
                 상품
               </NavItem>
-              <NavItem active={adminTab() === "orders"} onClick={() => actions.goAdminOrders()}>
+              <NavItem active={adminTab() === "orders"} href="/admin/orders">
                 주문
               </NavItem>
             </div>
@@ -115,15 +115,7 @@ export default function App() {
               <div className="help">{state.lastSaveError}</div>
             </div>
 
-            {state.route === "shop" ? <ShopPage /> : null}
-            {state.route === "product" ? <ProductPage /> : null}
-            {state.route === "cart" ? <CartPage /> : null}
-            {state.route === "checkout" ? <CheckoutPage /> : null}
-            {state.route === "orders" ? <OrdersPage /> : null}
-
-            {state.route === "admin.dashboard" ? <AdminDashboard /> : null}
-            {state.route === "admin.products" ? <AdminProducts /> : null}
-            {state.route === "admin.orders" ? <AdminOrders /> : null}
+            {children}
           </div>
         </div>
       </div>

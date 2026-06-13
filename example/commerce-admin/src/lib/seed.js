@@ -1,5 +1,3 @@
-import { makeId } from "./id.js";
-
 function now() {
   return Date.now();
 }
@@ -9,7 +7,7 @@ export function makeSeedState() {
 
   const products = [
     {
-      id: makeId("p"),
+      id: "p_aeui_mug",
       name: "AEUI 머그컵 (라바 글레이즈)",
       category: "굿즈",
       price: 12000,
@@ -23,7 +21,7 @@ export function makeSeedState() {
       updatedAt: t - 1000 * 60 * 60 * 3,
     },
     {
-      id: makeId("p"),
+      id: "p_aeui_note",
       name: "AEUI 노트 (그리드, 120p)",
       category: "문구",
       price: 6800,
@@ -37,7 +35,7 @@ export function makeSeedState() {
       updatedAt: t - 1000 * 60 * 45,
     },
     {
-      id: makeId("p"),
+      id: "p_brewing_beans",
       name: "브루잉 원두 200g (미디엄 로스트)",
       category: "커피",
       price: 14800,
@@ -51,7 +49,7 @@ export function makeSeedState() {
       updatedAt: t - 1000 * 60 * 60 * 24 * 1,
     },
     {
-      id: makeId("p"),
+      id: "p_vdom_poster",
       name: "포스터 A2 (VDOM / Polling)",
       category: "굿즈",
       price: 9000,
@@ -65,7 +63,7 @@ export function makeSeedState() {
       updatedAt: t - 1000 * 60 * 60 * 24 * 18,
     },
     {
-      id: makeId("p"),
+      id: "p_sticker_pack",
       name: "스티커 팩 (5종)",
       category: "굿즈",
       price: 3000,
@@ -79,7 +77,7 @@ export function makeSeedState() {
       updatedAt: t - 1000 * 60 * 60 * 8,
     },
     {
-      id: makeId("p"),
+      id: "p_let_state_tshirt",
       name: "티셔츠 (AEUI: let is state)",
       category: "의류",
       price: 21900,
@@ -93,7 +91,7 @@ export function makeSeedState() {
       updatedAt: t - 1000 * 60 * 60 * 5,
     },
     {
-      id: makeId("p"),
+      id: "p_tick_keycaps",
       name: "키캡 (Tick Key, 4개)",
       category: "커스텀",
       price: 16000,
@@ -107,7 +105,7 @@ export function makeSeedState() {
       updatedAt: t - 1000 * 60 * 60 * 10,
     },
     {
-      id: makeId("p"),
+      id: "p_inactive_sample",
       name: "비활성 상품 (숨김 테스트)",
       category: "문구",
       price: 5000,
@@ -123,7 +121,7 @@ export function makeSeedState() {
 
   const cart = { items: [], couponCode: "" };
 
-  const sampleOrderId = makeId("o");
+  const sampleOrderId = "o_sample_delivered";
   const orders = [
     {
       id: sampleOrderId,

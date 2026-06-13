@@ -1,5 +1,5 @@
 import { AEUI, watch } from "aeui";
-import { state, actions, select } from "../../store.js";
+import { actions, select } from "../../store.js";
 import { clampInt, formatKRW } from "../../lib/money.js";
 
 function maxQtyFor(product) {
@@ -7,15 +7,16 @@ function maxQtyFor(product) {
   return Math.max(1, stock);
 }
 
-export default function ProductPage() {
+export default function ProductPage({ route }) {
   let qty = 1;
-  let maxQty = maxQtyFor(select.currentProduct());
-  let lastProductId = select.currentProduct()?.id || null;
+  let maxQty = maxQtyFor(select.product(route?.params?.id));
+  let lastProductId = route?.params?.id || null;
 
-  const getProduct = () => select.currentProduct();
-
-  const onBack = () => {
-    actions.goShop();
+  const productId = () => route?.params?.id || null;
+  const getProduct = () => {
+    const p = select.product(productId());
+    if (!p || !p.active) return null;
+    return p;
   };
 
   const onInc = () => {
@@ -36,14 +37,14 @@ export default function ProductPage() {
   watch(() => {
     const p = getProduct();
     maxQty = maxQtyFor(p);
-    const currentProductId = p?.id || null;
+    const currentProductId = productId();
 
     if (currentProductId !== lastProductId) {
       lastProductId = currentProductId;
       qty = 1;
     }
     if (qty > maxQty) qty = maxQty;
-  }, [state.route, state.selectedProductId, getProduct()?.stock]);
+  }, [productId(), getProduct()?.stock]);
 
   const product = () => getProduct();
 
@@ -58,9 +59,9 @@ export default function ProductPage() {
                 {product().category} · 평점 {Number(product().rating).toFixed(1)}/5 · {formatKRW(product().price)}
               </div>
             </div>
-            <button className="btn" type="button" onClick={onBack}>
+            <a className="btn" href="/">
               뒤로
-            </button>
+            </a>
           </div>
           <div className="panel__body">
             <div className="split">
@@ -113,9 +114,9 @@ export default function ProductPage() {
         <>
           <div className="panel__head">
             <h2 className="panel__title">상품을 찾을 수 없습니다</h2>
-            <button className="btn" type="button" onClick={onBack}>
+            <a className="btn" href="/">
               스토어로
-            </button>
+            </a>
           </div>
           <div className="panel__body">
             <div className="help">삭제되었거나 비활성화된 상품일 수 있습니다.</div>
