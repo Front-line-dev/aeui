@@ -53,7 +53,7 @@ const WatchDedupeTest = () => {
     }
   }, 1000);
 
-  return () => (
+  return (
     <TestSection title="1. Watch Deduplication">
       <div>State: {JSON.stringify(state)}</div>
       <div>Triggers: {triggers}</div>
@@ -89,7 +89,7 @@ const InPlaceSetTest = () => {
     }
   }, 1000);
 
-  return () => (
+  return (
     <TestSection title="2. Set In-Place Mutation">
       <div>Set Size: {mySet.size}</div>
       <div>Triggers: {triggers}</div>
@@ -125,7 +125,7 @@ const InPlaceObjectTest = () => {
     }
   }, 1000);
 
-  return () => (
+  return (
     <TestSection title="3. Object In-Place Mutation">
       <div>Value: {myObj.nested.b}</div>
       <div>Triggers: {triggers}</div>
@@ -144,7 +144,7 @@ const DOMPropTest = () => {
     obj.style = "color: red";
   }, 2000)
   
-  return () => (
+  return (
     <TestSection title="4. DOM Prop Test">
       <div style={obj.style}>This should be blue to red.</div>
       <div>Inspect DOM to verify attributes.</div>
@@ -153,7 +153,7 @@ const DOMPropTest = () => {
 };
 
 const App = () => {
-  return () => (
+  return (
     <div style="font-family: sans-serif;">
       <h1>Deep Comparison Tests</h1>
       <WatchDedupeTest />

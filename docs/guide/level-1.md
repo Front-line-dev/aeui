@@ -20,8 +20,10 @@ npm run dev
 ### 수동 설정 (이미 있는 Vite 프로젝트에 추가)
 
 ```bash
-npm install aeui
+npm install aeui@npm:a-easy-ui
 ```
+
+패키지는 npm에 `a-easy-ui` 이름으로 배포되지만, 앱 안에서는 `aeui` alias로 설치한다. 그래서 import 경로는 계속 `aeui`를 사용한다.
 
 `vite.config.js`에서 AEUI Vite 플러그인을 설정:
 

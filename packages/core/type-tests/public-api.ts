@@ -22,7 +22,7 @@ const Counter: Component<{ title: string }> = ({ title }) => {
     count = 0;
   });
 
-  return () => AEUI.createElement(
+  return AEUI.createElement(
     'button',
     { onClick: () => { count += 1; } },
     title,

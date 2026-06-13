@@ -4,10 +4,10 @@
   "scripts": {
     "test": "npm --prefix example/test test",
     "build": "npm run build:core && npm run build:examples",
-    "build:core": "npm --workspace aeui run build",
+    "build:core": "npm --workspace a-easy-ui run build",
     "build:examples": "npm --prefix example/vite-demo run build && npm --prefix example/deep-compare-test run build && npm --prefix example/commerce-admin run build",
-    "typecheck": "npm --workspace aeui run typecheck",
-    "pack:core": "npm pack --dry-run --workspace aeui --cache .npm"
+    "typecheck": "npm --workspace a-easy-ui run typecheck",
+    "pack:core": "npm pack --dry-run --workspace a-easy-ui --cache .npm"
   },
   "workspaces": [
     "packages/*"
