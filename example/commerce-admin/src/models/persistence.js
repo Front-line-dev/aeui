@@ -1,5 +1,5 @@
-import { makeSeedState } from "../lib/seed.js";
-import { loadPersistedState } from "../lib/storage.js";
+import { makeSeedState } from "@/lib/seed.js";
+import { loadPersistedState } from "@/lib/storage.js";
 
 export function normalizeCart(value) {
   const cart = value && typeof value === "object" ? value : {};
@@ -19,4 +19,3 @@ export function loadInitialData() {
 
   return { products, cart, orders, activity };
 }
-

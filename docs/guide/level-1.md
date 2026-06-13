@@ -32,6 +32,8 @@ export default defineConfig({
 });
 ```
 
+`aeui/vite`는 JSX 변환에 필요한 `AEUI` import를 자동으로 주입한다. 컴포넌트 파일에서 JSX를 쓰기 위해 `import { AEUI } from 'aeui'`를 직접 작성할 필요는 없다. 또한 기본으로 `@` alias가 `src` 디렉터리를 가리키므로, 앱 내부 모듈은 `@/components/Button.jsx`처럼 가져올 수 있다.
+
 ### 앱 진입점
 
 `aeui/vite` 플러그인은 앱 진입점을 자동으로 주입한다. `index.html`에는 `#root`만 두면 된다.

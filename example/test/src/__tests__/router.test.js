@@ -120,6 +120,31 @@ describe('aeui/vite plugin', () => {
     expect(plugin.transformIndexHtml.handler(html)).toBe(html);
   });
 
+  it('provides @ as a default alias to src', () => {
+    const root = makeFixture();
+    const plugin = aeuiVite();
+
+    const config = plugin.config({ root });
+
+    expect(config.resolve.alias['@']).toBe(path.join(root, 'src'));
+  });
+
+  it('does not override an existing @ alias', () => {
+    const root = makeFixture();
+    const plugin = aeuiVite();
+
+    const config = plugin.config({
+      root,
+      resolve: {
+        alias: {
+          '@': path.join(root, 'custom-src'),
+        },
+      },
+    });
+
+    expect(config).toBe(null);
+  });
+
   it('generates router bootstrap code when src/pages contains route files', () => {
     const root = makeFixture();
     fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true });

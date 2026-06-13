@@ -1,6 +1,6 @@
-import { AEUI, watch, clean } from "aeui";
-import { state, actions } from "../../store.js";
-import { asArray } from "../../models/query.js";
+import { watch, clean } from "aeui";
+import { state, actions } from "@/store.js";
+import { asArray } from "@/models/query.js";
 
 export default function ToastHost() {
   const timers = new Map();

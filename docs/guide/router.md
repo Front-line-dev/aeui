@@ -15,6 +15,8 @@ export default defineConfig({
 });
 ```
 
+플러그인은 기본으로 `@` alias를 `src`에 연결하고, JSX에 필요한 `AEUI` import를 자동으로 주입한다. 페이지 파일에는 라우트 컴포넌트만 작성하면 된다.
+
 `index.html`에는 `#root`만 두면 된다. 별도의 앱 진입 파일을 만들 필요가 없다.
 
 ```html
@@ -41,8 +43,6 @@ export default defineConfig({
 페이지는 일반 AEUI 컴포넌트다. 컴포넌트 setup은 마운트 시 한 번 실행되고, 반환된 render 함수가 route prop 변경에 맞춰 다시 실행된다.
 
 ```jsx
-import { AEUI } from 'aeui';
-
 export default function ProductPage({ route }) {
   return (
     <main>

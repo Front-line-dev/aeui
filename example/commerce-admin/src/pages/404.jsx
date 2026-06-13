@@ -1,4 +1,3 @@
-import { AEUI } from "aeui";
 
 export default function NotFoundPage({ route }) {
   return (

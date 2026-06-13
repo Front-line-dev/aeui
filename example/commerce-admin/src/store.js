@@ -1,13 +1,13 @@
-import { makeSeedState } from "./lib/seed.js";
-import { clearPersistedState, exportPersistedState } from "./lib/storage.js";
+import { makeSeedState } from "@/lib/seed.js";
+import { clearPersistedState, exportPersistedState } from "@/lib/storage.js";
 
-import { loadInitialData, normalizeCart } from "./models/persistence.js";
-import { asArray, findOrder, findProduct } from "./models/query.js";
-import { dismissToast, pushToast } from "./models/notify.js";
+import { loadInitialData, normalizeCart } from "@/models/persistence.js";
+import { asArray, findOrder, findProduct } from "@/models/query.js";
+import { dismissToast, pushToast } from "@/models/notify.js";
 
-import * as cartModel from "./models/cart.js";
-import * as ordersModel from "./models/orders.js";
-import * as productsModel from "./models/products.js";
+import * as cartModel from "@/models/cart.js";
+import * as ordersModel from "@/models/orders.js";
+import * as productsModel from "@/models/products.js";
 
 const initial = loadInitialData();
 

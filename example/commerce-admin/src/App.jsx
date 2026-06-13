@@ -1,12 +1,12 @@
-import { AEUI, watch, clean } from "aeui";
+import { watch, clean } from "aeui";
 
-import { state, actions, select } from "./store.js";
-import { savePersistedState } from "./lib/storage.js";
-import { formatShortTime } from "./lib/util.js";
+import { state, actions, select } from "@/store.js";
+import { savePersistedState } from "@/lib/storage.js";
+import { formatShortTime } from "@/lib/util.js";
 
-import ToastHost from "./ui/components/ToastHost.jsx";
-import ProductEditorModal from "./ui/modals/ProductEditorModal.jsx";
-import ConfirmModal from "./ui/modals/ConfirmModal.jsx";
+import ToastHost from "@/components/ToastHost.jsx";
+import ProductEditorModal from "@/components/modals/ProductEditorModal.jsx";
+import ConfirmModal from "@/components/modals/ConfirmModal.jsx";
 
 function NavItem({ active, href, children, className = "" }) {
   return (

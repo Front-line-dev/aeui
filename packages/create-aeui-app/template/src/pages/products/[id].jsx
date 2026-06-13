@@ -1,5 +1,3 @@
-import { AEUI } from 'aeui';
-
 export default function ProductPage({ route }) {
   return (
     <main>

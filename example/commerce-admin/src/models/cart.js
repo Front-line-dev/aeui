@@ -1,6 +1,6 @@
-import { clampInt, normalizeCoupon } from "../lib/money.js";
-import { asArray, findProduct } from "./query.js";
-import { pushActivity, pushToast } from "./notify.js";
+import { clampInt, normalizeCoupon } from "@/lib/money.js";
+import { asArray, findProduct } from "@/models/query.js";
+import { pushActivity, pushToast } from "@/models/notify.js";
 
 function ensureCart(state) {
   if (!state.cart || typeof state.cart !== "object") state.cart = { items: [], couponCode: "" };
@@ -80,4 +80,3 @@ export function setCoupon(state, code) {
   }
   pushActivity(state, "CART", `쿠폰 변경: ${normalized || "-"}`);
 }
-

@@ -1,7 +1,6 @@
-import { AEUI } from "aeui";
-import { state, actions } from "../../store.js";
-import Modal from "../components/Modal.jsx";
-import { clampInt } from "../../lib/money.js";
+import { state, actions } from "@/store.js";
+import Modal from "@/components/Modal.jsx";
+import { clampInt } from "@/lib/money.js";
 
 function parseTags(text) {
   return String(text || "")

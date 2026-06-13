@@ -1,6 +1,6 @@
-import { makeId } from "../lib/id.js";
-import { asArray, findProduct } from "./query.js";
-import { pushActivity, pushToast } from "./notify.js";
+import { makeId } from "@/lib/id.js";
+import { asArray, findProduct } from "@/models/query.js";
+import { pushActivity, pushToast } from "@/models/notify.js";
 
 export function openProductCreate(state) {
   state.modal = {
@@ -117,4 +117,3 @@ export function saveProductFromEditor(state, { mode, productId, draft }) {
   pushToast(state, { tone: "ok", title: "상품", message: "수정이 저장되었습니다." });
   state.modal = null;
 }
-

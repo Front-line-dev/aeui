@@ -18,6 +18,39 @@ function transform(code) {
 }
 
 describe('AEUI Babel Plugin', () => {
+  it('JSX를 사용하는 파일에 AEUI import를 자동 주입한다', () => {
+    const code = transform(`
+      export default () => <div>hi</div>;
+    `);
+
+    expect(code).toMatch(/import\s+\{\s*AEUI\s*\}\s+from\s+["']aeui["']/);
+    expect(code).toMatch(/AEUI\.createElement\("div"/);
+  });
+
+  it('기존 aeui import가 있으면 AEUI specifier를 추가한다', () => {
+    const code = transform(`
+      import { watch } from 'aeui';
+      function App() {
+        let count = 0;
+        watch(() => {}, [count]);
+        return <div>{count}</div>;
+      }
+    `);
+
+    expect(code).toMatch(/import\s+\{\s*AEUI,\s*watch\s*\}\s+from\s+["']aeui["']/);
+    expect(code).toMatch(/AEUI\.__runtime\.watch\(/);
+  });
+
+  it('JSX와 compiled helper가 없으면 AEUI import를 주입하지 않는다', () => {
+    const code = transform(`
+      export default function helper() {
+        return 42;
+      }
+    `);
+
+    expect(code).not.toMatch(/from\s+["']aeui["']/);
+  });
+
   it('익명 default export 화살표 컴포넌트를 render factory로 변환한다', () => {
     const code = transform(`
       import { AEUI } from 'aeui';

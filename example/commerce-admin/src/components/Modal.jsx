@@ -1,4 +1,3 @@
-import { AEUI } from "aeui";
 
 export default function Modal({ title, onClose, footer, wide, children }) {
   const onOverlayClick = (e) => {

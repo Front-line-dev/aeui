@@ -1,4 +1,3 @@
-import { AEUI } from "aeui";
 
 export default function StatCard({ kicker, title, value, hint }) {
   return (
@@ -12,4 +11,3 @@ export default function StatCard({ kicker, title, value, hint }) {
     </div>
   );
 }
-

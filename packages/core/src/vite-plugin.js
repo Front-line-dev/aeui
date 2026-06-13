@@ -9,9 +9,41 @@ const PUBLIC_ENTRY_PATH = '/@aeui-entry';
 const RESOLVED_VIRTUAL_ENTRY_ID = `\0${VIRTUAL_ENTRY_ID}`;
 const ROUTE_EXT_RE = /\.jsx$/;
 const DEFAULT_ROUTER_DIR = 'src/pages';
+const DEFAULT_ALIAS = '@';
+const DEFAULT_ALIAS_DIR = 'src';
 
 function normalizePath(filePath) {
   return String(filePath || '').replace(/\\/g, '/');
+}
+
+function hasAlias(config, find) {
+  const alias = config?.resolve?.alias;
+  if (!alias) return false;
+
+  if (Array.isArray(alias)) {
+    return alias.some((entry) => entry && entry.find === find);
+  }
+
+  return Object.prototype.hasOwnProperty.call(alias, find);
+}
+
+function createAliasConfig(config, options) {
+  const aliasName = options.alias === undefined ? DEFAULT_ALIAS : options.alias;
+  if (aliasName === false) return null;
+  if (typeof aliasName !== 'string' || !aliasName) return null;
+  if (hasAlias(config, aliasName)) return null;
+
+  const aliasDir = options.aliasDir || DEFAULT_ALIAS_DIR;
+  const rootDir = path.resolve(process.cwd(), config.root || '.');
+  const replacement = path.resolve(rootDir, aliasDir);
+
+  return {
+    resolve: {
+      alias: {
+        [aliasName]: replacement,
+      },
+    },
+  };
 }
 
 function hasManualModuleEntry(html) {
@@ -93,6 +125,10 @@ export default function aeui(options = {}) {
   return {
     name: 'aeui:vite',
     enforce: 'pre',
+
+    config(config) {
+      return createAliasConfig(config, options);
+    },
 
     configResolved(config) {
       root = config.root;

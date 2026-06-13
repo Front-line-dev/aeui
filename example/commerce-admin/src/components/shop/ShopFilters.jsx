@@ -1,4 +1,3 @@
-import { AEUI } from "aeui";
 
 export default function ShopFilters({
   query,
@@ -51,4 +50,3 @@ export default function ShopFilters({
     </div>
   );
 }
-

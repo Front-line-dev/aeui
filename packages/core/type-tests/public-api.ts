@@ -43,3 +43,5 @@ const didRender: boolean = AEUI.render();
 console.log(didRender);
 console.log(typeof aeuiTransform({ types: {} }));
 console.log(typeof aeui());
+console.log(typeof aeui({ alias: false }));
+console.log(typeof aeui({ alias: '~', aliasDir: 'src' }));

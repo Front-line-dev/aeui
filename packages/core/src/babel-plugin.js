@@ -1,4 +1,74 @@
 export default function aeuiTransform({ types: t }) {
+  const isAeuiImportDeclaration = (node) => (
+    t.isImportDeclaration(node) && node.source.value === 'aeui'
+  );
+
+  const hasAeuiImportSpecifier = (importDeclaration) => (
+    importDeclaration.specifiers.some((specifier) => (
+      t.isImportSpecifier(specifier) &&
+      t.isIdentifier(specifier.imported, { name: 'AEUI' }) &&
+      t.isIdentifier(specifier.local, { name: 'AEUI' })
+    ))
+  );
+
+  const bindingIsAeuiImport = (binding) => (
+    binding &&
+    binding.path.isImportSpecifier() &&
+    t.isIdentifier(binding.path.node.imported, { name: 'AEUI' }) &&
+    binding.path.parentPath.isImportDeclaration() &&
+    binding.path.parentPath.node.source.value === 'aeui'
+  );
+
+  const ensureAeuiImport = (programPath) => {
+    const existingBinding = programPath.scope.getBinding('AEUI');
+    if (bindingIsAeuiImport(existingBinding)) return;
+    if (existingBinding) return;
+
+    const existingImport = programPath.node.body.find((statement) => (
+      isAeuiImportDeclaration(statement)
+    ));
+
+    if (existingImport) {
+      if (!hasAeuiImportSpecifier(existingImport)) {
+        existingImport.specifiers.unshift(
+          t.importSpecifier(t.identifier('AEUI'), t.identifier('AEUI'))
+        );
+      }
+      return;
+    }
+
+    programPath.unshiftContainer('body', t.importDeclaration(
+      [t.importSpecifier(t.identifier('AEUI'), t.identifier('AEUI'))],
+      t.stringLiteral('aeui')
+    ));
+  };
+
+  const needsAeuiRuntimeBinding = (programPath) => {
+    let needsBinding = false;
+
+    programPath.traverse({
+      JSXElement(path) {
+        needsBinding = true;
+        path.stop();
+      },
+      JSXFragment(path) {
+        needsBinding = true;
+        path.stop();
+      },
+      Identifier(path) {
+        if (!path.isReferencedIdentifier({ name: 'AEUI' })) return;
+
+        const binding = path.scope.getBinding('AEUI');
+        if (!binding) {
+          needsBinding = true;
+          path.stop();
+        }
+      },
+    });
+
+    return needsBinding;
+  };
+
   /**
    * Checks if a node is a JSX element, fragment, or a transformed VNode call.
    */
@@ -500,6 +570,14 @@ export default function aeuiTransform({ types: t }) {
 
   return {
     visitor: {
+      Program: {
+        exit(path) {
+          if (needsAeuiRuntimeBinding(path)) {
+            ensureAeuiImport(path);
+          }
+        },
+      },
+
       "ArrowFunctionExpression|FunctionDeclaration|FunctionExpression"(path) {
         if (!shouldTransformComponent(path)) {
           return;

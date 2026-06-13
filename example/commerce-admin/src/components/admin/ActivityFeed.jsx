@@ -1,6 +1,5 @@
-import { AEUI } from "aeui";
-import { formatDateTimeShort } from "../../../lib/util.js";
-import { asArray } from "../../../models/query.js";
+import { formatDateTimeShort } from "@/lib/util.js";
+import { asArray } from "@/models/query.js";
 
 function ActivityRow({ event }) {
   return (
@@ -28,4 +27,3 @@ export default function ActivityFeed({ items }) {
     </div>
   );
 }
-

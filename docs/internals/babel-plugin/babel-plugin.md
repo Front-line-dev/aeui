@@ -6,13 +6,16 @@ AEUI Babel 플러그인은 사용자가 작성한 컴포넌트 코드를 **AEUI 
 
 AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은 이 Babel 플러그인이 컴포넌트를 setup/render 이중 구조로 바꿔주기 때문에 가능하다. 플러그인 없이는 AEUI 컴포넌트가 정상 동작하지 않는다.
 
-### 플러그인이 수행하는 3가지 변환
+### 플러그인이 수행하는 4가지 변환
 
 | 변환 | 입력 | 출력 | 목적 |
 |------|------|------|------|
+| **Runtime import 주입** | JSX 또는 compiled helper 사용 | `import { AEUI } from 'aeui'` 자동 추가 | 사용자가 JSX 때문에 `AEUI` import를 직접 쓰지 않도록 함 |
 | **Return 래핑** | `return <div />` | `return () => <div />` | setup 1회 실행 + render 반복 실행 구조 생성 |
 | **Props 반응화** | `function Comp(props)` | `function Comp(_initialProps)` + `__props` 객체 | props 변경 시 클로저 참조를 최신 상태로 유지 |
 | **Watch deps 래핑** | `watch(cb, [count])` | `AEUI.__runtime.watch(cb, () => [count])` | 매 호출 시 현재 값을 읽도록 함수화 |
+
+플러그인은 JSX 또는 compiled helper가 `AEUI` 식별자를 필요로 하는 파일에 named import를 자동으로 넣는다. 기존 `import { watch } from 'aeui'`가 있으면 같은 import 선언에 `AEUI` specifier를 추가하고, import가 없으면 새 import 선언을 만든다.
 
 플러그인은 render wrapper에서 **`AEUI.__runtime.runRenderPhase()`를 호출**한다. props 동기화, watcher 실행, render context 설정은 이 runtime helper가 담당한다.
 
@@ -27,6 +30,8 @@ function Counter({ name }) {
 }
 
 // Babel 적용 후 개념 구조
+import { AEUI } from 'aeui';
+
 function Counter(_initialProps) {
   const __props = { ..._initialProps };
   let { name } = _initialProps;
@@ -81,6 +86,7 @@ Babel은 코드를 AST로 파싱한 뒤 visitor 패턴으로 각 노드를 순�
 1. `shouldTransformComponent`로 AEUI 컴포넌트인지 판별
 2. `transformToFactory`로 `return JSX`를 `return () => JSX`로 변환
 3. `injectReactiveProps`로 props 반응화, watch deps 래핑, render phase helper 주입 수행
+4. JSX 또는 compiled helper가 있으면 `AEUI` import를 자동 주입
 
 ---
 

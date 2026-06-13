@@ -1,5 +1,4 @@
-import { AEUI } from "aeui";
-import { formatKRW } from "../../../lib/money.js";
+import { formatKRW } from "@/lib/money.js";
 
 function CartEmptyState() {
   return (

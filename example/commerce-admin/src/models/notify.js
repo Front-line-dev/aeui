@@ -1,5 +1,5 @@
-import { makeId } from "../lib/id.js";
-import { asArray } from "./query.js";
+import { makeId } from "@/lib/id.js";
+import { asArray } from "@/models/query.js";
 
 export function pushActivity(state, type, message) {
   if (!state) return;
@@ -23,4 +23,3 @@ export function dismissToast(state, toastId) {
   if (!state) return;
   state.toasts = asArray(state.toasts).filter((t) => t?.id !== toastId);
 }
-

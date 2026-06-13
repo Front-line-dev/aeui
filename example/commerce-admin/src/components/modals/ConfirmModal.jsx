@@ -1,6 +1,5 @@
-import { AEUI } from "aeui";
-import { state, actions } from "../../store.js";
-import Modal from "../components/Modal.jsx";
+import { state, actions } from "@/store.js";
+import Modal from "@/components/Modal.jsx";
 
 function ConfirmModalFooter({ tone, confirmLabel, onClose, onConfirm }) {
   return (

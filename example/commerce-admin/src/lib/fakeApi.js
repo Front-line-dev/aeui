@@ -1,4 +1,4 @@
-import { makeId } from "./id.js";
+import { makeId } from "@/lib/id.js";
 
 export function fakeAuthorizePayment({ amount }) {
   const delayMs = 900 + Math.floor(Math.random() * 1100);
@@ -28,4 +28,3 @@ export function fakeAuthorizePayment({ amount }) {
     },
   };
 }
-
