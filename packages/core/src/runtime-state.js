@@ -14,10 +14,15 @@ export function createRuntimeState({ deepEqual, deepClone }) {
     didMutate: false,
     domEventDepth: 0,
     interactiveRenderRequested: false,
+    routerTeardown: null,
   };
 }
 
 export function resetRuntimeState(state) {
+  if (typeof state.routerTeardown === 'function') {
+    state.routerTeardown();
+  }
+
   state.rootNode = null;
   state.containerElement = null;
   state.RootComponent = null;
@@ -30,4 +35,5 @@ export function resetRuntimeState(state) {
   state.didMutate = false;
   state.domEventDepth = 0;
   state.interactiveRenderRequested = false;
+  state.routerTeardown = null;
 }

@@ -1,4 +1,5 @@
 import aeuiTransform from 'aeui/babel-plugin';
+import aeui from 'aeui/vite';
 import {
   AEUI,
   clean,
@@ -41,3 +42,4 @@ const didRender: boolean = AEUI.render();
 
 console.log(didRender);
 console.log(typeof aeuiTransform({ types: {} }));
+console.log(typeof aeui());

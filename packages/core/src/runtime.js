@@ -30,6 +30,10 @@ export function reconcileRoot(state) {
 
 export function init(state, RootComponent, containerElement) {
   state.stopScheduler();
+  if (typeof state.routerTeardown === 'function') {
+    state.routerTeardown();
+  }
+
   if (state.rootNode && state.rootNode.children[0]) {
     state.unmountNode(state.rootNode.children[0]);
   }

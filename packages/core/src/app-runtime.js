@@ -10,6 +10,7 @@ import {
 import { createNode, createRootNode } from './node-factory.js';
 import { reconcile, unmountNode } from './reconciler.js';
 import { createRuntimeState } from './runtime-state.js';
+import { createDirectoryRouter } from './router.js';
 import {
   dispatchDomEvent,
   init,
@@ -64,6 +65,11 @@ export function createAppRuntime({
     onAnimationFrame: (...args) => onAnimationFrame(state, ...args),
     runComponentWatchers: (...args) => runComponentWatchersBridge(state, ...args),
     runRenderPhase: (...args) => runRenderPhaseBridge(state, ...args),
+    initDirectoryRouter: (routeModules, containerElement, options) => {
+      const { Root, attach } = createDirectoryRouter(state, routeModules, options);
+      init(state, Root, containerElement);
+      attach(containerElement);
+    },
     createDomNode: (...args) => createDomNode(state, ...args),
     watch: (...args) => registerWatch(state, ...args),
     clean: (...args) => registerCleanup(state, ...args),

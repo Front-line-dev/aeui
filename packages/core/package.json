@@ -16,12 +16,20 @@
       "types": "./types/babel-plugin.d.ts",
       "import": "./dist/babel-plugin.js",
       "require": "./dist/babel-plugin.cjs"
+    },
+    "./vite": {
+      "types": "./types/vite.d.ts",
+      "import": "./dist/vite-plugin.js",
+      "require": "./dist/vite-plugin.cjs"
     }
   },
   "typesVersions": {
     "*": {
       "babel-plugin": [
         "types/babel-plugin.d.ts"
+      ],
+      "vite": [
+        "types/vite.d.ts"
       ],
       "*": [
         "types/index.d.ts"
@@ -38,6 +46,10 @@
     "dist/babel-plugin.cjs.map",
     "dist/babel-plugin.js",
     "dist/babel-plugin.js.map",
+    "dist/vite-plugin.cjs",
+    "dist/vite-plugin.cjs.map",
+    "dist/vite-plugin.js",
+    "dist/vite-plugin.js.map",
     "src",
     "types"
   ],
@@ -58,5 +70,9 @@
     "@rollup/plugin-node-resolve": "^16.0.3",
     "rollup": "^4.53.3",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/plugin-transform-react-jsx": "^7.23.0"
   }
 }

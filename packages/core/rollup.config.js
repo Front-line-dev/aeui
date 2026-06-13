@@ -1,5 +1,10 @@
 import resolve from '@rollup/plugin-node-resolve';
 
+const external = [
+  '@babel/core',
+  '@babel/plugin-transform-react-jsx',
+];
+
 export default [
   // Build Library (ESM & CJS)
   {
@@ -31,6 +36,24 @@ export default [
       },
       {
         file: 'dist/babel-plugin.js',
+        format: 'es',
+        sourcemap: true
+      }
+    ],
+    plugins: [resolve()]
+  },
+  {
+    input: 'src/vite-plugin.js',
+    external,
+    output: [
+      {
+        file: 'dist/vite-plugin.cjs',
+        format: 'cjs',
+        exports: 'default',
+        sourcemap: true
+      },
+      {
+        file: 'dist/vite-plugin.js',
         format: 'es',
         sourcemap: true
       }
