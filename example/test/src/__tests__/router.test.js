@@ -18,11 +18,11 @@ function NotFoundPage() {}
 describe('directory router route matching', () => {
   it('matches static, index, dynamic, catch-all, fallback, and query values', () => {
     const table = createRouteTable({
-      '/src/router/index.jsx': { default: HomePage },
-      '/src/router/about.jsx': { default: AboutPage },
-      '/src/router/products/[id].jsx': { default: ProductPage },
-      '/src/router/docs/[...slug].jsx': { default: CatchAllPage },
-      '/src/router/404.jsx': { default: NotFoundPage },
+      '/src/pages/index.jsx': { default: HomePage },
+      '/src/pages/about.jsx': { default: AboutPage },
+      '/src/pages/products/[id].jsx': { default: ProductPage },
+      '/src/pages/docs/[...slug].jsx': { default: CatchAllPage },
+      '/src/pages/404.jsx': { default: NotFoundPage },
     });
 
     expect(matchRoute(table, '/').component).toBe(HomePage);
@@ -46,8 +46,8 @@ describe('directory router route matching', () => {
     const StaticPage = () => null;
     const DynamicPage = () => null;
     const table = createRouteTable({
-      '/src/router/products/[id].jsx': { default: DynamicPage },
-      '/src/router/products/new.jsx': { default: StaticPage },
+      '/src/pages/products/[id].jsx': { default: DynamicPage },
+      '/src/pages/products/new.jsx': { default: StaticPage },
     });
 
     expect(matchRoute(table, '/products/new').component).toBe(StaticPage);
@@ -113,21 +113,24 @@ describe('aeui/vite plugin', () => {
     expect(result.tags[0].attrs.src).toBe('/@aeui-entry');
   });
 
-  it('keeps legacy manual main.js entries untouched', () => {
+  it('keeps manual main.js entries untouched', () => {
     const plugin = aeuiVite();
     const html = '<html><body><script type="module" src="/src/main.js"></script></body></html>';
 
     expect(plugin.transformIndexHtml.handler(html)).toBe(html);
   });
 
-  it('generates router bootstrap code when src/router contains route files', () => {
+  it('generates router bootstrap code when src/pages contains route files', () => {
     const root = makeFixture();
-    fs.mkdirSync(path.join(root, 'src/router'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'src/router/index.jsx'), 'export default function Home() {}');
+    fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src/pages/index.jsx'), 'export default function Home() {}');
 
     const plugin = aeuiVite();
     plugin.configResolved({ root });
 
-    expect(plugin.load('\0virtual:aeui-entry')).toContain('AEUI.__runtime.initDirectoryRouter');
+    const entry = plugin.load('\0virtual:aeui-entry');
+
+    expect(entry).toContain('AEUI.__runtime.initDirectoryRouter');
+    expect(entry).toContain('import.meta.glob("/src/pages/**/*.jsx"');
   });
 });

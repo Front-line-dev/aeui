@@ -1,4 +1,6 @@
 const ROUTE_EXT_RE = /\.[cm]?[jt]sx?$/;
+const DEFAULT_ROOT_DIR = '/src/pages';
+const ROUTE_ROOT_MARKERS = ['/pages/'];
 
 function stripQuery(path) {
   return String(path || '').split('?')[0].split('#')[0];
@@ -14,8 +16,17 @@ function trimTrailingSlash(path) {
 }
 
 function normalizeRootDir(rootDir) {
-  const normalized = normalizeSlashes(rootDir || '/src/router').replace(/\/+$/, '');
+  const normalized = normalizeSlashes(rootDir || DEFAULT_ROOT_DIR).replace(/\/+$/, '');
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+
+function inferRootDir(routeModules, rootDir) {
+  if (rootDir) return normalizeRootDir(rootDir);
+
+  const paths = Object.keys(routeModules || {}).map((filePath) => stripQuery(normalizeSlashes(filePath)));
+  if (paths.some((filePath) => filePath.startsWith(`${DEFAULT_ROOT_DIR}/`))) return DEFAULT_ROOT_DIR;
+
+  return DEFAULT_ROOT_DIR;
 }
 
 function toRouteRelativePath(filePath, rootDir) {
@@ -26,10 +37,11 @@ function toRouteRelativePath(filePath, rootDir) {
     return normalizedPath.slice(normalizedRoot.length + 1);
   }
 
-  const marker = '/router/';
-  const markerIndex = normalizedPath.lastIndexOf(marker);
-  if (markerIndex >= 0) {
-    return normalizedPath.slice(markerIndex + marker.length);
+  for (const marker of ROUTE_ROOT_MARKERS) {
+    const markerIndex = normalizedPath.lastIndexOf(marker);
+    if (markerIndex >= 0) {
+      return normalizedPath.slice(markerIndex + marker.length);
+    }
   }
 
   return normalizedPath.replace(/^\.?\//, '');
@@ -144,7 +156,7 @@ function findSpecialModule(routeModules, rootDir, name) {
 }
 
 export function createRouteTable(routeModules, options = {}) {
-  const rootDir = normalizeRootDir(options.rootDir);
+  const rootDir = inferRootDir(routeModules, options.rootDir);
   const routes = Object.entries(routeModules || {})
     .map(([filePath, mod]) => createRoute(filePath, mod, rootDir))
     .filter(Boolean)

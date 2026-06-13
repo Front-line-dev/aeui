@@ -1,7 +1,6 @@
 export interface AeuiViteOptions {
   appEntry?: string;
   rootId?: string;
-  routerDir?: string;
   styles?: string | false;
 }
 

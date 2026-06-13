@@ -8,6 +8,7 @@ const VIRTUAL_ENTRY_ID = 'virtual:aeui-entry';
 const PUBLIC_ENTRY_PATH = '/@aeui-entry';
 const RESOLVED_VIRTUAL_ENTRY_ID = `\0${VIRTUAL_ENTRY_ID}`;
 const ROUTE_EXT_RE = /\.jsx$/;
+const DEFAULT_ROUTER_DIR = 'src/pages';
 
 function normalizePath(filePath) {
   return String(filePath || '').replace(/\\/g, '/');
@@ -49,8 +50,7 @@ function createStyleImport(root, styleEntry) {
 }
 
 function createRouterEntry(root, options) {
-  const routerDir = options.routerDir || 'src/router';
-  const normalizedRouterDir = normalizePath(routerDir).replace(/^\/+/, '').replace(/\/+$/, '');
+  const normalizedRouterDir = DEFAULT_ROUTER_DIR;
   const absoluteRouterDir = path.resolve(root, normalizedRouterDir);
   const styleImport = createStyleImport(root, options.styles);
   const rootId = options.rootId || 'root';

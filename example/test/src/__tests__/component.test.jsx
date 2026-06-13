@@ -249,11 +249,11 @@ describe('directory router runtime', () => {
     }
 
     AEUI.__runtime.initDirectoryRouter({
-      '/src/router/_layout.jsx': { default: Layout },
-      '/src/router/index.jsx': { default: Home },
-      '/src/router/products/[id].jsx': { default: Product },
-      '/src/router/404.jsx': { default: NotFound },
-    }, container, { rootDir: '/src/router' });
+      '/src/pages/_layout.jsx': { default: Layout },
+      '/src/pages/index.jsx': { default: Home },
+      '/src/pages/products/[id].jsx': { default: Product },
+      '/src/pages/404.jsx': { default: NotFound },
+    }, container);
 
     expect(container.querySelector('#layout').getAttribute('data-path')).toBe('/');
     expect(container.querySelector('#page-title').textContent).toBe('Home /');

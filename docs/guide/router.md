@@ -1,6 +1,6 @@
 # 디렉터리 라우터
 
-`src/router` 디렉터리에 페이지 파일을 만들면 파일 경로가 그대로 URL이 된다. 화면 이동은 HTML에서 쓰던 것처럼 일반 `<a href="/path">` 링크를 사용한다.
+`src/pages` 디렉터리에 페이지 파일을 만들면 파일 경로가 그대로 URL이 된다. 화면 이동은 HTML에서 쓰던 것처럼 일반 `<a href="/path">` 링크를 사용한다.
 
 ## Vite 설정
 
@@ -23,18 +23,18 @@ export default defineConfig({
 
 ## 라우터 디렉터리
 
-`src/router` 디렉터리가 있으면 AEUI가 파일을 URL로 해석한다.
+`src/pages` 디렉터리가 있으면 AEUI가 파일을 URL로 해석한다. 새 프로젝트는 Next.js처럼 `pages` 디렉터리를 사용한다.
 
 | 파일 | URL |
 | --- | --- |
-| `src/router/index.jsx` | `/` |
-| `src/router/about.jsx` | `/about` |
-| `src/router/products/[id].jsx` | `/products/:id` |
-| `src/router/docs/[...slug].jsx` | `/docs/*slug` |
-| `src/router/404.jsx` | fallback |
-| `src/router/_layout.jsx` | 공통 layout |
+| `src/pages/index.jsx` | `/` |
+| `src/pages/about.jsx` | `/about` |
+| `src/pages/products/[id].jsx` | `/products/:id` |
+| `src/pages/docs/[...slug].jsx` | `/docs/*slug` |
+| `src/pages/404.jsx` | fallback |
+| `src/pages/_layout.jsx` | 공통 layout |
 
-`src/router`가 없으면 플러그인은 기존 방식처럼 `src/App.jsx`를 자동으로 부팅한다.
+`src/pages`가 없으면 플러그인은 기존 방식처럼 `src/App.jsx`를 자동으로 부팅한다.
 
 ## 페이지 컴포넌트
 

@@ -4,14 +4,14 @@
 
 ## 목적
 
-디렉터리 라우터는 사용자가 Router 컴포넌트, `Link`, `navigate`, `main.js`를 작성하지 않아도 `src/router` 파일과 일반 `<a href>`만으로 화면을 전환하게 만든다. 공개 API는 늘리지 않고, Vite 플러그인과 런타임 내부 브릿지로 동작을 숨긴다.
+디렉터리 라우터는 사용자가 Router 컴포넌트, `Link`, `navigate`, `main.js`를 작성하지 않아도 `src/pages` 파일과 일반 `<a href>`만으로 화면을 전환하게 만든다. 공개 API는 늘리지 않고, Vite 플러그인과 런타임 내부 브릿지로 동작을 숨긴다.
 
 ## 모듈 경계
 
 - `packages/core/src/vite-plugin.js`
   - `index.html`에 내부 가상 엔트리 `"/@aeui-entry"`를 주입한다.
-  - `src/router/**/*.jsx`가 있으면 route module map을 만들고 `AEUI.__runtime.initDirectoryRouter(...)`를 호출한다.
-  - `src/router`가 없으면 `src/App.jsx`를 기존 단일 앱처럼 자동 부팅한다.
+  - `src/pages/**/*.jsx`가 있으면 route module map을 만들고 `AEUI.__runtime.initDirectoryRouter(...)`를 호출한다.
+  - 라우트 디렉터리가 없으면 `src/App.jsx`를 기존 단일 앱처럼 자동 부팅한다.
   - JSX 파일 변환은 AEUI Babel 플러그인과 classic JSX transform을 같은 순서로 적용한다.
 
 - `packages/core/src/router.js`
@@ -27,7 +27,7 @@
 ## 런타임 흐름
 
 1. Vite가 `transformIndexHtml`의 pre hook에서 `"/@aeui-entry"` script를 삽입한다.
-2. 가상 엔트리는 `src/router/**/*.jsx`를 eager glob으로 로드한다.
+2. 가상 엔트리는 `src/pages/**/*.jsx`를 eager glob으로 로드한다.
 3. `initDirectoryRouter(routeModules, container, { rootDir })`가 route table과 router root component를 만든다.
 4. `AEUI.init(Root, container)`가 기존 reconciliation/scheduler 흐름을 그대로 시작한다.
 5. 내부 링크 클릭 시 router가 `history.pushState`를 호출하고 `state.requestRender()`로 다음 렌더를 예약한다.

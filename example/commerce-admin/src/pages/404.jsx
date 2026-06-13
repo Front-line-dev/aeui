@@ -13,7 +13,7 @@ export default function NotFoundPage({ route }) {
         </a>
       </div>
       <div className="panel__body">
-        <div className="help">src/router에 매칭되는 페이지 파일이 없습니다.</div>
+        <div className="help">src/pages에 매칭되는 페이지 파일이 없습니다.</div>
       </div>
     </div>
   );
