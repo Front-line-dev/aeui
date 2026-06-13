@@ -8,10 +8,13 @@
     "build": "vite build",
     "preview": "vite preview"
   },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "dependencies": {
     "aeui": "^0.0.1"
   },
   "devDependencies": {
-    "vite": "^5.0.0"
+    "vite": "^8.0.0"
   }
 }

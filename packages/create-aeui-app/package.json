@@ -4,9 +4,13 @@
   "description": "Scaffolding tool for AEUI apps",
   "main": "index.js",
   "bin": {
-    "create-aeui-app": "./index.js"
+    "create-aeui-app": "index.js"
   },
   "type": "module",
+  "files": [
+    "index.js",
+    "template"
+  ],
   "keywords": [
     "aeui",
     "cli",

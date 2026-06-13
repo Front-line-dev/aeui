@@ -8,6 +8,8 @@
 
 ### 프로젝트 생성
 
+AEUI 템플릿은 Vite 8을 사용하므로 Node.js `^20.19.0 || >=22.12.0` 환경에서 실행한다.
+
 ```bash
 npx create-aeui-app my-app
 cd my-app
