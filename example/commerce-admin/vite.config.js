@@ -1,23 +1,24 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// https://vitejs.dev/config/
+const aeuiBabelPlugins = [
+  ['aeui/babel-plugin'],
+  ['@babel/plugin-transform-react-jsx', {
+    pragma: 'AEUI.createElement',
+    pragmaFrag: 'AEUI.Fragment'
+  }]
+];
+
 export default defineConfig({
   plugins: [
     react({
-      jsxRuntime: 'classic', // Use classic to allow pragma customization
+      include: /\.[jt]sx$/,
+      jsxRuntime: 'classic',
       babel: {
-        plugins: [
-          // This plugin handles 'watch' deps and component factories naturally
-          ['aeui/babel-plugin'],
-          // Transform JSX to AEUI.createElement
-          ['@babel/plugin-transform-react-jsx', {
-            pragma: 'AEUI.createElement',
-            pragmaFrag: 'AEUI.Fragment'
-          }]
-        ]
+        babelrc: false,
+        configFile: false,
+        plugins: aeuiBabelPlugins
       }
     })
   ]
 });
-

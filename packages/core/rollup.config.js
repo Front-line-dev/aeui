@@ -6,13 +6,15 @@ export default [
     input: 'src/index.js',
     output: [
       {
-        file: 'dist/aeui.js',
+        file: 'dist/aeui.cjs',
         format: 'cjs',
-        exports: 'named'
+        exports: 'named',
+        sourcemap: true
       },
       {
         file: 'dist/aeui.esm.js',
-        format: 'es'
+        format: 'es',
+        sourcemap: true
       }
     ],
     plugins: [resolve()]
@@ -24,11 +26,13 @@ export default [
       {
         file: 'dist/babel-plugin.cjs',
         format: 'cjs',
-        exports: 'default'
+        exports: 'default',
+        sourcemap: true
       },
       {
         file: 'dist/babel-plugin.js',
-        format: 'es'
+        format: 'es',
+        sourcemap: true
       }
     ],
     plugins: [resolve()]

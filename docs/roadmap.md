@@ -1,5 +1,14 @@
 # 로드맵 (Roadmap)
 
+## ✅ 완료된 개선
+
+### 테스트·패키징·타입·Vite 설정 정리
+
+- 루트 `package.json`에 테스트, core 빌드, 예제 빌드, 타입 검증, 패키징 dry-run 스크립트 추가.
+- `aeui` 패키지의 CJS entry를 `.cjs`로 분리해 `require('aeui')` 경로 수정.
+- `packages/core/types/` 기반 초기 TypeScript 선언과 smoke typecheck 추가.
+- `create-aeui-app` 템플릿과 예제 Vite 설정을 AEUI Babel plugin 순서 기준으로 통일.
+
 ## 🟡 중간 우선순위
 
 ### 테스트 coverage 확장
@@ -91,9 +100,8 @@ JSX 특성상 Fragment가 필요한 부분에 트랜스파일 단계에서 자�
 
 ### TypeScript 타입 정의
 
-- `packages/core/types/index.d.ts` 추가
-- 최소한 `AEUI`, `watch`, `clean`, `createVNode`의 타입 선언
-- `package.json`에 `types` 필드 추가
+- 타입 선언의 정밀도 개선: DOM prop, event handler, component props inference 보강
+- JSX namespace와 TypeScript 프로젝트 설정 예시 문서화
 
 ### App-local runtime context
 
@@ -102,16 +110,13 @@ JSX 특성상 Fragment가 필요한 부분에 트랜스파일 단계에서 자�
 ### 빌드 설정 개선
 
 - Rollup에 minification 플러그인 추가 (`@rollup/plugin-terser`)
-- Source map 생성
-- `package.json`에 `sideEffects: false` 추가
+- npm 배포 전 smoke 검증 자동화
 
 ### `create-aeui-app` CLI 개선
 
 - AEUI 버전을 동적으로 삽입
-- `.gitignore` 자동 생성
 - 선택적 템플릿 (minimal / with-router / with-ssr)
 
 ### 모노레포 워크스페이스 개선
 
-- 루트 `package.json`에 공통 스크립트 추가
 - ESLint, Prettier 설정

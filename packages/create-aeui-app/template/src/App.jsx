@@ -3,7 +3,6 @@ import { AEUI, watch } from 'aeui';
 function Counter({ title }) {
   let count = 0;
 
-  // This watch dependency [count] should be transformed to () => [count] by the plugin
   watch(() => {
     console.log(`Counter ${title} changed to:`, count);
   }, [count]);
@@ -19,11 +18,11 @@ function Counter({ title }) {
 
 export default function App() {
   return (
-    <div>
-      <h1>AEUI Vite Demo</h1>
-      <p>This is a standard Vite project using AEUI.</p>
+    <main>
+      <h1>AEUI App</h1>
+      <p>State changes through ordinary JavaScript variables.</p>
       <Counter title="Counter 1" />
       <Counter title="Counter 2" />
-    </div>
+    </main>
   );
 }

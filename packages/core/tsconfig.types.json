@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2020", "DOM"],
+    "skipLibCheck": false,
+    "noEmit": true
+  },
+  "include": [
+    "types/**/*.d.ts",
+    "type-tests/**/*.ts"
+  ]
+}

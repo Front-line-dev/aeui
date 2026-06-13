@@ -63,15 +63,15 @@ aeui/
 ### 코어 라이브러리 빌드
 
 ```bash
-cd packages/core
-npm run build
+npm run build:core
 ```
 
 `dist/` 폴더에 ESM과 CJS 형식의 번들이 생성된다:
 - `dist/aeui.esm.js` — ES Module
-- `dist/aeui.js` — CommonJS
+- `dist/aeui.cjs` — CommonJS
 - `dist/babel-plugin.cjs` — Babel 플러그인 (CJS)
 - `dist/babel-plugin.js` — Babel 플러그인 (ESM)
+- 각 번들의 `.map` 파일 — source map
 
 ---
 
@@ -80,10 +80,10 @@ npm run build
 ### 테스트 실행
 
 ```bash
-cd example/test
-npm install
 npm test
 ```
+
+루트 `npm test`는 `example/test`의 Vitest suite를 실행한다.
 
 ### 테스트 구조
 
@@ -98,6 +98,46 @@ npm test
 - **프레임워크**: Vitest
 - **DOM 시뮬레이션**: jsdom
 - **JSX 변환**: Babel + AEUI 플러그인 (vitest 설정에서 자동 적용)
+
+---
+
+## 타입 검증
+
+```bash
+npm run typecheck
+```
+
+`packages/core/types/`의 public 타입 선언과 `packages/core/type-tests/`의 smoke 사용 예제를 TypeScript로 검증한다. 현재 core 소스는 JavaScript를 유지하고, 타입 선언은 배포용 `.d.ts`로 제공한다.
+
+---
+
+## 패키징 검증
+
+```bash
+npm run pack:core
+```
+
+패키지 dry-run으로 `dist`, `src`, `types`가 포함되는지 확인한다. ESM/CJS 진입점은 다음 smoke command로 확인할 수 있다:
+
+```bash
+node -e "import('aeui').then(m => console.log(Object.keys(m)))"
+node -e "const m = require('aeui'); console.log(Object.keys(m), typeof m.AEUI.init)"
+node -e "import('aeui/babel-plugin').then(m => console.log(typeof m.default))"
+node -e "const plugin = require('aeui/babel-plugin'); console.log(typeof plugin)"
+```
+
+---
+
+## 전체 검증
+
+```bash
+npm run build
+npm test
+npm run typecheck
+npm run pack:core
+```
+
+`npm run build`는 core 번들과 Vite 예제 앱들을 모두 빌드한다.
 
 ---
 

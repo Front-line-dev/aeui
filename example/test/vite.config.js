@@ -1,20 +1,23 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const aeuiBabelPlugins = [
+  ['aeui/babel-plugin'],
+  ['@babel/plugin-transform-react-jsx', {
+    pragma: 'AEUI.createElement',
+    pragmaFrag: 'AEUI.Fragment'
+  }]
+];
+
 export default defineConfig({
   plugins: [
     react({
+      include: /\.[jt]sx$/,
       jsxRuntime: 'classic',
-      // .jsx 파일에만 babel plugin 적용 (dist 파일 제외)
-      include: '**/*.jsx',
       babel: {
-        plugins: [
-          ['aeui/babel-plugin'],
-          ['@babel/plugin-transform-react-jsx', {
-            pragma: 'AEUI.createElement',
-            pragmaFrag: 'AEUI.Fragment'
-          }]
-        ]
+        babelrc: false,
+        configFile: false,
+        plugins: aeuiBabelPlugins
       }
     })
   ],

@@ -3,26 +3,49 @@
   "version": "0.0.1",
   "type": "module",
   "description": "A lightweight, custom frontend framework",
-  "main": "dist/aeui.js",
+  "main": "dist/aeui.cjs",
   "module": "dist/aeui.esm.js",
+  "types": "types/index.d.ts",
   "exports": {
     ".": {
+      "types": "./types/index.d.ts",
       "import": "./dist/aeui.esm.js",
-      "require": "./dist/aeui.js"
+      "require": "./dist/aeui.cjs"
     },
     "./babel-plugin": {
+      "types": "./types/babel-plugin.d.ts",
       "import": "./dist/babel-plugin.js",
       "require": "./dist/babel-plugin.cjs"
     }
   },
+  "typesVersions": {
+    "*": {
+      "babel-plugin": [
+        "types/babel-plugin.d.ts"
+      ],
+      "*": [
+        "types/index.d.ts"
+      ]
+    }
+  },
+  "sideEffects": false,
   "files": [
-    "dist",
-    "src"
+    "dist/aeui.cjs",
+    "dist/aeui.cjs.map",
+    "dist/aeui.esm.js",
+    "dist/aeui.esm.js.map",
+    "dist/babel-plugin.cjs",
+    "dist/babel-plugin.cjs.map",
+    "dist/babel-plugin.js",
+    "dist/babel-plugin.js.map",
+    "src",
+    "types"
   ],
   "scripts": {
     "build": "rollup -c",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm --prefix ../../example/test test",
+    "typecheck": "tsc -p tsconfig.types.json --noEmit"
   },
   "keywords": [
     "frontend",
@@ -33,6 +56,7 @@
   "license": "ISC",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
-    "rollup": "^4.53.3"
+    "rollup": "^4.53.3",
+    "typescript": "^5.9.3"
   }
 }
