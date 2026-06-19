@@ -42,10 +42,12 @@
 - catch-all: `docs/[...slug]`
 
 동일 depth에서 static route가 dynamic route보다 먼저 매칭되어야 한다.
+`index.jsx`는 해당 디렉터리의 exact route를 담당하므로, catch-all은 남은 segment가 하나 이상 있을 때만 매칭한다. 예를 들어 `/docs`는 `docs/index.jsx`가 처리하고, `/docs/core/router`는 `docs/[...slug].jsx`가 처리한다.
+동적 segment 또는 catch-all segment를 decode할 수 없는 malformed URL은 해당 route 매칭을 실패 처리해 fallback으로 보낸다.
 
 ## 정리와 테스트 기준
 
 - `AEUI.init`을 다시 호출하거나 테스트에서 runtime state를 reset할 때 router listener를 제거해야 한다.
 - 내부 링크, 외부 링크, 새 탭, download, modifier-click, middle click을 분리해서 테스트한다.
-- route matching은 static, dynamic, catch-all, query, fallback, priority를 독립적으로 검증한다.
+- route matching은 static, dynamic, catch-all, index vs catch-all, malformed segment, query, fallback, priority를 독립적으로 검증한다.
 - 컴포넌트 통합 테스트는 `_layout.jsx`, `route` prop 전달, anchor click, `popstate`를 포함해야 한다.

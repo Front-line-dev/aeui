@@ -13,11 +13,13 @@ AEUI가 “실제 앱 형태”에서 잘 동작하는지, 그리고 **React보�
 
 - `src/store.js`: 글로벌 `state` + `actions` (그냥 오브젝트, 페이지에서는 `state.products`처럼 직접 접근)
 - `src/models/*`: 비즈니스 로직(카트/주문/상품)을 파일 단위로 분리
-- `src/App.jsx`: 레이아웃 + `watch/clean`(clock/autosave/admin mode)
-- `src/ui/pages/*`: 화면. `state`를 읽고 `actions.*`를 호출
-- `src/ui/components/*`: 페이지가 커지면 view 컴포넌트를 분리(예: `components/shop`, `components/cart`, `components/admin`)
-- `src/ui/components/ToastHost.jsx`: toast TTL 타이머(`watch/clean`)
-- `src/ui/modals/*`: `state.modal` 기반 모달
+- `src/App.jsx`: 공통 앱 shell + `watch/clean`(clock/autosave/admin mode)
+- `src/pages/_layout.jsx`: 모든 라우트 페이지를 `App` shell 안에 배치하는 layout
+- `src/pages/*`: 파일 경로 기반 화면. `state`를 읽고 `actions.*`를 호출
+- `src/pages/products/[id].jsx`: 동적 세그먼트를 `route.params.id`로 읽는 상품 상세 화면
+- `src/components/*`: 페이지가 커지면 view 컴포넌트를 분리(예: `components/shop`, `components/cart`, `components/admin`)
+- `src/components/ToastHost.jsx`: toast TTL 타이머(`watch/clean`)
+- `src/components/modals/*`: `state.modal` 기반 모달
 - `src/lib/util.js`: 날짜/시간 포맷 같은 공용 유틸
 
 ## 실행

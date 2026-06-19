@@ -14,6 +14,7 @@ function AboutPage() {}
 function ProductPage() {}
 function CatchAllPage() {}
 function NotFoundPage() {}
+function DocsIndexPage() {}
 
 describe('directory router route matching', () => {
   it('matches static, index, dynamic, catch-all, fallback, and query values', () => {
@@ -52,6 +53,39 @@ describe('directory router route matching', () => {
 
     expect(matchRoute(table, '/products/new').component).toBe(StaticPage);
     expect(matchRoute(table, '/products/123').component).toBe(DynamicPage);
+  });
+
+  it('keeps index routes ahead of catch-all routes for empty remainders', () => {
+    const table = createRouteTable({
+      '/src/pages/index.jsx': { default: HomePage },
+      '/src/pages/docs/index.jsx': { default: DocsIndexPage },
+      '/src/pages/docs/[...slug].jsx': { default: CatchAllPage },
+      '/src/pages/[...slug].jsx': { default: CatchAllPage },
+      '/src/pages/404.jsx': { default: NotFoundPage },
+    });
+
+    expect(matchRoute(table, '/').component).toBe(HomePage);
+    expect(matchRoute(table, '/docs').component).toBe(DocsIndexPage);
+
+    const nested = matchRoute(table, '/docs/core/router');
+    expect(nested.component).toBe(CatchAllPage);
+    expect(nested.route.params).toEqual({ slug: ['core', 'router'] });
+  });
+
+  it('falls back instead of throwing when dynamic params cannot be decoded', () => {
+    const table = createRouteTable({
+      '/src/pages/products/[id].jsx': { default: ProductPage },
+      '/src/pages/docs/[...slug].jsx': { default: CatchAllPage },
+      '/src/pages/404.jsx': { default: NotFoundPage },
+    });
+
+    const malformedDynamic = matchRoute(table, '/products/%E0%A4%A');
+    expect(malformedDynamic.component).toBe(NotFoundPage);
+    expect(malformedDynamic.isFallback).toBe(true);
+
+    const malformedCatchAll = matchRoute(table, '/docs/core/%E0%A4%A');
+    expect(malformedCatchAll.component).toBe(NotFoundPage);
+    expect(malformedCatchAll.isFallback).toBe(true);
   });
 });
 
@@ -113,11 +147,31 @@ describe('aeui/vite plugin', () => {
     expect(result.tags[0].attrs.src).toBe('/@aeui-entry');
   });
 
-  it('keeps manual main.js entries untouched', () => {
+  it('keeps manual main entries untouched regardless of script attribute order', () => {
     const plugin = aeuiVite();
-    const html = '<html><body><script type="module" src="/src/main.js"></script></body></html>';
+    const manualEntries = [
+      '<script type="module" src="/src/main.js"></script>',
+      '<script src="/src/main.js" type="module"></script>',
+      '<script src="/base/src/main.js" type="module"></script>',
+      '<script defer src="/src/main.jsx" type="module"></script>',
+      '<script type="module" src="./src/main.js?version=1#entry"></script>',
+    ];
 
-    expect(plugin.transformIndexHtml.handler(html)).toBe(html);
+    manualEntries.forEach((script) => {
+      const html = `<html><body>${script}</body></html>`;
+      expect(plugin.transformIndexHtml.handler(html)).toBe(html);
+    });
+  });
+
+  it('does not treat data attributes as manual main script attributes', () => {
+    const plugin = aeuiVite();
+    plugin.configResolved({ root: makeFixture() });
+
+    const result = plugin.transformIndexHtml.handler(
+      '<html><body><script data-src="/src/main.js" data-type="module"></script></body></html>'
+    );
+
+    expect(result.tags[0].attrs.src).toBe('/@aeui-entry');
   });
 
   it('provides @ as a default alias to src', () => {

@@ -16,6 +16,17 @@ function normalizePath(filePath) {
   return String(filePath || '').replace(/\\/g, '/');
 }
 
+function getHtmlAttribute(tag, name) {
+  const pattern = new RegExp(`(?:^|[\\s<])${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i');
+  const match = String(tag || '').match(pattern);
+  return match ? (match[1] || match[2] || match[3] || '') : null;
+}
+
+function isManualMainSrc(src) {
+  const normalized = normalizePath(src).split('?')[0].split('#')[0].replace(/^\.\//, '');
+  return /(^|\/)src\/main\.[^/]+$/i.test(normalized);
+}
+
 function hasAlias(config, find) {
   const alias = config?.resolve?.alias;
   if (!alias) return false;
@@ -47,7 +58,12 @@ function createAliasConfig(config, options) {
 }
 
 function hasManualModuleEntry(html) {
-  return /<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["'][^"']*\/src\/main\.[^"']*["'][^>]*>/i.test(html);
+  const scriptTags = String(html || '').match(/<script\b[^>]*>/gi) || [];
+  return scriptTags.some((tag) => {
+    const type = getHtmlAttribute(tag, 'type');
+    const src = getHtmlAttribute(tag, 'src');
+    return String(type || '').toLowerCase() === 'module' && isManualMainSrc(src || '');
+  });
 }
 
 function hasFile(filePath) {

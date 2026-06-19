@@ -184,6 +184,14 @@ function routeInfoFromUrl(url, params = {}) {
   };
 }
 
+function safeDecodeSegment(segment) {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}
+
 function matchSegments(routeSegments, pathSegments) {
   const params = {};
 
@@ -192,7 +200,13 @@ function matchSegments(routeSegments, pathSegments) {
     const pathSegment = pathSegments[i];
 
     if (routeSegment.kind === 'catchAll') {
-      params[routeSegment.name] = pathSegments.slice(i).map(decodeURIComponent);
+      const rest = pathSegments.slice(i);
+      if (rest.length === 0) return null;
+
+      const decoded = rest.map(safeDecodeSegment);
+      if (decoded.some((segment) => segment == null)) return null;
+
+      params[routeSegment.name] = decoded;
       return params;
     }
 
@@ -203,7 +217,9 @@ function matchSegments(routeSegments, pathSegments) {
     }
 
     if (routeSegment.kind === 'dynamic') {
-      params[routeSegment.name] = decodeURIComponent(pathSegment);
+      const decoded = safeDecodeSegment(pathSegment);
+      if (decoded == null) return null;
+      params[routeSegment.name] = decoded;
     }
   }
 
