@@ -29,6 +29,17 @@ describe('deepEqual', () => {
     expect(_deepEqual({ a: { b: 1 } }, { a: { b: 1 } })).toBe(true);
   });
 
+  it('객체 key 비교는 enumerable own key만 동일하게 취급', () => {
+    const a = { visible: 1 };
+    const b = { other: 1 };
+    Object.defineProperty(b, 'visible', {
+      value: 1,
+      enumerable: false,
+    });
+
+    expect(_deepEqual(a, b)).toBe(false);
+  });
+
   it('Date 비교', () => {
     const d1 = new Date('2024-01-01');
     const d2 = new Date('2024-01-01');
@@ -63,6 +74,22 @@ describe('deepEqual', () => {
     const s1 = new Set([{ a: 1 }, { a: 1 }]);
     const s2 = new Set([{ a: 1 }, { b: 2 }]);
     expect(_deepEqual(s1, s2)).toBe(false);
+  });
+
+  it('Set 내부 primitive와 같은 참조 객체를 빠르게 매칭해도 deep 객체 비교를 보존', () => {
+    const shared = { shared: true };
+    const s1 = new Set([1, 'a', shared, { id: 1 }, { nested: { ok: true } }]);
+    const s2 = new Set([{ nested: { ok: true } }, { id: 1 }, shared, 'a', 1]);
+
+    expect(_deepEqual(s1, s2)).toBe(true);
+  });
+
+  it('Set 내부 VNode는 같은 참조일 때만 동일하게 취급', () => {
+    const vnode = AEUI.createVNode('div', { id: 'same' }, 'hello');
+    const equivalentVNode = AEUI.createVNode('div', { id: 'same' }, 'hello');
+
+    expect(_deepEqual(new Set([vnode]), new Set([vnode]))).toBe(true);
+    expect(_deepEqual(new Set([vnode]), new Set([equivalentVNode]))).toBe(false);
   });
 
   it('순환 참조 객체 비교 시 크래시 없이 동작', () => {

@@ -4,8 +4,72 @@
 
 import { VNODE_MARKER } from './vnode-marker.js';
 
+const propertyIsEnumerable = Object.prototype.propertyIsEnumerable;
+
 function isVNode(v) {
   return v !== null && typeof v === 'object' && v[VNODE_MARKER] === true;
+}
+
+function canDeepMatchSetValue(v) {
+  return v !== null && typeof v === 'object' && !isVNode(v);
+}
+
+function primitiveSignature(value) {
+  if (value === null) return 'null';
+
+  const type = typeof value;
+  if (type === 'number') {
+    if (Number.isNaN(value)) return 'number:NaN';
+    if (Object.is(value, -0)) return 'number:-0';
+  }
+
+  return `${type}:${String(value)}`;
+}
+
+function getValueShape(v) {
+  if (v === null || typeof v !== 'object') return primitiveSignature(v);
+  if (isVNode(v)) return 'vnode';
+  if (Array.isArray(v)) return `array:${v.length}`;
+  if (v instanceof Date) return `date:${primitiveSignature(v.getTime())}`;
+  if (v instanceof RegExp) return `regexp:${v.source}/${v.flags}`;
+  if (v instanceof Map) return `map:${v.size}`;
+  if (v instanceof Set) return `set:${v.size}`;
+  return `object:${Object.keys(v).sort().join('\u001f')}`;
+}
+
+function getOwnDataPropertyShape(object, key) {
+  const descriptor = Object.getOwnPropertyDescriptor(object, key);
+  if (!descriptor || !descriptor.enumerable) return 'missing';
+  if (!('value' in descriptor)) return 'accessor';
+  return getValueShape(descriptor.value);
+}
+
+function getSetMatchSignature(value) {
+  if (value === null || typeof value !== 'object') return primitiveSignature(value);
+  if (isVNode(value)) return 'vnode';
+  if (Array.isArray(value)) return `array:${value.length}`;
+  if (value instanceof Date) return `date:${primitiveSignature(value.getTime())}`;
+  if (value instanceof RegExp) return `regexp:${value.source}/${value.flags}`;
+  if (value instanceof Map) return `map:${value.size}`;
+  if (value instanceof Set) return `set:${value.size}`;
+
+  const keys = Object.keys(value).sort();
+  return `object:${keys.map((key) => `${key}:${getOwnDataPropertyShape(value, key)}`).join('\u001e')}`;
+}
+
+function getCachedSetMatchSignature(cache, value) {
+  if (!cache.has(value)) {
+    cache.set(value, getSetMatchSignature(value));
+  }
+  return cache.get(value);
+}
+
+function mergeSeen(target, source) {
+  if (source === target) return;
+
+  for (const [key, val] of source) {
+    target.set(key, val);
+  }
 }
 
 export function _deepEqual(a, b, seen = new Map()) {
@@ -45,46 +109,57 @@ export function _deepEqual(a, b, seen = new Map()) {
   if (a instanceof Set) {
     if (!(b instanceof Set) || a.size !== b.size) return false;
 
-    const bValues = [...b];
-    const used = new Array(bValues.length).fill(false);
+    const remainingB = new Set(b);
+    const signatureCache = new Map();
     let activeSeen = seen;
+    let preferFirstCandidate = true;
 
     for (const valA of a) {
-      let matchedIndex = -1;
+      if (remainingB.delete(valA)) continue;
+      if (!canDeepMatchSetValue(valA)) return false;
+
+      if (preferFirstCandidate) {
+        const firstCandidate = remainingB.values().next();
+        const trialSeen = new Map(activeSeen);
+        if (!firstCandidate.done && _deepEqual(valA, firstCandidate.value, trialSeen)) {
+          remainingB.delete(firstCandidate.value);
+          activeSeen = trialSeen;
+          continue;
+        }
+        preferFirstCandidate = false;
+      }
+
+      const signatureA = getCachedSetMatchSignature(signatureCache, valA);
+      let matchedValue = null;
       let matchedSeen = null;
 
-      for (let i = 0; i < bValues.length; i++) {
-        if (used[i]) continue;
+      for (const valB of remainingB) {
+        if (signatureA !== getCachedSetMatchSignature(signatureCache, valB)) continue;
 
         const trialSeen = new Map(activeSeen);
-        if (_deepEqual(valA, bValues[i], trialSeen)) {
-          matchedIndex = i;
+        if (_deepEqual(valA, valB, trialSeen)) {
+          matchedValue = valB;
           matchedSeen = trialSeen;
           break;
         }
       }
 
-      if (matchedIndex === -1) return false;
+      if (!matchedSeen) return false;
 
-      used[matchedIndex] = true;
+      remainingB.delete(matchedValue);
       activeSeen = matchedSeen;
     }
 
-    if (activeSeen !== seen) {
-      for (const [key, val] of activeSeen) {
-        seen.set(key, val);
-      }
-    }
-    return true;
+    mergeSeen(seen, activeSeen);
+    return remainingB.size === 0;
   }
 
   const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
 
-  if (keysA.length !== keysB.length) return false;
+  if (keysA.length !== Object.keys(b).length) return false;
 
   for (const key of keysA) {
-    if (!keysB.includes(key) || !_deepEqual(a[key], b[key], seen)) return false;
+    if (!propertyIsEnumerable.call(b, key) || !_deepEqual(a[key], b[key], seen)) return false;
   }
 
   return true;

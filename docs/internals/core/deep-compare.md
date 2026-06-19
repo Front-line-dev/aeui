@@ -129,43 +129,57 @@ if (a instanceof Map) {
 if (a instanceof Set) {
   if (!(b instanceof Set) || a.size !== b.size) return false;
 
-  const bValues = [...b];
-  const used = new Array(bValues.length).fill(false);
+  const remainingB = new Set(b);
+  const signatureCache = new Map();
   let activeSeen = seen;
+  let preferFirstCandidate = true;
 
   for (const val of a) {
-    let matchedIndex = -1;
+    if (remainingB.delete(val)) continue;
+    if (!canDeepMatchSetValue(val)) return false;
+
+    if (preferFirstCandidate) {
+      const firstCandidate = remainingB.values().next();
+      const trialSeen = new Map(activeSeen);
+      if (!firstCandidate.done && _deepEqual(val, firstCandidate.value, trialSeen)) {
+        remainingB.delete(firstCandidate.value);
+        activeSeen = trialSeen;
+        continue;
+      }
+      preferFirstCandidate = false;
+    }
+
+    const signature = getCachedSetMatchSignature(signatureCache, val);
+    let matchedValue = null;
     let matchedSeen = null;
 
-    for (let i = 0; i < bValues.length; i++) {
-      if (used[i]) continue;
+    for (const candidate of remainingB) {
+      if (signature !== getCachedSetMatchSignature(signatureCache, candidate)) continue;
 
       // Set 후보 매칭은 백트래킹이 필요하므로 seen 상태를 분리한다.
       const trialSeen = new Map(activeSeen);
-      if (_deepEqual(val, bValues[i], trialSeen)) {
-        matchedIndex = i;
+      if (_deepEqual(val, candidate, trialSeen)) {
+        matchedValue = candidate;
         matchedSeen = trialSeen;
         break;
       }
     }
 
-    if (matchedIndex === -1) return false;
+    if (!matchedSeen) return false;
 
-    used[matchedIndex] = true;
+    remainingB.delete(matchedValue);
     activeSeen = matchedSeen;
   }
-  if (activeSeen !== seen) {
-    for (const [key, val] of activeSeen) {
-      seen.set(key, val);
-    }
-  }
-  return true;
+  mergeSeen(seen, activeSeen);
+  return remainingB.size === 0;
 }
 ```
 
-Set의 요소가 **객체일 수 있으므로**, `Set.has()`로 찾을 수 없다 (`has`는 참조 비교를 사용하므로). 따라서 `_deepEqual`로 1:1 매칭을 시도하는 **O(n²)** 방식을 사용한다.
+Set 비교는 먼저 `remainingB.delete(val)`로 **동일 primitive / 동일 객체 참조**를 제거한다. 이 경로는 일반적인 primitive Set을 O(n)에 가깝게 처리하고, 같은 객체 참조가 양쪽 Set에 들어 있는 경우도 후보 탐색 없이 끝낸다.
 
-**`used` 배열**: 이미 매칭된 b의 요소는 다시 매칭하지 않는다. 이전 구현은 `used` 표시가 없어서 `Set([{a:1}, {a:1}])` vs `Set([{a:1}, {b:2}])`처럼 중복 요소가 있는 경우 잘못된 `true`를 반환할 수 있었다.
+남은 값은 서로 다른 객체 참조이므로 깊은 비교가 필요하다. deepClone처럼 양쪽 Set의 순서가 보존된 경우를 위해 먼저 `remainingB`의 첫 후보를 직접 비교한다. 첫 후보 직접 비교가 한 번 실패하면 순서가 어긋난 Set으로 보고 이후에는 이 fast path를 끈다. 그 다음에는 `getSetMatchSignature()`로 값의 큰 형태(Array 길이, Map/Set 크기, 일반 객체의 enumerable key와 data property shape)를 비교하여 명백히 다른 후보를 건너뛴다. 그래도 같은 shape의 객체끼리는 `_deepEqual`로 1:1 매칭을 시도하므로 최악의 경우는 여전히 O(n²)일 수 있다.
+
+**`remainingB` Set**: 이미 매칭된 b의 요소는 삭제한다. 이 덕분에 `Set([{a:1}, {a:1}])` vs `Set([{a:1}, {b:2}])`처럼 deep-equal 중복 요소가 있는 경우에도 같은 후보를 두 번 재사용하지 않는다.
 
 **`trialSeen` 백트래킹**: 후보 매칭 시 `seen` 상태를 복사(`new Map(activeSeen)`)하여 시도한다. 매칭이 실패하면 `seen`이 오염되지 않고, 성공하면 그 상태를 `activeSeen`으로 승격한다.
 
@@ -173,12 +187,11 @@ Set의 요소가 **객체일 수 있으므로**, `Set.has()`로 찾을 수 없�
 
 ```javascript
 const keysA = Object.keys(a);
-const keysB = Object.keys(b);
 
-if (keysA.length !== keysB.length) return false;
+if (keysA.length !== Object.keys(b).length) return false;
 
 for (const key of keysA) {
-  if (!keysB.includes(key) || !_deepEqual(a[key], b[key], seen)) return false;
+  if (!propertyIsEnumerable.call(b, key) || !_deepEqual(a[key], b[key], seen)) return false;
 }
 return true;
 ```
@@ -186,6 +199,8 @@ return true;
 key 수가 같고, 모든 key에 대해 value가 같으면 동일하다.
 
 **key 순서는 무시**한다: `{a:1, b:2}`와 `{b:2, a:1}`은 동일하다고 판단한다.
+
+key 존재 여부는 `keysB.includes(key)`가 아니라 `propertyIsEnumerable.call(b, key)`로 확인한다. `keysB.includes()`는 key마다 배열을 선형 검색하므로 key 수가 많을 때 O(n²)이 되지만, `propertyIsEnumerable`은 b 객체의 enumerable own property 여부를 직접 확인한다.
 
 `Object.keys()`는 `enumerable` 속성만 반환하므로, `Symbol` 키, non-enumerable 속성, prototype chain의 속성은 비교하지 않는다.
 
