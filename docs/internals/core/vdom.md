@@ -90,22 +90,19 @@ createVNode(tag, props, ...children) {
   // 1. children 평탄화 및 필터링
   const validChildren = children.flat().filter(c => c != null && typeof c !== 'boolean');
   
-  // 2. props가 null이면 빈 객체로 대체
-  const finalProps = props || {};
+  // 2. 전달받은 props는 변이하지 않고 새 객체로 복사
+  const finalProps = { ...(props || {}), children: validChildren };
   
-  // 3. children을 props에도 저장
-  finalProps.children = validChildren;
-  
-  // 4. VNode 객체 생성
+  // 3. VNode 객체 생성
   const vnode = { tag, props: finalProps, children: validChildren };
 
-  // 5. 내부 VNode marker를 non-enumerable Symbol로 부여
+  // 4. 내부 VNode marker를 non-enumerable Symbol로 부여
   Object.defineProperty(vnode, VNODE_MARKER, {
     value: true,
     enumerable: false,
   });
 
-  // 6. VNode 객체 반환
+  // 5. VNode 객체 반환
   return vnode;
 }
 ```
@@ -166,10 +163,10 @@ flat 후: [VNode, VNode, VNode]
 ### 3단계: props 기본값
 
 ```javascript
-const finalProps = props || {};
+const finalProps = { ...(props || {}), children: validChildren };
 ```
 
-JSX에서 속성이 없는 요소(`<div>내용</div>`)의 경우 Babel이 props를 `null`로 전달한다. 이를 빈 객체 `{}`로 변환하여, 이후 코드에서 `props.children`에 안전하게 접근할 수 있게 한다.
+JSX에서 속성이 없는 요소(`<div>내용</div>`)의 경우 Babel이 props를 `null`로 전달한다. 이를 빈 객체 `{}`로 변환하여, 이후 코드에서 `props.children`에 안전하게 접근할 수 있게 한다. props 객체가 전달된 경우에도 원본 객체를 직접 변이하지 않고 새 객체를 만든다. 같은 props 객체를 여러 VNode에 재사용하거나 frozen 객체를 전달해도 `children` 추가 때문에 원본이 오염되거나 throw하지 않아야 한다.
 
 ---
 

@@ -15,7 +15,7 @@ AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은
 | **Props 반응화** | `function Comp(props)` | `function Comp(_initialProps)` + `__props` 객체 | props 변경 시 클로저 참조를 최신 상태로 유지 |
 | **Watch deps 래핑** | `watch(cb, [count])` | `AEUI.__runtime.watch(cb, () => [count])` | 매 호출 시 현재 값을 읽도록 함수화 |
 
-플러그인은 JSX 또는 compiled helper가 `AEUI` 식별자를 필요로 하는 파일에 named import를 자동으로 넣는다. 기존 `import { watch } from 'aeui'`가 있으면 같은 import 선언에 `AEUI` specifier를 추가하고, import가 없으면 새 import 선언을 만든다.
+플러그인은 JSX 또는 compiled helper가 `AEUI` 식별자를 필요로 하는 파일에 named import를 자동으로 넣는다. 기존 `import { watch } from 'aeui'`가 있으면 같은 import 선언에 `AEUI` specifier를 추가하고, import가 없으면 새 import 선언을 만든다. 같은 파일에 로컬 `AEUI` binding이 있으면 JSX runtime helper를 안전하게 가리킬 수 없으므로 compile error를 낸다.
 
 플러그인은 render wrapper에서 **`AEUI.__runtime.runRenderPhase()`를 호출**한다. props 동기화, watcher 실행, render context 설정은 이 runtime helper가 담당한다.
 
@@ -98,7 +98,7 @@ Babel은 코드를 AST로 파싱한 뒤 visitor 패턴으로 각 노드를 순�
 
 ```text
 1. JSX 태그로 사용되는 함수 → 컴포넌트
-2. PascalCase(대문자로 시작) 함수 → 컴포넌트
+2. PascalCase(대문자로 시작)이고 renderable expression을 반환하는 함수 → 컴포넌트
 3. renderable expression을 반환하는 anonymous default export → 컴포넌트
 4. 그 외 → 변환하지 않음
 ```
@@ -124,12 +124,12 @@ binding.referencePaths.forEach(refPath => {
 ### PascalCase 검사
 
 ```javascript
-if (varName && /^[A-Z]/.test(varName)) {
+if (varName && /^[A-Z]/.test(varName) && returnsRenderableValue(path)) {
   return true;
 }
 ```
 
-React와 같은 관례로, AEUI에서도 컴포넌트는 PascalCase를 우선 기준으로 삼는다.
+React와 같은 관례로, AEUI에서도 컴포넌트 이름은 PascalCase를 사용한다. 다만 일반 유틸리티 함수가 대문자로 시작할 수 있으므로, PascalCase만으로는 변환하지 않고 JSX 또는 `AEUI.createVNode(...)` 같은 renderable return이 확인될 때만 컴포넌트로 본다.
 
 ### anonymous default export 예외
 
@@ -218,6 +218,23 @@ function UserCard({ name, age }) { ... }
 function UserCard(_initialProps) {
   const __props = { ..._initialProps };
   let { name, age } = _initialProps;
+  ...
+}
+```
+
+**default parameter를 가진 구조 분해**
+
+```javascript
+// 입력
+function UserCard({ name } = { name: 'Guest' }) { ... }
+
+// 출력 개념
+function UserCard(_initialProps) {
+  const _initialPropsValue = _initialProps === undefined
+    ? { name: 'Guest' }
+    : _initialProps;
+  const __props = { ..._initialPropsValue };
+  let { name } = _initialPropsValue;
   ...
 }
 ```

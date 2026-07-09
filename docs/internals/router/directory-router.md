@@ -10,13 +10,13 @@
 
 - `packages/core/src/vite-plugin.js`
   - `index.html`에 내부 가상 엔트리 `"/@aeui-entry"`를 주입한다.
-  - `src/pages/**/*.jsx`가 있으면 route module map을 만들고 `AEUI.__runtime.initDirectoryRouter(...)`를 호출한다.
+  - `src/pages/**/*.{js,jsx,ts,tsx,mjs,cjs}`가 있으면 route module map을 만들고 `AEUI.__runtime.initDirectoryRouter(...)`를 호출한다.
   - 라우트 디렉터리가 없으면 `src/App.jsx`를 기존 단일 앱처럼 자동 부팅한다.
-  - JSX 파일 변환은 AEUI Babel 플러그인과 classic JSX transform을 같은 순서로 적용한다.
+  - 지원 확장자의 모듈 변환은 AEUI Babel 플러그인과 classic JSX transform을 같은 순서로 적용한다. TypeScript syntax는 parser에서 허용하고, type 제거는 이후 Vite 파이프라인에 맡긴다.
 
 - `packages/core/src/router.js`
   - route module map을 route table로 변환한다.
-  - `index.jsx`, `[id].jsx`, `[...slug].jsx`, `_layout.jsx`, `404.jsx` 규칙을 처리한다.
+  - `index`, `[id]`, `[...slug]`, `_layout`, `404` 파일 규칙을 처리한다.
   - 현재 URL을 `route` prop으로 정규화해 page component에 전달한다.
   - 앱 컨테이너에 click delegation을 등록해 same-origin 내부 `<a href>` 이동을 History API 전환으로 처리한다.
 
@@ -27,7 +27,7 @@
 ## 런타임 흐름
 
 1. Vite가 `transformIndexHtml`의 pre hook에서 `"/@aeui-entry"` script를 삽입한다.
-2. 가상 엔트리는 `src/pages/**/*.jsx`를 eager glob으로 로드한다.
+2. 가상 엔트리는 `src/pages/**/*.{js,jsx,ts,tsx,mjs,cjs}`를 eager glob으로 로드한다.
 3. `initDirectoryRouter(routeModules, container, { rootDir })`가 route table과 router root component를 만든다.
 4. `AEUI.init(Root, container)`가 기존 reconciliation/scheduler 흐름을 그대로 시작한다.
 5. 내부 링크 클릭 시 router가 `history.pushState`를 호출하고 `state.requestRender()`로 다음 렌더를 예약한다.
@@ -42,8 +42,9 @@
 - catch-all: `docs/[...slug]`
 
 동일 depth에서 static route가 dynamic route보다 먼저 매칭되어야 한다.
-`index.jsx`는 해당 디렉터리의 exact route를 담당하므로, catch-all은 남은 segment가 하나 이상 있을 때만 매칭한다. 예를 들어 `/docs`는 `docs/index.jsx`가 처리하고, `/docs/core/router`는 `docs/[...slug].jsx`가 처리한다.
-동적 segment 또는 catch-all segment를 decode할 수 없는 malformed URL은 해당 route 매칭을 실패 처리해 fallback으로 보낸다.
+`index` 파일은 해당 디렉터리의 exact route를 담당하므로, catch-all은 남은 segment가 하나 이상 있을 때만 매칭한다. 예를 들어 `/docs`는 `docs/index`가 처리하고, `/docs/core/router`는 `docs/[...slug]`가 처리한다.
+catch-all segment는 route의 마지막 segment에서만 유효하다. `src/pages/[...slug]/edit.jsx`처럼 뒤에 segment가 남는 파일은 route table에 넣지 않는다.
+정적 segment, 동적 segment, catch-all segment는 URL decode 후 비교한다. decode할 수 없는 malformed URL은 해당 route 매칭을 실패 처리해 fallback으로 보낸다.
 
 ## 정리와 테스트 기준
 

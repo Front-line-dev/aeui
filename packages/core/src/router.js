@@ -129,6 +129,10 @@ function createRoute(filePath, mod, rootDir) {
   }
 
   const segments = routeParts.map(parseSegment);
+  if (segments.some((segment, index) => segment.kind === 'catchAll' && index !== segments.length - 1)) {
+    return null;
+  }
+
   const component = mod && (mod.default || mod.Page || mod);
   if (typeof component !== 'function') return null;
 
@@ -212,8 +216,11 @@ function matchSegments(routeSegments, pathSegments) {
 
     if (pathSegment == null) return null;
 
-    if (routeSegment.kind === 'static' && routeSegment.value !== pathSegment) {
-      return null;
+    if (routeSegment.kind === 'static') {
+      const decoded = safeDecodeSegment(pathSegment);
+      if (decoded == null || routeSegment.value !== decoded) {
+        return null;
+      }
     }
 
     if (routeSegment.kind === 'dynamic') {

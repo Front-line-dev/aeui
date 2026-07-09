@@ -41,6 +41,8 @@ DOM 속성 diff를 수행하고 실제 DOM에 반영한다. `children`, `key`, `
 1. `<select>`는 `<option>` children이 모두 렌더된 뒤에야 `value`를 설정할 수 있다.
 2. `<input type="file">`의 `value`는 보안상 DOM property에 직접 쓸 수 없다.
 
+`updateDomProps()`도 같은 규칙을 따른다. `input`이 이전 렌더의 `type="text"`에서 이번 렌더의 `type="file"`로 바뀌는 경우, props 순서와 무관하게 다음 `type`을 기준으로 file input 여부를 판단하고 `value` attribute를 제거한다.
+
 ---
 
 ## `updateProps(target, newProps)`

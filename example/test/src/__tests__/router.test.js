@@ -43,6 +43,28 @@ describe('directory router route matching', () => {
     expect(missing.isFallback).toBe(true);
   });
 
+  it('accepts the documented route file extensions consistently', () => {
+    function JsPage() {}
+    function TsPage() {}
+    function TsxPage() {}
+    function MjsPage() {}
+    function CjsPage() {}
+    const table = createRouteTable({
+      '/src/pages/about.js': { default: JsPage },
+      '/src/pages/settings.ts': { default: TsPage },
+      '/src/pages/profile.tsx': { default: TsxPage },
+      '/src/pages/feed.mjs': { default: MjsPage },
+      '/src/pages/legacy.cjs': { default: CjsPage },
+      '/src/pages/404.jsx': { default: NotFoundPage },
+    });
+
+    expect(matchRoute(table, '/about').component).toBe(JsPage);
+    expect(matchRoute(table, '/settings').component).toBe(TsPage);
+    expect(matchRoute(table, '/profile').component).toBe(TsxPage);
+    expect(matchRoute(table, '/feed').component).toBe(MjsPage);
+    expect(matchRoute(table, '/legacy').component).toBe(CjsPage);
+  });
+
   it('prioritizes static routes over dynamic routes', () => {
     const StaticPage = () => null;
     const DynamicPage = () => null;
@@ -86,6 +108,29 @@ describe('directory router route matching', () => {
     const malformedCatchAll = matchRoute(table, '/docs/core/%E0%A4%A');
     expect(malformedCatchAll.component).toBe(NotFoundPage);
     expect(malformedCatchAll.isFallback).toBe(true);
+  });
+
+  it('matches static path segments after URL decoding', () => {
+    function CafePage() {}
+    const table = createRouteTable({
+      '/src/pages/café.jsx': { default: CafePage },
+      '/src/pages/404.jsx': { default: NotFoundPage },
+    });
+
+    expect(matchRoute(table, '/café').component).toBe(CafePage);
+    expect(matchRoute(table, '/caf%C3%A9').component).toBe(CafePage);
+  });
+
+  it('ignores catch-all routes that are not the final segment', () => {
+    function InvalidCatchAllPage() {}
+    const table = createRouteTable({
+      '/src/pages/[...slug]/edit.jsx': { default: InvalidCatchAllPage },
+      '/src/pages/404.jsx': { default: NotFoundPage },
+    });
+
+    expect(table.routes.map((route) => route.filePath)).not.toContain('/src/pages/[...slug]/edit.jsx');
+    expect(matchRoute(table, '/foo/edit').component).toBe(NotFoundPage);
+    expect(matchRoute(table, '/foo/bar/edit').component).toBe(NotFoundPage);
   });
 });
 
@@ -202,7 +247,7 @@ describe('aeui/vite plugin', () => {
   it('generates router bootstrap code when src/pages contains route files', () => {
     const root = makeFixture();
     fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'src/pages/index.jsx'), 'export default function Home() {}');
+    fs.writeFileSync(path.join(root, 'src/pages/index.tsx'), 'export default function Home() {}');
 
     const plugin = aeuiVite();
     plugin.configResolved({ root });
@@ -210,6 +255,24 @@ describe('aeui/vite plugin', () => {
     const entry = plugin.load('\0virtual:aeui-entry');
 
     expect(entry).toContain('AEUI.__runtime.initDirectoryRouter');
-    expect(entry).toContain('import.meta.glob("/src/pages/**/*.jsx"');
+    expect(entry).toContain('import.meta.glob("/src/pages/**/*.{js,jsx,ts,tsx,mjs,cjs}"');
+  });
+
+  it('transforms JSX and TSX route modules before Vite handles the rest of the pipeline', async () => {
+    const plugin = aeuiVite();
+
+    const jsx = await plugin.transform('export default () => <div />;', '/app/src/pages/index.jsx');
+    const tsx = await plugin.transform(
+      'const title: string = "Home"; export default function Home(): unknown { return <h1>{title}</h1>; }',
+      '/app/src/pages/index.tsx'
+    );
+    const ts = await plugin.transform(
+      'import { AEUI } from "aeui"; export function Home(): unknown { return AEUI.createVNode("h1", null, "Home"); }',
+      '/app/src/pages/home.ts'
+    );
+
+    expect(jsx.code).toContain('AEUI.createElement("div"');
+    expect(tsx.code).toContain('AEUI.createElement("h1"');
+    expect(ts.code).toContain('AEUI.__runtime.runRenderPhase');
   });
 });

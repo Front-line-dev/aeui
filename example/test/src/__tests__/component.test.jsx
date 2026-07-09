@@ -613,6 +613,31 @@ describe('props 구조분해 반응성', () => {
     expect(container.querySelector('#default-count').textContent).toBe('5');
   });
 
+  it('default parameter 구조분해 props도 새 값이 전달되면 render에 반영된다', () => {
+    function DefaultParamChild({ name } = { name: 'Guest' }) {
+      return <span id="default-param-name">{name}</span>;
+    }
+
+    function DefaultParamApp() {
+      let name = 'first';
+
+      return (
+        <div>
+          <DefaultParamChild name={name} />
+          <button id="default-param-change" onClick={() => { name = 'second'; }}>change</button>
+        </div>
+      );
+    }
+
+    AEUI.init(DefaultParamApp, container);
+    expect(container.querySelector('#default-param-name').textContent).toBe('first');
+
+    container.querySelector('#default-param-change').click();
+    AEUI.render();
+
+    expect(container.querySelector('#default-param-name').textContent).toBe('second');
+  });
+
   it('nested 구조분해된 props가 최신값으로 갱신된다', () => {
     function NestedChild({ user: { name } }) {
       return <span id="nested-name">{name}</span>;

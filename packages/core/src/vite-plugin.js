@@ -7,7 +7,8 @@ import aeuiTransform from './babel-plugin.js';
 const VIRTUAL_ENTRY_ID = 'virtual:aeui-entry';
 const PUBLIC_ENTRY_PATH = '/@aeui-entry';
 const RESOLVED_VIRTUAL_ENTRY_ID = `\0${VIRTUAL_ENTRY_ID}`;
-const ROUTE_EXT_RE = /\.jsx$/;
+const ROUTE_EXT_RE = /\.[cm]?[jt]sx?$/;
+const ROUTE_GLOB_EXTENSIONS = 'js,jsx,ts,tsx,mjs,cjs';
 const DEFAULT_ROUTER_DIR = 'src/pages';
 const DEFAULT_ALIAS = '@';
 const DEFAULT_ALIAS_DIR = 'src';
@@ -108,7 +109,7 @@ function createRouterEntry(root, options) {
       import { AEUI } from "aeui";
       ${styleImport}
 
-      const routes = import.meta.glob("/${normalizedRouterDir}/**/*.jsx", { eager: true });
+      const routes = import.meta.glob("/${normalizedRouterDir}/**/*.{${ROUTE_GLOB_EXTENSIONS}}", { eager: true });
       AEUI.__runtime.initDirectoryRouter(routes, document.getElementById(${JSON.stringify(rootId)}), {
         rootDir: "/${normalizedRouterDir}"
       });
@@ -130,9 +131,23 @@ function createRouterEntry(root, options) {
 
 function shouldTransform(id) {
   const filePath = id.split('?')[0];
-  if (!/\.jsx$/.test(filePath)) return false;
+  if (!ROUTE_EXT_RE.test(filePath)) return false;
   if (filePath.includes('/node_modules/')) return false;
   return true;
+}
+
+function createParserPlugins(filePath) {
+  if (/\.tsx?$/.test(filePath)) {
+    return [
+      ...(/\.tsx$/.test(filePath) ? ['jsx'] : []),
+      ['typescript', {
+        allExtensions: true,
+        isTSX: /\.tsx$/.test(filePath),
+      }],
+    ];
+  }
+
+  return [];
 }
 
 export default function aeui(options = {}) {
@@ -182,11 +197,15 @@ export default function aeui(options = {}) {
 
     async transform(code, id) {
       if (!shouldTransform(id)) return null;
+      const filePath = id.split('?')[0];
 
       const result = await transformAsync(code, {
         babelrc: false,
         configFile: false,
-        filename: id.split('?')[0],
+        filename: filePath,
+        parserOpts: {
+          plugins: createParserPlugins(filePath),
+        },
         plugins: [
           aeuiTransform,
           [jsxTransform, {

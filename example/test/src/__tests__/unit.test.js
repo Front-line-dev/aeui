@@ -247,6 +247,26 @@ describe('AEUI.createVNode', () => {
     expect(vnode.children).toEqual(['a', 'b']);
   });
 
+  it('전달받은 props 객체를 변이하지 않고 VNode별 props를 만든다', () => {
+    const shared = { id: 'x' };
+    const first = AEUI.createVNode('div', shared, 'A');
+    const second = AEUI.createVNode('span', shared, 'B');
+
+    expect(shared).toEqual({ id: 'x' });
+    expect(first.props).not.toBe(shared);
+    expect(second.props).not.toBe(shared);
+    expect(first.props.children).toEqual(['A']);
+    expect(second.props.children).toEqual(['B']);
+  });
+
+  it('frozen props 객체를 받아도 children 추가 때문에 throw하지 않는다', () => {
+    const props = Object.freeze({ id: 'frozen' });
+
+    expect(() => {
+      AEUI.createVNode('div', props, 'A');
+    }).not.toThrow();
+  });
+
   it('null children 필터링', () => {
     const vnode = AEUI.createVNode('div', null, 'a', null, 'b', undefined);
     expect(vnode.children).toEqual(['a', 'b']);

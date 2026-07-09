@@ -60,6 +60,17 @@ function placeNode(state, parentDom, node, beforeDom) {
   state.didMutate = true;
 }
 
+function removeInsertedSiblings(state, parentDom, afterDom, beforeDom) {
+  let current = afterDom ? afterDom.nextSibling : parentDom.firstChild;
+
+  while (current && current !== beforeDom) {
+    const next = current.nextSibling;
+    parentDom.removeChild(current);
+    state.didMutate = true;
+    current = next;
+  }
+}
+
 function warnDuplicateKey(key) {
   console.warn(`[AEUI] Duplicate key detected in sibling list: ${String(key)}`);
 }
@@ -177,17 +188,39 @@ function mountHostNode(state, parentDom, node, beforeDom) {
   node.lastDom = dom;
   state.didMutate = true;
 
-  reconcileChildren(state, dom, node, node.vnode.children || [], null);
-  syncHostControlledProps(state, node);
-  node.firstDom = dom;
-  node.lastDom = dom;
-  return node;
+  try {
+    reconcileChildren(state, dom, node, node.vnode.children || [], null);
+    syncHostControlledProps(state, node);
+    node.firstDom = dom;
+    node.lastDom = dom;
+    return node;
+  } catch (error) {
+    state.unmountNode(node, false);
+    if (dom.parentNode === parentDom) {
+      parentDom.removeChild(dom);
+      state.didMutate = true;
+    }
+    node.dom = null;
+    node.firstDom = null;
+    node.lastDom = null;
+    throw error;
+  }
 }
 
 function mountFragmentNode(state, parentDom, node, beforeDom) {
-  reconcileChildren(state, parentDom, node, getFragmentChildren(state.Fragment, node.vnode), beforeDom);
-  updateRangeFromChildren(node);
-  return node;
+  const afterDom = beforeDom ? beforeDom.previousSibling : parentDom.lastChild;
+
+  try {
+    reconcileChildren(state, parentDom, node, getFragmentChildren(state.Fragment, node.vnode), beforeDom);
+    updateRangeFromChildren(node);
+    return node;
+  } catch (error) {
+    state.unmountNode(node, false);
+    removeInsertedSiblings(state, parentDom, afterDom, beforeDom);
+    node.firstDom = null;
+    node.lastDom = null;
+    throw error;
+  }
 }
 
 function mountComponentNode(state, parentDom, node, beforeDom) {

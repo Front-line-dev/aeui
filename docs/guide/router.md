@@ -27,6 +27,8 @@ export default defineConfig({
 
 `src/pages` 디렉터리가 있으면 AEUI가 파일을 URL로 해석한다. 새 프로젝트는 Next.js처럼 `pages` 디렉터리를 사용한다.
 
+라우트 파일 확장자는 `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`를 지원한다. JSX를 쓰는 파일은 Vite 플러그인이 AEUI Babel 플러그인과 JSX transform을 먼저 적용하고, TypeScript 문법은 이후 Vite 파이프라인이 처리한다.
+
 | 파일 | URL |
 | --- | --- |
 | `src/pages/index.jsx` | `/` |
@@ -36,7 +38,7 @@ export default defineConfig({
 | `src/pages/404.jsx` | fallback |
 | `src/pages/_layout.jsx` | 공통 layout |
 
-`[...slug].jsx` 같은 catch-all 페이지는 뒤에 하나 이상의 path segment가 있을 때 매칭된다. 예를 들어 `src/pages/docs/[...slug].jsx`는 `/docs/core/router`를 처리하고, `/docs` 화면은 `src/pages/docs/index.jsx`에 작성한다.
+`[...slug].jsx` 같은 catch-all 페이지는 route의 마지막 segment로만 사용한다. 뒤에 하나 이상의 path segment가 있을 때 매칭된다. 예를 들어 `src/pages/docs/[...slug].jsx`는 `/docs/core/router`를 처리하고, `/docs` 화면은 `src/pages/docs/index.jsx`에 작성한다.
 
 `src/pages`가 없으면 플러그인은 기존 방식처럼 `src/App.jsx`를 자동으로 부팅한다.
 

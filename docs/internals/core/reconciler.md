@@ -157,6 +157,8 @@ switch (oldNode.kind) {
 
 cleanup과 DOM 제거 규칙이 한곳에 모여 있기 때문에, type mismatch 교체와 `null` 렌더링이 같은 정리 경로를 공유한다.
 
+mount 중 자식 reconcile이나 component setup/render에서 에러가 나면, 이미 삽입된 host/fragment DOM은 해당 mount 경계에서 제거한다. 실패한 subtree가 RuntimeNode tree에 커밋되지 않은 상태로 DOM에 남으면 다음 렌더에서 중복 삽입될 수 있기 때문이다.
+
 ---
 
 ## host controlled props

@@ -70,8 +70,10 @@ export function init(state, RootComponent, containerElement) {
 ```text
 1. RootComponent로부터 VNode 생성: createVNode(RootComponent)
 2. 현재 root wrapper의 children[0] (이전 루트 child node) 획득
-3. reconcile(containerElement, previousRootChild, rootVNode, null, rootNode) 호출
-4. root wrapper의 children, firstDom, lastDom 갱신
+3. 이전에 커밋된 DOM node 집합을 기록
+4. reconcile(containerElement, previousRootChild, rootVNode, null, rootNode) 호출
+5. reconcile이 성공하면 root wrapper의 children, firstDom, lastDom 갱신
+6. reconcile 중 에러가 나면 커밋된 DOM 집합에 없던 미커밋 DOM을 제거하고 에러를 다시 던짐
 ```
 
 ### 코드
@@ -82,13 +84,21 @@ export function reconcileRoot(state) {
 
   const rootVNode = state.createVNode(state.RootComponent);
   const previousRootChild = state.rootNode.children[0] || null;
-  const nextRootChild = state.reconcile(
-    state.containerElement,
-    previousRootChild,
-    rootVNode,
-    null,
-    state.rootNode
-  );
+  const committedDomNodes = collectCommittedDomNodes(previousRootChild);
+  let nextRootChild;
+
+  try {
+    nextRootChild = state.reconcile(
+      state.containerElement,
+      previousRootChild,
+      rootVNode,
+      null,
+      state.rootNode
+    );
+  } catch (error) {
+    removeUncommittedDom(state.containerElement, committedDomNodes);
+    throw error;
+  }
 
   state.rootNode.children = nextRootChild ? [nextRootChild] : [];
   state.rootNode.firstDom = nextRootChild ? nextRootChild.firstDom : null;
@@ -97,6 +107,8 @@ export function reconcileRoot(state) {
 ```
 
 root wrapper node가 루트 child node를 소유하고, `reconcile`이 `firstDom`/`lastDom` 범위로 DOM 위치를 관리하므로, 인덱스 계산이나 `_getDomNodeCount` 합산이 필요하지 않다.
+
+렌더 중 setup/render 에러가 발생하면 `tick()`이 에러를 로깅하고 다음 렌더를 계속 허용한다. 이때 실패한 렌더에서 이미 삽입된 DOM이 root tree에 커밋되지 않은 상태로 남으면 다음 렌더마다 중복될 수 있으므로, `reconcileRoot()`는 에러 전 커밋 상태를 기준으로 미커밋 DOM을 정리한다.
 
 ---
 

@@ -10,18 +10,55 @@ function computeNextPollingDelay(state, didMutate) {
   state.framesUntilNextTick = state.frameDelay - 1;
 }
 
+function collectCommittedDomNodes(node, nodes = new Set()) {
+  if (!node) return nodes;
+
+  if (node.dom) {
+    nodes.add(node.dom);
+  }
+
+  if (node.firstDom && node.firstDom === node.lastDom) {
+    nodes.add(node.firstDom);
+  }
+
+  (node.children || []).forEach((child) => {
+    collectCommittedDomNodes(child, nodes);
+  });
+
+  return nodes;
+}
+
+function removeUncommittedDom(parentDom, committedNodes) {
+  Array.from(parentDom.childNodes).forEach((child) => {
+    if (!committedNodes.has(child)) {
+      parentDom.removeChild(child);
+      return;
+    }
+
+    removeUncommittedDom(child, committedNodes);
+  });
+}
+
 export function reconcileRoot(state) {
   if (!state.rootNode || !state.containerElement || !state.RootComponent) return;
 
   const rootVNode = state.createVNode(state.RootComponent);
   const previousRootChild = state.rootNode.children[0] || null;
-  const nextRootChild = state.reconcile(
-    state.containerElement,
-    previousRootChild,
-    rootVNode,
-    null,
-    state.rootNode
-  );
+  const committedDomNodes = collectCommittedDomNodes(previousRootChild);
+  let nextRootChild;
+
+  try {
+    nextRootChild = state.reconcile(
+      state.containerElement,
+      previousRootChild,
+      rootVNode,
+      null,
+      state.rootNode
+    );
+  } catch (error) {
+    removeUncommittedDom(state.containerElement, committedDomNodes);
+    throw error;
+  }
 
   state.rootNode.children = nextRootChild ? [nextRootChild] : [];
   state.rootNode.firstDom = nextRootChild ? nextRootChild.firstDom : null;

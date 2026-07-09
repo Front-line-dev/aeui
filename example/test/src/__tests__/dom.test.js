@@ -144,6 +144,20 @@ describe('_updateDomProps', () => {
     expect(input.getAttribute('value')).toBeNull();
   });
 
+  it('input이 text에서 file로 바뀌면 이전 value attribute를 제거함', () => {
+    const input = document.createElement('input');
+    const oldProps = { value: 'old-path', type: 'text' };
+
+    runtime.updateDomProps(input, oldProps, {});
+    expect(input.getAttribute('value')).toBe('old-path');
+
+    runtime.updateDomProps(input, { value: 'fake-path', type: 'file' }, oldProps);
+
+    expect(input.type).toBe('file');
+    expect(input.value).toBe('');
+    expect(input.getAttribute('value')).toBeNull();
+  });
+
   it('attribute 제거 (undefined)', () => {
     runtime.updateDomProps(div, { id: 'test' });
     runtime.updateDomProps(div, { id: undefined }, { id: 'test' });
@@ -745,6 +759,41 @@ describe('에러 처리', () => {
     }).toThrow('render boom');
 
     expect(runtime.state.currentComponentNode).toBeNull();
+  });
+
+  it('렌더 실패 중 삽입된 미커밋 DOM은 다음 렌더에 누적되지 않음', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    function Broken() {
+      throw new Error('setup boom');
+    }
+
+    function App() {
+      return () => AEUI.createVNode(
+        'div',
+        { className: 'wrap' },
+        AEUI.createVNode('span', null, 'ok'),
+        AEUI.createVNode(Broken, null)
+      );
+    }
+
+    AEUI.init(App, container);
+    expect(container.querySelectorAll('.wrap')).toHaveLength(0);
+    expect(container.innerHTML).toBe('');
+
+    AEUI.render();
+    expect(container.querySelectorAll('.wrap')).toHaveLength(0);
+    expect(container.innerHTML).toBe('');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[AEUI] Render error:',
+      expect.objectContaining({ message: 'setup boom' })
+    );
+
+    consoleSpy.mockRestore();
+    resetAeuiRuntime();
+    container.remove();
   });
 
   it('watcher 에러가 다른 watcher를 차단하지 않음', () => {

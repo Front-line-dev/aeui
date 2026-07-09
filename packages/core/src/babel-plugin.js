@@ -22,7 +22,11 @@ export default function aeuiTransform({ types: t }) {
   const ensureAeuiImport = (programPath) => {
     const existingBinding = programPath.scope.getBinding('AEUI');
     if (bindingIsAeuiImport(existingBinding)) return;
-    if (existingBinding) return;
+    if (existingBinding) {
+      throw programPath.buildCodeFrameError(
+        '[AEUI] Local AEUI bindings conflict with the JSX runtime import. Rename the local binding or import { AEUI } from "aeui".'
+      );
+    }
 
     const existingImport = programPath.node.body.find((statement) => (
       isAeuiImportDeclaration(statement)
@@ -46,6 +50,24 @@ export default function aeuiTransform({ types: t }) {
   const needsAeuiRuntimeBinding = (programPath) => {
     let needsBinding = false;
 
+    const isAeuiRuntimeReference = (path) => {
+      const parent = path.parentPath;
+      if (!parent || !parent.isMemberExpression() || parent.node.object !== path.node) {
+        return false;
+      }
+
+      if (parent.node.computed || !t.isIdentifier(parent.node.property)) {
+        return false;
+      }
+
+      return (
+        parent.node.property.name === 'createElement' ||
+        parent.node.property.name === 'createVNode' ||
+        parent.node.property.name === 'Fragment' ||
+        parent.node.property.name === '__runtime'
+      );
+    };
+
     programPath.traverse({
       JSXElement(path) {
         needsBinding = true;
@@ -60,6 +82,12 @@ export default function aeuiTransform({ types: t }) {
 
         const binding = path.scope.getBinding('AEUI');
         if (!binding) {
+          needsBinding = true;
+          path.stop();
+          return;
+        }
+
+        if (!bindingIsAeuiImport(binding) && isAeuiRuntimeReference(path)) {
           needsBinding = true;
           path.stop();
         }
@@ -289,7 +317,7 @@ export default function aeuiTransform({ types: t }) {
       return true;
     }
 
-    if (varName && /^[A-Z]/.test(varName)) {
+    if (varName && /^[A-Z]/.test(varName) && returnsRenderableValue(path)) {
       return true;
     }
 
@@ -416,10 +444,51 @@ export default function aeuiTransform({ types: t }) {
       return [];
     };
 
+    const isSupportedPropsParam = (param) => {
+      if (!param) return false;
+      if (t.isIdentifier(param) || t.isObjectPattern(param) || t.isArrayPattern(param)) {
+        return true;
+      }
+      if (!t.isAssignmentPattern(param)) return false;
+      return t.isIdentifier(param.left) || t.isObjectPattern(param.left) || t.isArrayPattern(param.left);
+    };
+
+    const getPropsBindingPattern = (param) => (
+      t.isAssignmentPattern(param) ? param.left : param
+    );
+
+    const createInitialPropsSource = (param, initialPropsId) => {
+      if (!t.isAssignmentPattern(param)) {
+        return {
+          statements: [],
+          sourceId: initialPropsId,
+        };
+      }
+
+      const sourceId = path.scope.generateUidIdentifier('initialPropsValue');
+      return {
+        statements: [
+          t.variableDeclaration('const', [
+            t.variableDeclarator(
+              sourceId,
+              t.conditionalExpression(
+                t.binaryExpression('===', t.cloneNode(initialPropsId), t.identifier('undefined')),
+                t.cloneNode(param.right, true),
+                t.cloneNode(initialPropsId)
+              )
+            )
+          ])
+        ],
+        sourceId,
+      };
+    };
+
     // --- Props-specific setup (only when params exist) ---
-    if (params.length > 0 && (t.isIdentifier(params[0]) || t.isObjectPattern(params[0]))) {
+    if (params.length > 0 && isSupportedPropsParam(params[0])) {
       const originalParam = params[0];
+      const bindingPattern = getPropsBindingPattern(originalParam);
       const initialPropsId = path.scope.generateUidIdentifier("initialProps");
+      const initialPropsSource = createInitialPropsSource(originalParam, initialPropsId);
       propsId = t.identifier("__props");
 
       // 1. Rename Param: (props) -> (_initialProps)
@@ -429,19 +498,23 @@ export default function aeuiTransform({ types: t }) {
       const propsSetup = t.variableDeclaration("const", [
         t.variableDeclarator(
           propsId,
-          t.objectExpression([t.spreadElement(initialPropsId)])
+          t.objectExpression([t.spreadElement(t.cloneNode(initialPropsSource.sourceId))])
         )
       ]);
 
       let restoreVars;
+      const setupStatements = [
+        ...initialPropsSource.statements,
+        propsSetup,
+      ];
 
       // 3. Restore User Variables
-      if (t.isIdentifier(originalParam)) {
+      if (t.isIdentifier(bindingPattern)) {
         restoreVars = t.variableDeclaration("const", [
-          t.variableDeclarator(originalParam, propsId)
+          t.variableDeclarator(t.cloneNode(bindingPattern, true), propsId)
         ]);
-      } else if (t.isObjectPattern(originalParam)) {
-        const bindingIdentifiers = t.getBindingIdentifiers(originalParam);
+      } else if (t.isObjectPattern(bindingPattern) || t.isArrayPattern(bindingPattern)) {
+        const bindingIdentifiers = t.getBindingIdentifiers(bindingPattern);
         Object.keys(bindingIdentifiers).forEach((name) => {
           destructuredNames.add(name);
         });
@@ -453,7 +526,7 @@ export default function aeuiTransform({ types: t }) {
             t.arrowFunctionExpression([], t.blockStatement([
               t.variableDeclaration('const', [
                 t.variableDeclarator(
-                  t.cloneNode(originalParam, true),
+                  t.cloneNode(bindingPattern, true),
                   t.cloneNode(propsId)
                 )
               ]),
@@ -469,12 +542,15 @@ export default function aeuiTransform({ types: t }) {
         ]);
 
         restoreVars = t.variableDeclaration("let", [
-          t.variableDeclarator(originalParam, initialPropsId)
+          t.variableDeclarator(
+            t.cloneNode(bindingPattern, true),
+            t.cloneNode(initialPropsSource.sourceId)
+          )
         ]);
-        bodyPath.unshiftContainer('body', [resolvePropsSetup]);
+        setupStatements.push(resolvePropsSetup);
       }
 
-      bodyPath.unshiftContainer('body', [propsSetup, restoreVars]);
+      bodyPath.unshiftContainer('body', [...setupStatements, restoreVars]);
     }
 
     // --- Watch & Return transformation (always runs) ---

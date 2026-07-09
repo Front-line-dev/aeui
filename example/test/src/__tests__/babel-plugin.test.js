@@ -51,6 +51,28 @@ describe('AEUI Babel Plugin', () => {
     expect(code).not.toMatch(/from\s+["']aeui["']/);
   });
 
+  it('JSX를 반환하지 않는 PascalCase 유틸 함수는 컴포넌트로 변환하지 않는다', () => {
+    const code = transform(`
+      function User(name) {
+        return name.toUpperCase();
+      }
+
+      console.log(User('kim'));
+    `);
+
+    expect(code).toMatch(/function User\(name\)/);
+    expect(code).toMatch(/return name\.toUpperCase\(\);/);
+    expect(code).not.toMatch(/__props/);
+    expect(code).not.toMatch(/runRenderPhase/);
+  });
+
+  it('로컬 AEUI binding이 JSX runtime import를 가리면 compile error를 낸다', () => {
+    expect(() => transform(`
+      const AEUI = { custom: true };
+      export default () => <div />;
+    `)).toThrow(/Local AEUI bindings conflict/);
+  });
+
   it('익명 default export 화살표 컴포넌트를 render factory로 변환한다', () => {
     const code = transform(`
       import { AEUI } from 'aeui';
@@ -95,6 +117,18 @@ describe('AEUI Babel Plugin', () => {
 
     expect(code).toMatch(/return _newProps => AEUI\.__runtime\.runRenderPhase\(/);
     expect(code).toMatch(/resolvedProps\.name/);
+  });
+
+  it('default parameter를 가진 구조분해 props도 최신 props target을 사용한다', () => {
+    const code = transform(`
+      import { AEUI } from 'aeui';
+      const Greeting = ({ name } = { name: 'Guest' }) => <p>{name}</p>;
+    `);
+
+    expect(code).toMatch(/const __props = \{/);
+    expect(code).toMatch(/runRenderPhase\(_newProps, __props,/);
+    expect(code).toMatch(/resolvedProps\.name/);
+    expect(code).not.toMatch(/runRenderPhase\([^,]+, null,/);
   });
 
   it('구조분해된 수동 render param을 사용하는 컴포넌트도 변환된다', () => {

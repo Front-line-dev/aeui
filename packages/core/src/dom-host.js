@@ -2,6 +2,10 @@ function isInternalJsxMetadataProp(key) {
   return key === '__self' || key === '__source';
 }
 
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
 export function cloneHostPropsSnapshot(state, props = {}) {
   const snapshot = {};
 
@@ -63,8 +67,12 @@ export function updateDomProps(state, domNode, props, oldProps = {}) {
 
     const newValue = props ? props[key] : undefined;
     const oldValue = oldProps ? oldProps[key] : undefined;
+    const nextInputType = hasOwn(props, 'type') ? props.type : domNode.type;
+    const isNextFileInputValue = key === 'value' &&
+      domNode.tagName === 'INPUT' &&
+      String(nextInputType || '').toLowerCase() === 'file';
 
-    if (state.deepEqual(newValue, oldValue)) continue;
+    if (state.deepEqual(newValue, oldValue) && !isNextFileInputValue) continue;
 
     if (key.startsWith('on')) {
       const eventName = key.substring(2).toLowerCase();
@@ -113,8 +121,7 @@ export function updateDomProps(state, domNode, props, oldProps = {}) {
       domNode.style.cssText = newValue;
       state.didMutate = true;
     } else if (key === 'value') {
-      const isFileInput = domNode.tagName === 'INPUT' && domNode.type === 'file';
-      if (isFileInput) {
+      if (isNextFileInputValue) {
         domNode.removeAttribute('value');
         state.didMutate = true;
         continue;
