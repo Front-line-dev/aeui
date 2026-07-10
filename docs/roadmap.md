@@ -1,14 +1,53 @@
 # 로드맵 (Roadmap)
 
+이 문서는 아직 완료되지 않은 작업만 기록한다. 현재 구현을 설명하는 내용은 `docs/ai`의 **현재 구현** 문단에 두고, 아래 작업은 **현재 구현 결함 수정**과 **계획 기능**을 구분해 관리한다.
+
+## 🔴 우선 수정 필요
+
+### DOM 입력 및 접근성 정확성
+
+- file input 판정을 모든 DOM 갱신 경로에서 대소문자 비구분으로 통일한다. 현재 controlled sync는 `type="FILE"` 등을 일반 input으로 오인해 금지된 non-empty value 쓰기를 시도할 수 있다.
+- `aria-*`의 boolean 값을 HTML boolean attribute처럼 빈 문자열/제거로 처리하지 않는다. nullish만 제거하고 `true`와 `false`는 각각 문자열 attribute로 보존한다.
+
+### Babel import 병합 정확성
+
+- JSX runtime용 `AEUI` 자동 import를 추가할 때 기존 default import의 의미를 바꾸지 않는다.
+- namespace import에는 named specifier를 같은 declaration에 강제로 넣지 않고, 문법적으로 유효한 별도 named import를 생성한다.
+- named/default/namespace/alias 조합별 transform 회귀를 새 적합성 suite에 포함한다.
+
+### Vite route 및 virtual entry 정확성
+
+- route detector, eager glob, transform filter, parser가 공식 지원 확장자 `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` 하나의 목록을 공유하도록 고친다.
+- `.mts`, `.cts`, `.mjsx` 등 detector만 받아들이고 실제 route import/parser는 처리하지 못하는 불일치를 제거한다.
+- HTML에 public entry `/@aeui-entry` 또는 internal id `virtual:aeui-entry`가 이미 있으면 virtual entry script를 중복 주입하지 않는다.
+
+### 적합성 테스트 전면 재작성
+
+현재 `example/test`는 현재 구현의 회귀를 조사하는 참고 자료일 뿐 문서 계약의 적합성 판정 기준으로 사용하지 않는다. 기존 suite에 테스트를 덧붙이는 방식이 아니라 `docs/ai`의 규범과 목표 계약에서 새 suite를 처음부터 작성한다.
+
+- 각 테스트가 검증하는 문서 절과 상태를 명시한다.
+- **현재 구현**과 **계획 기능**을 현재 합격 조건으로 고정하지 않는다.
+- **수정 필요** 항목은 잘못된 현재 결과가 아니라 문서에 적힌 목표 결과를 검증한다.
+- fragment reorder, nested destructuring props와 render param 조합, cleanup/watch ordering을 새 suite의 명시적 시나리오로 다시 설계한다.
+- source 직접 import와 빌드된 package entry 검증을 분리하고, package 소비 ESM/CJS smoke를 실행 가능한 명령으로 제공한다.
+
 ## 🟡 중간 우선순위
 
-### 테스트 coverage 확장
+### 마운트 실패 자원 정리 보장
 
-희귀 케이스 보강
+최초 mount 도중 뒤쪽 sibling이 실패해도 앞에서 setup을 끝낸 provisional component의 cleanup이 정확히 한 번 실행되도록 한다. 이는 전체 render의 완전한 트랜잭션 rollback이나 error boundary와 별개인 수명주기 보장이다.
 
-- fragment reorder edge case
-- nested destructuring props + render param 조합
-- cleanup/watch ordering regression
+### file input polling 변화 감지 개선
+
+동일한 file input props에서 제거할 `value` attribute가 이미 없다면 DOM mutation으로 세지 않도록 개선한다. 실제 DOM 변화가 없을 때 adaptive polling backoff가 정상적으로 증가해야 한다.
+
+### component ArrayPattern props 지원
+
+component의 첫 파라미터가 ArrayPattern 또는 ArrayPattern assignment일 때 plain-object VNode props와 충돌하지 않는 입력 표현 및 resolver 규칙을 설계한다. 구현 전까지 이 문법은 지원 기능이나 현재 적합성 조건으로 간주하지 않는다.
+
+### event prop 판정 정밀화
+
+현재의 단순 `startsWith('on')` 판정을 대체해 `once` 같은 일반 prop을 `ce` event로 오인하지 않는 이름 규칙을 설계한다. listener 교체·해제와 기존 event proxy 안정성은 유지한다.
 
 ### 입력 바인딩 문법 추가 (DX 향상)
 
@@ -26,8 +65,8 @@ JSX에서 자주 사용하는 DOM prop과 HTML attribute의 매핑 규칙을 정
 - `attribute`, `class`, `for`, `ref`, `event` 등 DOM prop 처리 보강.
 - `class`/`className`, `for`/`htmlFor`처럼 HTML 표준 명칭과 JS 친화 명칭의 alias 정책 정리.
 - `ref`를 DOM attribute로 내려보내지 않고 실제 DOM node 또는 component 노드에 접근할 수 있는 API 검토.
-- 이벤트 prop의 이름 규칙, listener 교체/해제, 중복 등록 방지 규칙 보강.
-- boolean attribute, dataset, aria 속성 등 기존 처리와 충돌하지 않도록 테스트 케이스 확장.
+- event capture/options 문법과 listener options 지원 범위 검토.
+- HTML boolean attribute, dataset, 일반 DOM property의 장기 매핑 정책 정리.
 
 ### 컴포넌트 스토리 및 상태 저장 시스템
 
@@ -43,7 +82,6 @@ Storybook과 비슷하게 컴포넌트를 독립적으로 실행, 확인, 공유
 
 Babel 플러그인의 컴포넌트 판별 휴리스틱과 renderable return 감지 범위를 개선한다.
 
-- PascalCase 함수가 JSX를 직접 반환하지 않는 경우의 오인/누락 케이스 점검.
 - JSX를 담은 지역 변수를 반환하는 패턴 지원 검토.
 - 감지할 수 없는 컴포넌트 패턴에 대한 dev warning 추가.
 - 명시적 컴포넌트 표시를 위한 annotation 또는 helper API 검토.
@@ -53,7 +91,6 @@ Babel 플러그인의 컴포넌트 판별 휴리스틱과 renderable return 감�
 JSX 사용을 위해 모든 파일에서 `AEUI`를 import하거나 Vite Babel 설정을 직접 작성해야 하는 부담을 줄인다.
 
 - `aeui/jsx-runtime` 제공 검토.
-- Babel 플러그인의 자동 import 주입 검토.
 
 ### GitHub Pages 배포 기능
 
