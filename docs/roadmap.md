@@ -15,6 +15,21 @@
 - namespace import에는 named specifier를 같은 declaration에 강제로 넣지 않고, 문법적으로 유효한 별도 named import를 생성한다.
 - named/default/namespace/alias 조합별 transform 회귀를 새 적합성 suite에 포함한다.
 
+### 깊은 데이터 비교 및 복제 정확성
+
+- `AEUI-DATA-FIX-001`: `_deepEqual(a, b)`와 `_deepEqual(b, a)`가 항상 같은 결과를 내도록 타입 분기와 양방향 참조 대응을 수정한다. 서로 다른 내장 타입, 순환 구조, 공유 참조 구조를 포함한 property test를 추가한다.
+- `AEUI-DATA-FIX-002`: enumerable own `__proto__`가 clone의 prototype setter로 작동하지 않고 own data property로 복제되도록 수정한다. clone 및 전역 prototype 불변성을 회귀 테스트로 고정한다.
+
+### Babel 컴포넌트 및 hook 판별 정확성
+
+- `AEUI-COMPILER-FIX-001`: 임의 호출의 첫 인자라는 이유만으로 일반 callback을 컴포넌트로 변환하지 않도록 판별 근거를 JSX tag, 정확한 AEUI element factory의 type 위치, 명시적 component 표식처럼 검증 가능한 신호로 제한한다. 일반 callback negative fixture와 실제 component positive fixture를 함께 추가한다.
+- `AEUI-COMPILER-FIX-002`: 고정된 `__props` 생성 이름을 scope-safe UID로 바꾸고 사용자 binding 충돌 회귀를 추가한다.
+- `AEUI-COMPILER-FIX-003`: named dependency getter가 함수 객체 자체를 반환하는 getter로 바뀌지 않도록 binding 종류를 판별하고, 실제 dependency 배열이 runtime에 전달되는지 검증한다.
+- `AEUI-COMPILER-FIX-004`: hook의 local 이름이 아니라 `aeui`에서 가져온 실제 imported 이름으로 `watch`와 `clean`을 판별하고 alias·shadowing negative fixture를 추가한다.
+- `AEUI-COMPILER-FIX-005`: `_newProps` parameter 이름 접두사 대신 plugin metadata 또는 생성 wrapper 구조로 idempotence를 판별하고, 사용자 parameter 보존과 재컴파일 무중복을 함께 검증한다.
+- React의 JSX 처리에서 참고할 수 있는 경계를 별도 compiler pipeline 설명으로 문서화한다. JSX 변환은 tag를 element type으로 보존하고 후속 단계가 host string과 component value를 구분한다는 점을 참고하되, React가 사용자 컴포넌트 함수 본문을 AEUI식 render factory로 미리 다시 쓴다고 설명하지 않는다.
+- AEUI pipeline을 `component 후보 수집 -> 명시적 판별/진단 -> setup/render factory 변환 -> JSX lowering -> runtime component 실행` 단계로 나누고, 각 단계의 입력·출력·실패 조건 및 단계별 fixture를 문서화한다.
+
 ### Vite route 및 virtual entry 정확성
 
 - route detector, eager glob, transform filter, parser가 공식 지원 확장자 `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` 하나의 목록을 공유하도록 고친다.
@@ -78,9 +93,9 @@ Storybook과 비슷하게 컴포넌트를 독립적으로 실행, 확인, 공유
 - 저장된 상태를 스토리/케이스 단위로 관리하고, UI에서 선택해 재현할 수 있는 구조 검토.
 - 로컬 개발 기능이 production bundle에 포함되지 않도록 dev-only 빌드 경계 설계.
 
-### 컴포넌트 판별 및 return 규칙 개선
+### 컴포넌트 return 규칙 확장
 
-Babel 플러그인의 컴포넌트 판별 휴리스틱과 renderable return 감지 범위를 개선한다.
+우선 수정 항목의 컴포넌트 판별 pipeline을 확정한 뒤 renderable return 감지 범위를 확장한다.
 
 - JSX를 담은 지역 변수를 반환하는 패턴 지원 검토.
 - 감지할 수 없는 컴포넌트 패턴에 대한 dev warning 추가.

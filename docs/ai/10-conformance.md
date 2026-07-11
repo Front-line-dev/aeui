@@ -68,8 +68,14 @@
 | **수정 필요** | 공식 route/source 확장자 통일 | 여섯 공식 확장자의 전 계층 일치와 목록 밖 suffix의 제외를 검증한다. |
 | **수정 필요** | public/internal virtual entry 중복 방지 | 실제 module script의 두 id는 중복 주입하지 않고 `data-src`·주석은 오인하지 않는지 검증한다. |
 | **수정 필요** | boolean `aria-*` 의미 | `true`/`false` 문자열 attribute와 nullish 제거, expando 비생성을 검증한다. |
+| **수정 필요** | `AEUI-DATA-FIX-001`: 깊은 비교 대칭성·타입·참조 그래프 | 인자 순서를 바꿔도 결과가 같고, 서로 다른 내장 타입은 양방향 모두 `false`이며, 순환 및 공유 참조의 일대일 대응이 다른 그래프를 같다고 판정하지 않는 목표 테스트를 둔다. |
+| **수정 필요** | `AEUI-DATA-FIX-002`: `__proto__` 안전 복제 | enumerable own `__proto__`를 같은 own data property로 복제하되 clone의 prototype과 전역 prototype을 바꾸지 않는 목표 테스트를 둔다. |
+| **수정 필요** | `AEUI-COMPILER-FIX-001`: 일반 callback의 컴포넌트 오판 제거 | JSX tag와 정확한 AEUI element factory의 type 위치는 컴포넌트 증거로 취급하되 `map`, `filter`, timer, registration, Promise callback의 첫 인자는 변환하지 않는 positive/negative fixture를 분리한다. |
+| **수정 필요** | `AEUI-COMPILER-FIX-002`: compiler 생성 이름 충돌 방지 | 사용자 코드에 `__props`가 있어도 변환 결과가 parse되고 원래 binding 의미가 유지되며, 모든 생성 이름이 scope-safe UID인지 검증한다. |
+| **수정 필요** | `AEUI-COMPILER-FIX-003`: 이름 있는 의존성 getter 보존 | local function declaration과 함수 binding을 deps로 넘기면 실제 배열 결과가 runtime에 전달되고 `() => getDeps`처럼 함수 객체 자체를 반환하지 않는지 검증한다. 일반 값 deps의 getter wrapping은 유지한다. |
+| **수정 필요** | `AEUI-COMPILER-FIX-004`: hook의 원본 import 이름 판별 | `watch as observe`는 watch로, `clean as watch`는 clean으로 변환하며 같은 local 이름의 비-AEUI import와 shadowed binding은 변환하지 않는지 검증한다. |
+| **수정 필요** | `AEUI-COMPILER-FIX-005`: compiler wrapper 중복 변환 방지 | 사용자가 `_newProps`로 시작하는 parameter를 선언해도 필요한 변환을 수행하고, 이미 생성된 wrapper를 다시 컴파일할 때에는 중복 wrapper를 만들지 않는 두 조건을 함께 검증한다. |
 | **현재 구현** | props target 열거·삭제·복사 의미 | 03 §7.3의 정확한 사실 설명을 참고한다. 이를 더 강한 일반 객체 replacement 계약으로 확대하지 않는다. |
-| **현재 구현** | deep clone의 `__proto__` 대입 예외 | 02 §8의 정확한 사실 설명을 참고한다. 안전한 clone으로 바꾸려면 별도 규범 변경을 먼저 한다. |
 
 ## 4. 재작성 완료 전 참고 검증 순서
 
@@ -238,6 +244,16 @@ git diff --check
 - deps가 함수가 아니면 getter로 래핑
 - deps 생략, 세 번째 options 인자, 배열이 첫 인자인 구식 순서는 runtime watch helper로 변환하지 않음
 
+위 inventory에 더해 `AEUI-COMPILER-FIX-001`~`005`는 각각 독립 test ID를 갖는다. 특히 컴포넌트 판별 suite는 JSX tag처럼 컴포넌트임을 직접 보여 주는 구문과 일반 JavaScript callback 사용을 같은 fixture에 섞지 않는다. React의 JSX pipeline을 참고할 때에도 React가 사용자 컴포넌트 함수 본문을 JSX 단계에서 AEUI식 render factory로 다시 쓴다고 가정하지 않는다. 참고할 경계는 JSX tag를 element type 값으로 보존한 뒤 host tag와 사용자 component를 후속 단계에서 구분한다는 점이다. AEUI 고유의 setup 1회·render factory 변환은 이 JSX lowering과 분리된 단계로 검증한다.
+
+컴파일러 pipeline 검증은 다음 순서의 관찰 결과를 고정한다.
+
+1. JSX tag와 정확한 `AEUI.createElement`/`AEUI.createVNode` type 위치에서 component 후보 binding을 수집한다.
+2. 일반 call argument는 후보 근거에서 제외하고, 정적으로 확정할 수 없는 pattern은 명시적 helper·annotation 또는 diagnostic 정책으로 보낸다.
+3. 확정된 component binding에만 scope-safe props·render wrapper 변환을 한 번 적용한다.
+4. JSX lowering 결과가 원래 component binding을 element type으로 전달하는지 검증한다.
+5. runtime 통합 테스트에서 해당 type이 component setup 1회와 반복 render 계약으로 실행되는지 확인한다.
+
 기존 “첫 specifier로 `AEUI` 추가” assertion은 named-only import의 현재 경로를 조사하는 자료일 뿐 모든 import 문법의 목표 계약이 아니다. 새 suite는 default import 의미 보존과 namespace import용 별도 named declaration을 06 §3.3에 따라 검증해야 한다. component ArrayPattern의 현재 TypeError는 **계획 기능**의 미구현 상태이므로 실패 결과를 호환 assertion으로 복사하지 않는다.
 
 ### 5.10 `router.test.js`: route table과 Vite 결합
@@ -270,6 +286,8 @@ git diff --check
 - 재-init 시 이전 RAF에 대한 cancel 호출 자체
 - component ArrayPattern props의 현재 TypeError 원인과 향후 입력 ABI 결정 필요성. TypeError 자체를 합격 기대값으로 만들지 않음
 - 배열을 첫 argument로 둔 legacy watch 호출의 미변환과 dynamic/catch-all pattern 충돌의 module insertion-order 선점
+- `AEUI-DATA-FIX-001`~`002`의 대칭성·cross-type·공유/순환 참조·`__proto__` 안전성 property test
+- `AEUI-COMPILER-FIX-001`~`005`의 일반 callback negative fixture, 생성 UID, named deps getter, hook imported-name, wrapper idempotence fixture
 - 생성 tarball을 실제 소비 프로젝트에 설치한 뒤 ESM/CJS에서 root, `babel-plugin`, `vite` 세 진입점을 불러오는 smoke
 
 이 항목을 기존 suite에 부분적으로 추가하거나 수동 검증하는 것만으로 적합성 작업을 완료 처리하지 않는다. 새 suite에서 해당 문서 조항의 상태와 기대 동작을 다시 정한 뒤 독립 테스트로 작성한다.

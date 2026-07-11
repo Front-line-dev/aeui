@@ -52,7 +52,7 @@ src/
 | `vnode-helpers.js` | `getVNodeKey`, `isFragmentVNode`, `getFragmentChildren` | `resolveFragmentComponent` | 02 §5 |
 | `deep-compare.js` | `_deepEqual`, `_deepClone` | `isVNode`, `canDeepMatchSetValue`, `primitiveSignature`, `getValueShape`, `getOwnDataPropertyShape`, `getSetMatchSignature`, `getCachedSetMatchSignature`, `mergeSeen`, cached `propertyIsEnumerable` | 02 §7~8 |
 
-deep compare의 private signature helper는 최적화이면서 Set 1:1 후보 선택 의미에 관여한다. 이름만 다른 단순 최적화로 제거하지 말고 02 §7.3의 후보 필터 및 trial `seen` 규칙을 보존한다.
+위 private 심볼은 현재 구현 inventory다. deep compare의 signature helper는 Set 1:1 후보 선택 최적화에 관여하지만, `AEUI-DATA-FIX-001`을 구현할 때 단방향 `seen` 구조나 `mergeSeen` 모양까지 보존해서는 안 된다. 목표 구현은 02 §7.4의 현재 후보 격리 방식을 참고하되 §7.5의 양방향 대응과 독립 trial 상태를 만족하도록 helper와 manifest를 함께 갱신한다.
 
 ## 5. RuntimeNode와 컴포넌트 모듈
 

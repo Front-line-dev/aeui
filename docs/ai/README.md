@@ -35,7 +35,7 @@
 
 현재 동작의 한계가 자동으로 규범이 되는 것은 아니다. 의도적으로 유지하는 비직관적 동작만 규범으로 남기고, 우발적인 구현 결과는 **현재 구현**, 나중에 추가할 동작은 **계획 기능**, 이미 잘못되었다고 판단한 동작은 **수정 필요**로 분리한다.
 
-예를 들어 재귀적으로 모든 children 배열을 평탄화하지 않는 것, `ref`를 실행하지 않는 것, 공개 라우터 API를 추가하지 않는 것은 현재의 의도된 범위다. 반면 실패한 mount의 provisional child cleanup, file input polling 최적화, component ArrayPattern 지원, 더 엄격한 event prop 판정은 계획 기능이며 현재 합격 조건이 아니다. file type 대소문자 처리, AEUI import 병합, route 확장자 불일치, virtual entry 중복 주입, boolean ARIA 의미는 수정해야 할 현재 결함이다.
+예를 들어 재귀적으로 모든 children 배열을 평탄화하지 않는 것, `ref`를 실행하지 않는 것, 공개 라우터 API를 추가하지 않는 것은 현재의 의도된 범위다. 반면 실패한 mount의 provisional child cleanup, file input polling 최적화, component ArrayPattern 지원, 더 엄격한 event prop 판정은 계획 기능이며 현재 합격 조건이 아니다. file type 대소문자 처리, AEUI import 병합, route 확장자 불일치, virtual entry 중복 주입, boolean ARIA 의미, 깊은 비교·복제의 안전성, 컴포넌트 판별과 hook 변환의 오판은 수정해야 할 현재 결함이다.
 
 ### 2.2 현재 전환 항목 분류
 
@@ -50,8 +50,14 @@
 | **수정 필요** | route detector, glob, transform, parser의 지원 확장자 통일 | 07 §4, 08 §7·§10 |
 | **수정 필요** | public/internal virtual entry의 중복 주입 방지 | 08 §5 |
 | **수정 필요** | boolean `aria-*`의 문자열 의미 보존 | 04 §11.3 |
+| **수정 필요** | `AEUI-DATA-FIX-001`: `_deepEqual` 대칭성·타입 일치·참조 그래프 대응 보장 | 02 `AEUI-DATA-FIX-001` |
+| **수정 필요** | `AEUI-DATA-FIX-002`: `_deepClone`의 `__proto__` own property 안전 복제 | 02 `AEUI-DATA-FIX-002` |
+| **수정 필요** | `AEUI-COMPILER-FIX-001`: 임의 호출의 첫 인자를 컴포넌트로 오인하는 판별 제거 | 06 `AEUI-COMPILER-FIX-001` |
+| **수정 필요** | `AEUI-COMPILER-FIX-002`: 고정 생성 이름 `__props`를 사용자 binding과 충돌하지 않는 UID로 교체 | 06 `AEUI-COMPILER-FIX-002` |
+| **수정 필요** | `AEUI-COMPILER-FIX-003`: 이름 있는 의존성 getter를 함수 객체 반환 getter로 오변환하지 않음 | 06 `AEUI-COMPILER-FIX-003` |
+| **수정 필요** | `AEUI-COMPILER-FIX-004`: hook의 local 이름이 아니라 실제 원본 import 이름으로 `watch`/`clean` 판별 | 06 `AEUI-COMPILER-FIX-004` |
+| **수정 필요** | `AEUI-COMPILER-FIX-005`: `_newProps` 이름 접두사를 compiler 생성 wrapper의 판별 근거로 사용하지 않음 | 06 `AEUI-COMPILER-FIX-005` |
 | **현재 구현** | props target의 실제 열거·삭제·복사 의미로 사실 설명 수정 완료 | 03 §7.3 |
-| **현재 구현** | 일반 객체 deep clone의 `__proto__` assignment 예외로 사실 설명 수정 완료 | 02 §8 |
 | **테스트 전면 재작성 예정** | 기존 `example/test`를 적합성 기준에서 제외하고 문서 계약으로 새 suite 작성 | 10 전체 |
 
 ## 3. 문서 우선 개발 규칙
