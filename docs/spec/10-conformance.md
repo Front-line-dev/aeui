@@ -8,7 +8,7 @@
 
 기존 suite가 통과했다는 사실은 기존 코드와의 우발적인 회귀가 적다는 참고 신호만 제공한다. 다음 중 어느 것도 증명하지 않는다.
 
-- 구현이 `docs/ai`의 규범적 계약을 만족한다.
+- 구현이 `docs/spec`의 규범적 계약을 만족한다.
 - 기존 assertion이 올바른 제품 동작을 기대한다.
 - 기존 구현의 알려진 결함이나 비의도적 artifact를 보존해야 한다.
 - 문서에 적힌 경계 조건, 실패 정리, package 소비 경로가 충분히 검증되었다.
@@ -33,7 +33,7 @@
 
 새 suite는 기존 파일을 항목별로 보충하는 방식이 아니라 문서 계약에서 다시 설계한다. 다음 원칙을 모두 적용한다.
 
-1. **문서 조항에서 시작한다.** 각 테스트는 `docs/ai`의 장·절과 검증할 문장을 식별한다. 기존 테스트 이름이나 기존 implementation branch를 출발점으로 삼지 않는다.
+1. **문서 조항에서 시작한다.** 각 테스트는 `docs/spec`의 장·절과 검증할 문장을 식별한다. 기존 테스트 이름이나 기존 implementation branch를 출발점으로 삼지 않는다.
 2. **상태 분류를 기대값에 반영한다.** **규범**만 정상 통과 기대값으로 둔다. **수정 필요** 항목은 잘못된 현재 결과를 정답으로 고정하지 않고 목표 계약을 먼저 쓴 뒤 실패하는 테스트로 연결한다. **계획 기능**은 구현 전까지 별도의 future/pending 상태로 추적한다. **현재 구현**은 마이그레이션 조사 자료이며 자동으로 합격 기준이 되지 않는다.
 3. **관찰 가능한 동작을 우선한다.** 공개 API, DOM 결과, lifecycle 순서, cleanup 횟수, scheduler 상태 전이, compiler output의 유효성, router 결과와 package import 성공을 검증한다. private helper 이름이나 현재 파일 분할은 그 자체가 명시적 ABI가 아닌 한 expected value가 아니다.
 4. **정상·경계·실패를 분리한다.** 각 계약마다 정상 경로뿐 아니라 nullish, duplicate, malformed input, throw, partial mount, teardown과 재진입 경계를 독립된 테스트로 만든다. 한 통합 테스트가 여러 계약을 우연히 거치는 것으로 coverage를 대신하지 않는다.
@@ -61,7 +61,7 @@
 |---|---|---|
 | **계획 기능** | 부분 mount 실패의 provisional component cleanup | 구현 전에는 future로 추적하고 현재 pass 조건에서 제외한다. ABI를 확정한 뒤 cleanup 1회 성공 테스트를 작성한다. |
 | **계획 기능** | 동일 file input props의 실제 mutation 기반 backoff | 구현 전에는 future로 추적한다. 이후 실제 attribute 제거 유무와 frameDelay 전이를 함께 검증한다. |
-| **계획 기능** | component props ArrayPattern | 현재 TypeError를 기대값으로 고정하지 않는다. 입력 ABI를 확정한 뒤 성공 경로를 새로 작성한다. |
+| **계획 기능** | component props ArrayPattern 필수 지원 | 현재 TypeError를 기대값으로 고정하지 않는다. 입력 ABI를 확정한 뒤 표준 VNode 성공 경로와 패턴 경계 테스트를 반드시 작성한다. |
 | **계획 기능** | 더 정확한 event prop 판정 | 현재 `once -> ce`를 합격 조건으로 만들지 않는다. 이름 규칙 확정 뒤 일반 prop/event 등록/해제를 각각 검증한다. |
 | **수정 필요** | file type 대소문자 판정 | `file`, `FILE`, `File` 모두 value property에 사용자 값을 쓰지 않는 목표 테스트를 먼저 둔다. |
 | **수정 필요** | Babel default/namespace import 보존 | 생성 결과의 parse 성공과 기존 import specifier 종류·binding 의미 보존을 검증한다. |
@@ -254,7 +254,7 @@ git diff --check
 4. JSX lowering 결과가 원래 component binding을 element type으로 전달하는지 검증한다.
 5. runtime 통합 테스트에서 해당 type이 component setup 1회와 반복 render 계약으로 실행되는지 확인한다.
 
-기존 “첫 specifier로 `AEUI` 추가” assertion은 named-only import의 현재 경로를 조사하는 자료일 뿐 모든 import 문법의 목표 계약이 아니다. 새 suite는 default import 의미 보존과 namespace import용 별도 named declaration을 06 §3.3에 따라 검증해야 한다. component ArrayPattern의 현재 TypeError는 **계획 기능**의 미구현 상태이므로 실패 결과를 호환 assertion으로 복사하지 않는다.
+기존 “첫 specifier로 `AEUI` 추가” assertion은 named-only import의 현재 경로를 조사하는 자료일 뿐 모든 import 문법의 목표 계약이 아니다. 새 suite는 default import 의미 보존과 namespace import용 별도 named declaration을 06 §3.3에 따라 검증해야 한다. component ArrayPattern의 현재 TypeError는 필수 **계획 기능**의 미구현 상태이므로 실패 결과를 호환 assertion으로 복사하지 않는다.
 
 ### 5.10 `router.test.js`: route table과 Vite 결합
 
@@ -284,7 +284,7 @@ git diff --check
 - host snapshot의 `children`/`key`/`ref` 제외와 `value` nullish 제거
 - handler 교체 시 proxy listener 한 개 유지 및 multi-DOM Fragment/component range 이동
 - 재-init 시 이전 RAF에 대한 cancel 호출 자체
-- component ArrayPattern props의 현재 TypeError 원인과 향후 입력 ABI 결정 필요성. TypeError 자체를 합격 기대값으로 만들지 않음
+- component ArrayPattern props의 현재 TypeError 원인과 필수 지원을 위한 입력 ABI 결정 필요성. TypeError 자체를 합격 기대값으로 만들지 않음
 - 배열을 첫 argument로 둔 legacy watch 호출의 미변환과 dynamic/catch-all pattern 충돌의 module insertion-order 선점
 - `AEUI-DATA-FIX-001`~`002`의 대칭성·cross-type·공유/순환 참조·`__proto__` 안전성 property test
 - `AEUI-COMPILER-FIX-001`~`005`의 일반 callback negative fixture, 생성 UID, named deps getter, hook imported-name, wrapper idempotence fixture
@@ -324,7 +324,7 @@ git diff --check
 
 ## 8. 변경 완료 체크리스트
 
-- [ ] 변경하려는 동작이 먼저 `docs/ai`에 쓰였다.
+- [ ] 변경하려는 동작이 먼저 `docs/spec`에 쓰였다.
 - [ ] 정상 경로뿐 아니라 nullish, duplicate, malformed, teardown, error 경계를 명시했다.
 - [ ] 컴파일 전/후 계약이 모두 영향을 받는지 확인했다.
 - [ ] 공개 API, `__runtime`, 타입 선언, package exports의 일관성을 확인했다.

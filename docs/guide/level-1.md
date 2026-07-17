@@ -38,7 +38,7 @@ export default defineConfig({
 
 `aeui/vite`는 JSX 변환에 필요한 `AEUI` import를 자동으로 주입한다. 컴포넌트 파일에서 JSX를 쓰기 위해 `import { AEUI } from 'aeui'`를 직접 작성할 필요는 없다. 또한 기본으로 `@` alias가 `src` 디렉터리를 가리키므로, 앱 내부 모듈은 `@/components/Button.jsx`처럼 가져올 수 있다.
 
-### 앱 진입점
+### 앱 진입점과 core 라우터
 
 `aeui/vite` 플러그인은 앱 진입점을 자동으로 주입한다. `index.html`에는 `#root`만 두면 된다.
 
@@ -46,9 +46,11 @@ export default defineConfig({
 <div id="root"></div>
 ```
 
-기본 앱은 `src/App.jsx`를 루트 컴포넌트로 부팅한다.
+`create-aeui-app`이 만드는 기본 앱은 AEUI core 디렉터리 라우터를 사용한다. `src/pages/index.jsx`가 `/`, `src/pages/about.jsx`가 `/about`처럼 파일 경로가 URL이 되며 별도의 router package나 main entry를 만들지 않는다. 자세한 페이지 규칙은 [디렉터리 라우터 가이드](router.md)를 따른다.
 
-기존 방식처럼 직접 초기화해야 하는 특수한 앱에서는 아래처럼 `AEUI.init`을 사용할 수 있다.
+`src/pages` 아래에 route 파일이 하나도 없는 앱에서는 `aeui/vite`가 `src/App.jsx`를 단일 루트 컴포넌트로 사용하는 fallback을 제공한다.
+
+직접 초기화해야 하는 특수한 앱에서는 아래처럼 `AEUI.init`을 사용할 수 있다.
 
 ```javascript
 import { AEUI } from 'aeui';

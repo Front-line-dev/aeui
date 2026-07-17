@@ -1,6 +1,6 @@
 # 04. Reconciliation과 DOM 호스트 명세
 
-이 문서는 `old RuntimeNode + new render value`를 비교해 RuntimeNode를 재사용하고 실제 DOM을 배치하는 알고리즘을 규정한다. DOM diff는 React 호환을 목표로 하지 않는다. 기본적으로 아래의 key 매칭, DOM range, prop branch 순서는 현재 AEUI 구현을 설명한다. 상태 용어는 `README.md`의 **현재 구현**, **계획 기능**, **수정 필요** 정의를 따른다.
+이 문서는 `old RuntimeNode + new render value`를 비교해 RuntimeNode를 재사용하고 실제 DOM을 배치하는 알고리즘을 규정한다. DOM diff는 React 호환을 목표로 하지 않는다. 기본적으로 아래의 key 매칭, DOM range, prop branch 순서는 현재 AEUI 구현을 설명한다. 상태 용어는 `README.md`의 **규범**, **현재 구현**, **계획 기능**, **수정 필요** 정의를 따른다.
 
 - **계획 기능**은 현재 적합성 요건이 아니며 나중에 구현한다.
 - **수정 필요**는 현재 코드가 잘못된 상태이므로 결함을 복제하지 않고 본문에 적힌 목표 계약을 따른다.

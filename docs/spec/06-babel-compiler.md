@@ -1,6 +1,6 @@
 # 06. Babel 컴파일러와 컴파일러 런타임 ABI
 
-이 문서는 `packages/core/src/babel-plugin.js`와 `packages/core/src/compiler-runtime.js`의 목표 계약과 현재 구현을 함께 설명한다. 설명을 단순화한 사용 가이드가 아니라 AST 판별 조건, 순회 범위, 생성 코드, 런타임 호출 순서를 구현 단위로 고정한다. 상태는 **현재 구현**, **계획 기능**, **수정 필요**로 구분한다. **수정 필요**로 표시한 현재 동작은 재구현 시 보존할 계약이 아니며 목표 계약에 맞게 고쳐야 한다. **계획 기능**은 현재 적합성 요건이 아니지만 향후 구현해야 할 기능이다.
+이 문서는 `packages/core/src/babel-plugin.js`와 `packages/core/src/compiler-runtime.js`의 목표 계약과 현재 구현을 함께 설명한다. 설명을 단순화한 사용 가이드가 아니라 AST 판별 조건, 순회 범위, 생성 코드, 런타임 호출 순서를 구현 단위로 고정한다. 상태는 **규범**, **현재 구현**, **계획 기능**, **수정 필요**로 구분한다. **수정 필요**로 표시한 현재 동작은 재구현 시 보존할 계약이 아니며 목표 계약에 맞게 고쳐야 한다. **계획 기능**은 현재 적합성 요건이 아니지만 향후 구현해야 할 기능이다.
 
 ## 1. 책임과 입력/출력
 
@@ -603,7 +603,7 @@ function Card(_initialProps) {
 
 #### **계획 기능**: component ArrayPattern props
 
-component ArrayPattern props는 현재 사용할 수 없지만 향후 구현해야 할 기능이다. 현재 compiler는 ArrayPattern에도 위 코드를 생성하지만 `__props`는 항상 object spread로 만든 plain object다.
+component ArrayPattern props는 현재 사용할 수 없지만 AEUI compiler가 향후 **반드시 지원해야 하는 계획 기능**이다. 이 요구를 선택 기능이나 비목표로 내릴 수 없다. 현재 compiler는 ArrayPattern에도 위 코드를 생성하지만 `__props`는 항상 object spread로 만든 plain object다.
 
 ```js
 function Pair([left, right]) { /* ... */ }
@@ -626,14 +626,14 @@ function Pair(_initialProps) {
 
 반면 **반환된 render 함수의 파라미터**가 ArrayPattern인 경우에는 `_renderProps`를 그대로 `const [x] = _renderProps`에 사용하므로 실제 render props가 배열이면 동작한다. component props ArrayPattern과 render parameter ArrayPattern을 같은 지원 수준으로 서술해서는 안 된다.
 
-위 TypeError는 현재 상태를 진단하기 위한 설명일 뿐, 향후 구현이 재현해야 할 실패 계약이 아니다. 현재 적합성 기준에서는 component props ArrayPattern을 미지원 기능으로 분류한다. 향후 구현 전에는 다음 사항을 별도 설계 문서에서 먼저 확정해야 한다.
+위 TypeError는 현재 상태를 진단하기 위한 설명일 뿐, 향후 구현이 재현해야 할 실패 계약이 아니다. 현재 적합성 기준에서는 component props ArrayPattern을 아직 구현되지 않은 **계획 기능**으로 분류한다. 지원 자체는 확정된 필수 목표이며, 구현 전에는 다음 세부 ABI를 별도 설계 문서에서 먼저 확정해야 한다.
 
 - object인 `vnode.props`를 positional ArrayPattern에 어떤 순서로 대응시킬지
 - 또는 ArrayPattern component에 실제 iterable props를 전달하는 별도 ABI를 둘지
 - `__props`의 identity 유지와 render마다 최신 props를 다시 구조 분해하는 규칙을 어떻게 보존할지
 - 빈 패턴, hole, rest element, default value, assignment pattern을 각각 어떻게 처리할지
 
-이 설계가 확정된 뒤에는 표준 VNode 경로에서 ArrayPattern component가 TypeError 없이 setup과 반복 render를 완료하는 테스트를 추가해야 한다.
+어떤 ABI를 선택하더라도 최종 규범은 표준 VNode 경로에서 ArrayPattern component가 TypeError 없이 setup과 반복 render를 완료하는 것이다. 설계가 확정되면 이 성공 경로와 빈 패턴, hole, rest, default, assignment 경계를 새 적합성 suite에 반드시 추가한다.
 
 ### 7.4 구조 분해 참조 재작성
 
@@ -987,7 +987,7 @@ node가 있으면 `runComponentRenderPhase`가 다음 순서를 보장한다.
 - `clean`도 runtime helper로 변환된다.
 - `watch`는 정확히 두 argument만 변환하고 첫 argument array를 거부한다.
 - props는 첫 component 파라미터만 처리한다. 현재 정상 지원 범위는 identifier/object pattern과 그 assignment pattern이다.
-- component ArrayPattern props의 현재 TypeError는 보존할 불변식이 아니라 향후 구현할 **계획 기능**이다.
+- component ArrayPattern props의 현재 TypeError는 보존할 불변식이 아니다. ArrayPattern 지원은 향후 반드시 구현할 **계획 기능**이다.
 - render 함수는 원 첫 파라미터만 재바인딩하고 나머지는 버린다.
 - destructured props의 최신값 재작성은 render와 inline watch 함수에 한정된다.
 - classic JSX transform의 pragma는 `AEUI.createElement`, fragment pragma는 `AEUI.Fragment`다.
@@ -1016,6 +1016,6 @@ node가 있으면 `runComponentRenderPhase`가 다음 순서를 보장한다.
 - namespace import를 그대로 유지하고 별도 named `AEUI` import 생성
 - 생성된 출력의 Babel parse 성공과 실제 import specifier 종류 확인
 
-component ArrayPattern의 현재 TypeError를 호환 계약으로 고정하는 테스트는 만들지 않는다. 향후 기능의 입력 ABI가 확정되면 성공 경로 테스트로 추가한다.
+component ArrayPattern의 현재 TypeError를 호환 계약으로 고정하는 테스트는 만들지 않는다. 입력 ABI가 확정되면 표준 VNode 경로의 성공 테스트를 필수로 추가한다.
 
 Vite 통합에서의 parser와 JSX transform 목표 순서는 `08-vite-plugin-and-build.md`를 따른다.

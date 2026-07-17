@@ -1,6 +1,6 @@
 # 07. 디렉터리 라우터 명세
 
-이 문서는 AEUI 디렉터리 라우터의 목표 계약과 현재 구현을 함께 설명한다. 라우터는 공개 `Router`, `Link`, `navigate` API를 제공하지 않는다. `aeui/vite`가 숨은 entry를 만들고, 일반 `<a href>`와 `AEUI.__runtime.initDirectoryRouter` 내부 bridge로 동작한다. 상태는 **현재 구현**, **계획 기능**, **수정 필요**로 구분한다. **수정 필요**로 표시한 현재 동작은 재구현 시 보존하지 않고 목표 계약에 맞게 고쳐야 한다.
+이 문서는 AEUI core 제품에 포함되는 디렉터리 라우터의 목표 계약과 현재 구현을 함께 설명한다. 라우터는 선택적 외부 통합이 아니며 공식 Vite bootstrap과 `create-aeui-app`의 기본 앱 구조를 구성한다. 공개 `Router`, `Link`, `navigate` API는 제공하지 않고, `aeui/vite`가 만든 숨은 entry, 일반 `<a href>`와 `AEUI.__runtime.initDirectoryRouter` 내부 bridge로 동작한다. 상태는 **규범**, **현재 구현**, **계획 기능**, **수정 필요**로 구분한다. **수정 필요**로 표시한 현재 동작은 재구현 시 보존하지 않고 목표 계약에 맞게 고쳐야 한다.
 
 기준 소스는 다음과 같다.
 

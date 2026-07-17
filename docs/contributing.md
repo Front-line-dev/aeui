@@ -50,6 +50,8 @@ aeui/
 │           └── component.test.jsx  컴포넌트 통합 테스트
 │
 ├── docs/                        문서
+│   ├── README.md                문서 인덱스, 권위와 읽기 순서
+│   ├── spec/                    코드가 따라야 하는 구현 명세
 │   ├── guide/                   사용자 가이드 (Level 1~3)
 │   └── internals/               내부 구현 상세 문서
 │
@@ -172,9 +174,14 @@ npm run dev
 
 ### 문서 위치
 
+문서를 수정하기 전에 [`docs/README.md`](README.md)의 권위와 읽기 순서를 확인한다. 구현 계약을 바꾸는 작업은 `docs/spec`을 먼저 수정하고, 적합성 테스트와 소스 구현을 뒤따르게 한다.
+
 | 문서 | 대상 독자 | 내용 |
 |------|-----------|------|
+| `docs/README.md` | 모든 독자 | 문서 인덱스와 권위 |
+| `docs/spec/` | 구현자·리뷰어 | 규범, 현재 구현, 계획 기능, 수정 필요 항목 |
 | `docs/guide/level-1.md` | 첫 사용자 | 기본 사용법 |
+| `docs/guide/router.md` | 사용자 | core 디렉터리 라우터 사용법 |
 | `docs/guide/level-2.md` | 사용자 | 핵심 원리 이해 |
 | `docs/guide/level-3.md` | 기여자 | 내부 구조 개요 |
 | `docs/internals/` | 기여자 | 상세 구현 문서 |

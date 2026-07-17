@@ -11,7 +11,7 @@
 - `packages/core/src/hooks.js`
 - `packages/core/types/index.d.ts`
 
-라우터의 파일 규칙과 History 동작은 `docs/ai/07-directory-router.md`에서 이어서 명세한다.
+디렉터리 라우터는 AEUI core 제품 계약이며 별도 공개 router package로 분리하지 않는다. 파일 규칙과 History 동작은 `docs/spec/07-directory-router.md`에서 이어서 명세한다.
 
 ## 1. 패키지 진입점
 

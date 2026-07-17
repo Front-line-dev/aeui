@@ -11,7 +11,7 @@
 - `example/test`가 현재 확인하는 관찰 가능한 동작과 새로 작성할 적합성 suite의 범위
 - 예제 애플리케이션이 맡는 통합 검증 역할
 
-`docs/guide`는 사용자 사용법, `docs/internals`는 구현 배경과 해설, `docs/ai`는 코드가 따라야 할 상세 계약이라는 경계를 유지한다.
+`docs/README.md`는 전체 문서 인덱스, `docs/guide`는 사용자 사용법, `docs/internals`는 구현 배경과 해설, `docs/spec`은 코드가 따라야 할 상세 계약이라는 경계를 유지한다. 구현 명세의 공식 경로는 `docs/spec` 하나다.
 
 ## 2. 규범의 강도
 
@@ -35,7 +35,7 @@
 
 현재 동작의 한계가 자동으로 규범이 되는 것은 아니다. 의도적으로 유지하는 비직관적 동작만 규범으로 남기고, 우발적인 구현 결과는 **현재 구현**, 나중에 추가할 동작은 **계획 기능**, 이미 잘못되었다고 판단한 동작은 **수정 필요**로 분리한다.
 
-예를 들어 재귀적으로 모든 children 배열을 평탄화하지 않는 것, `ref`를 실행하지 않는 것, 공개 라우터 API를 추가하지 않는 것은 현재의 의도된 범위다. 반면 실패한 mount의 provisional child cleanup, file input polling 최적화, component ArrayPattern 지원, 더 엄격한 event prop 판정은 계획 기능이며 현재 합격 조건이 아니다. file type 대소문자 처리, AEUI import 병합, route 확장자 불일치, virtual entry 중복 주입, boolean ARIA 의미, 깊은 비교·복제의 안전성, 컴포넌트 판별과 hook 변환의 오판은 수정해야 할 현재 결함이다.
+예를 들어 재귀적으로 모든 children 배열을 평탄화하지 않는 것, `ref`를 실행하지 않는 것, 공개 라우터 API를 추가하지 않는 것은 현재의 의도된 범위다. 반면 실패한 mount의 provisional child cleanup, file input polling 최적화, 반드시 지원해야 하는 component ArrayPattern, 더 엄격한 event prop 판정은 계획 기능이며 현재 합격 조건이 아니다. file type 대소문자 처리, AEUI import 병합, route 확장자 불일치, virtual entry 중복 주입, boolean ARIA 의미, 깊은 비교·복제의 안전성, 컴포넌트 판별과 hook 변환의 오판은 수정해야 할 현재 결함이다.
 
 ### 2.2 현재 전환 항목 분류
 
@@ -43,7 +43,7 @@
 |---|---|---|
 | **계획 기능** | 실패한 최초 mount의 provisional component cleanup 보장 | 04 §9.3, 05 §13 |
 | **계획 기능** | 동일 file input props의 실제 DOM 변화 기반 polling backoff | 04 §13, 05 §5~6 |
-| **계획 기능** | component props의 ArrayPattern 지원 | 06 §7.3 |
+| **계획 기능** | component props의 ArrayPattern 필수 지원 | 06 §7.3 |
 | **계획 기능** | `startsWith('on')`보다 정확한 event prop 판정 | 04 §12 |
 | **수정 필요** | file input type의 대소문자 비구분 판정 | 04 §13.2 |
 | **수정 필요** | 기존 default/namespace import를 보존하는 `AEUI` import 주입 | 06 §3.3 |
@@ -58,13 +58,13 @@
 | **수정 필요** | `AEUI-COMPILER-FIX-004`: hook의 local 이름이 아니라 실제 원본 import 이름으로 `watch`/`clean` 판별 | 06 `AEUI-COMPILER-FIX-004` |
 | **수정 필요** | `AEUI-COMPILER-FIX-005`: `_newProps` 이름 접두사를 compiler 생성 wrapper의 판별 근거로 사용하지 않음 | 06 `AEUI-COMPILER-FIX-005` |
 | **현재 구현** | props target의 실제 열거·삭제·복사 의미로 사실 설명 수정 완료 | 03 §7.3 |
-| **테스트 전면 재작성 예정** | 기존 `example/test`를 적합성 기준에서 제외하고 문서 계약으로 새 suite 작성 | 10 전체 |
+| **계획 기능** | 기존 `example/test`를 적합성 기준에서 제외하고 문서 계약으로 새 suite 작성 | 10 전체 |
 
 ## 3. 문서 우선 개발 규칙
 
 기능을 변경할 때는 다음 순서를 따른다.
 
-1. 영향을 받는 `docs/ai` 계약과 경계 조건을 먼저 수정한다.
+1. 영향을 받는 `docs/spec` 계약과 경계 조건을 먼저 수정한다.
 2. 변경된 계약을 검증할 적합성 테스트를 추가하거나 수정한다.
 3. 소스 코드를 구현한다.
 4. 빌드된 코어를 사용해 전체 검증을 수행한다.
@@ -78,7 +78,7 @@
 
 | 우선순위 | 근거 | 역할 |
 |---:|---|---|
-| 1 | `docs/ai`의 규범 및 수정 필요 항목에 적힌 목표 계약 | 구현 전 작성하는 기준 계약 |
+| 1 | `docs/spec`의 규범 및 수정 필요 항목에 적힌 목표 계약 | 구현 전 작성하는 기준 계약 |
 | 2 | 새로 작성할 적합성 suite | 기준 계약을 실행 가능한 형태로 검증 |
 | 3 | `packages/*/src` | 계약의 현재 참조 구현 |
 | 4 | `docs/guide`, `docs/internals` | 사용자 설명과 설계 배경 |
@@ -138,7 +138,7 @@
 6. 형제 목록은 key가 있으면 key 우선, key가 없으면 이전 unkeyed 형제 순서로 매칭한다.
 7. 컴포넌트와 Fragment는 별도 래퍼 DOM을 만들지 않으며 `firstDom`/`lastDom` 범위로 소유 DOM을 표현한다.
 8. `watch` callback은 의존성이 바뀐 렌더에서 실제 render 함수보다 먼저 실행된다.
-9. 디렉터리 라우터는 공개 `Router`, `Link`, `navigate` API 없이 `src/pages`와 일반 `<a>`를 이용한다.
+9. 디렉터리 라우터는 AEUI core 제품 계약이다. 공개 `Router`, `Link`, `navigate` API 없이 `src/pages`와 일반 `<a>`를 이용한다.
 10. JSX 파일은 AEUI Babel 변환과 classic JSX 변환을 거쳐야 한다. 컴파일되지 않은 `watch()`는 의도적으로 오류를 낸다.
 11. `AEUI.init()`은 컨테이너의 기존 DOM을 비우므로 SSR hydration을 제공하지 않는다.
 12. 각 `createAppRuntime()` 호출의 mutable runtime state는 다른 호출과 격리된다. 공개 패키지는 그 팩토리가 만든 단일 기본 앱을 노출한다.

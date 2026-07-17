@@ -1,6 +1,6 @@
 # 08. Vite 플러그인, 타입, 빌드와 패키지 계약
 
-이 문서는 `packages/core/src/vite-plugin.js`, `packages/core/rollup.config.js`, `packages/core/package.json`, `packages/core/types/**`의 목표 계약과 현재 구현을 함께 설명한다. Vite hook 순서부터 npm export map과 tarball 포함 파일까지 하나의 배포 계약으로 다룬다. 상태는 **현재 구현**, **계획 기능**, **수정 필요**로 구분한다. **수정 필요**로 표시한 현재 동작은 재구현 시 보존하지 않고 목표 계약에 맞게 고쳐야 한다.
+이 문서는 `packages/core/src/vite-plugin.js`, `packages/core/rollup.config.js`, `packages/core/package.json`, `packages/core/types/**`의 목표 계약과 현재 구현을 함께 설명한다. Vite hook 순서부터 npm export map과 tarball 포함 파일까지 하나의 배포 계약으로 다룬다. 상태는 **규범**, **현재 구현**, **계획 기능**, **수정 필요**로 구분한다. **수정 필요**로 표시한 현재 동작은 재구현 시 보존하지 않고 목표 계약에 맞게 고쳐야 한다.
 
 ## 1. 공개 진입점과 패키지 이름
 

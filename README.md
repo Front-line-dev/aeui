@@ -26,6 +26,7 @@ React의 `useState`나 Svelte의 컴파일러 없이, **일반 JavaScript 변수
 - **Setup 1회 실행**: 컴포넌트 함수 본문은 한 번만 실행, 렌더 함수만 반복
 - **JSX 지원**: React와 동일한 JSX 문법
 - **Babel 기반 변환**: 기존 빌드 도구(Vite, Webpack)와 통합
+- **파일 기반 라우터 내장**: AEUI core가 `src/pages`와 일반 `<a>`를 이용한 디렉터리 라우팅 제공
 
 ---
 
@@ -42,11 +43,21 @@ npm run dev
 
 ## 문서
 
+문서의 역할, 권위와 읽기 순서는 [문서 인덱스](docs/README.md)에서 먼저 확인한다.
+
+### 구현 명세
+
+| 문서 | 설명 |
+|------|------|
+| [AEUI 구현 명세](docs/spec/README.md) | 코드가 따라야 하는 규범, 현재 구현, 계획 기능, 수정 필요 항목 |
+| [적합성 검증](docs/spec/10-conformance.md) | 문서 계약에서 새 테스트를 작성하고 추적하는 원칙 |
+
 ### 사용자 가이드
 
 | 문서 | 설명 |
 |------|------|
 | [Level 1 — 기본 사용법](docs/guide/level-1.md) | 컴포넌트, 상태, props, watch, clean |
+| [디렉터리 라우터](docs/guide/router.md) | core 파일 기반 라우팅과 페이지 규칙 |
 | [Level 2 — 핵심 원리](docs/guide/level-2.md) | Babel 변환, VDOM, Tick 루프 |
 | [Level 3 — 내부 구조](docs/guide/level-3.md) | 아키텍처, 코드 구조, 내부 문서 인덱스 |
 

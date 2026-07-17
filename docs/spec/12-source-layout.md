@@ -308,7 +308,7 @@ vite-plugin
 6. router와 Vite plugin
 7. public types, Rollup와 package export map
 8. create CLI/template
-9. `docs/ai` 계약에서 처음부터 작성한 새 적합성 suite와 reference apps
+9. `docs/spec` 계약에서 처음부터 작성한 새 적합성 suite와 reference apps
 
 각 단계에서 다음 단계의 임시 stub을 공개 API로 남기지 않는다. 최종 package root export는 01과 08의 세 값으로 돌아와야 한다.
 

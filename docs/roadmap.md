@@ -1,6 +1,6 @@
 # 로드맵 (Roadmap)
 
-이 문서는 아직 완료되지 않은 작업만 기록한다. 현재 구현을 설명하는 내용은 `docs/ai`의 **현재 구현** 문단에 두고, 아래 작업은 **현재 구현 결함 수정**과 **계획 기능**을 구분해 관리한다.
+이 문서는 아직 완료되지 않은 작업만 기록한다. 현재 구현을 설명하는 내용은 `docs/spec`의 **현재 구현** 문단에 두고, 아래 작업은 **현재 구현 결함 수정**과 **계획 기능**을 구분해 관리한다.
 
 ## 🔴 우선 수정 필요
 
@@ -38,7 +38,7 @@
 
 ### 적합성 테스트 전면 재작성
 
-현재 `example/test`는 현재 구현의 회귀를 조사하는 참고 자료일 뿐 문서 계약의 적합성 판정 기준으로 사용하지 않는다. 기존 suite에 테스트를 덧붙이는 방식이 아니라 `docs/ai`의 규범과 목표 계약에서 새 suite를 처음부터 작성한다.
+현재 `example/test`는 현재 구현의 회귀를 조사하는 참고 자료일 뿐 문서 계약의 적합성 판정 기준으로 사용하지 않는다. 기존 suite에 테스트를 덧붙이는 방식이 아니라 `docs/spec`의 규범과 목표 계약에서 새 suite를 처음부터 작성한다.
 
 - 각 테스트가 검증하는 문서 절과 상태를 명시한다.
 - **현재 구현**과 **계획 기능**을 현재 합격 조건으로 고정하지 않는다.
@@ -58,7 +58,7 @@
 
 ### component ArrayPattern props 지원
 
-component의 첫 파라미터가 ArrayPattern 또는 ArrayPattern assignment일 때 plain-object VNode props와 충돌하지 않는 입력 표현 및 resolver 규칙을 설계한다. 구현 전까지 이 문법은 지원 기능이나 현재 적합성 조건으로 간주하지 않는다.
+component의 첫 파라미터가 ArrayPattern 또는 ArrayPattern assignment인 문법은 반드시 지원한다. plain-object VNode props와 충돌하지 않는 입력 표현 및 resolver 규칙을 설계하고, 표준 VNode 경로에서 setup과 반복 render가 TypeError 없이 완료되도록 구현한다. 구현 전까지는 **계획 기능**이므로 현재 적합성 조건에는 포함하지 않지만, 선택 기능이나 비목표로 재분류하지 않는다.
 
 ### event prop 판정 정밀화
 
@@ -146,7 +146,7 @@ JSX 특성상 Fragment가 필요한 부분에 트랜스파일 단계에서 자�
 ### `create-aeui-app` CLI 개선
 
 - AEUI 버전을 동적으로 삽입
-- 선택적 템플릿 (minimal / with-router / with-ssr)
+- core 디렉터리 라우터를 사용하는 router-first 기본 템플릿을 유지하면서 추가 템플릿 정책 검토
 
 ### 모노레포 워크스페이스 개선
 
