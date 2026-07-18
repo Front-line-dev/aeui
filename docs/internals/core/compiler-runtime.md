@@ -18,7 +18,7 @@ Babel 플러그인이 변환한 렌더 함수에서 호출되는 진입점이다
 |----------|------|------|
 | `state` | `Object` | runtime state |
 | `nextProps` | `Object` | 이번 render의 props |
-| `propsTarget` | `Object` | Babel이 만든 `__props` 객체 (클로저에 유지됨) |
+| `propsTarget` | `Object` | 컴파일러가 만든 props 저장 객체. 클로저에서 같은 참조를 유지한다. |
 | `render` | `Function` | 실제 render 함수 |
 
 ### 동작
@@ -59,7 +59,7 @@ export function runComponentWatchersBridge(state, node) {
 }
 ```
 
-현재는 단순 위임이지만, 향후 계측이나 에러 경계 삽입 지점으로 활용할 수 있다.
+이 함수는 값을 가공하거나 오류를 처리하지 않고 watcher 실행을 그대로 위임한다.
 
 ---
 

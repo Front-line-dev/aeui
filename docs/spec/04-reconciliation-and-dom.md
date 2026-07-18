@@ -1,9 +1,6 @@
 # 04. Reconciliation과 DOM 호스트 명세
 
-이 문서는 `old RuntimeNode + new render value`를 비교해 RuntimeNode를 재사용하고 실제 DOM을 배치하는 알고리즘을 규정한다. DOM diff는 React 호환을 목표로 하지 않는다. 기본적으로 아래의 key 매칭, DOM range, prop branch 순서는 현재 AEUI 구현을 설명한다. 상태 용어는 `README.md`의 **규범**, **현재 구현**, **계획 기능**, **수정 필요** 정의를 따른다.
-
-- **계획 기능**은 현재 적합성 요건이 아니며 나중에 구현한다.
-- **수정 필요**는 현재 코드가 잘못된 상태이므로 결함을 복제하지 않고 본문에 적힌 목표 계약을 따른다.
+이 문서는 `old RuntimeNode + new render value`를 비교해 RuntimeNode를 재사용하고 실제 DOM을 배치하는 알고리즘을 규정한다. DOM diff는 React 호환을 목표로 하지 않으며, 아래 key 매칭, DOM range, prop 처리 및 오류 정리 계약을 따른다.
 
 ## 1. 모듈 경계
 
@@ -54,7 +51,7 @@ null/boolean은 placeholder RuntimeNode를 만들지 않는다. 따라서 조건
 | old kind | 같은 타입 조건 |
 | --- | --- |
 | `text` | `typeof newVNode !== 'object' || newVNode == null` |
-| `fragment` | 새 값이 배열 또는 현재 Fragment VNode |
+| `fragment` | 새 값이 배열이거나 `newVNode.tag === state.Fragment`인 VNode |
 | `host` | 새 값이 non-array object이고 `oldNode.tag === newVNode.tag` |
 | `component` | 새 값이 object이고 tag가 함수이며 Fragment가 아니고 `oldNode.component === newVNode.tag` |
 
@@ -230,7 +227,7 @@ vnode/key/component 참조를 갱신하고 `renderComponentNode`를 호출한다
 
 부모 cleanup이 자식 cleanup보다 먼저 실행된다. 자식에는 `removeDom=false`를 전달하고 최상위 제거 node의 연속 range를 한 번만 DOM에서 뺀다. 실제로 하나 이상의 DOM을 제거했으면 `didMutate = true`다.
 
-일반 unmount는 text/host의 `node.dom`, vnode, props 필드까지 지우지는 않는다. RuntimeNode를 트리에서 떼고 lifecycle/range 참조를 정리하는 것이 현재 범위다.
+일반 unmount는 text/host의 `node.dom`, vnode, props 필드까지 지우지 않는다. RuntimeNode를 트리에서 떼고 lifecycle/range 참조를 정리하는 범위만 보장한다.
 
 ## 9. 실패한 mount의 국소 DOM 정리
 
@@ -252,29 +249,6 @@ host element 제거로 그 안에 삽입된 DOM도 함께 제거된다.
 ### 9.2 fragment mount 실패
 
 mount 전에 `beforeDom` 직전 sibling(없으면 parent의 현재 lastChild)을 기억한다. 실패하면 fragment node를 `removeDom=false`로 unmount한 뒤, 기억한 지점 다음부터 `beforeDom` 직전까지 새로 삽입된 모든 sibling을 제거하고 error를 다시 던진다.
-
-### 9.3 **계획 기능**: 부분 mount 실패의 lifecycle cleanup
-
-현재 `reconcileChildren`은 전체 루프 성공 뒤에야 `parentNode.children = nextChildren`을 commit한다. 따라서 최초 mount 도중 앞쪽 component child는 성공했지만 뒤 child에서 실패한 경우, 아직 parent children에 연결되지 않은 성공 child의 lifecycle cleanup까지 local catch가 찾아가지 못할 수 있다.
-
-예를 들어 첫 번째 sibling component가 setup에서 timer를 만들고 `clean` callback을 등록한 뒤, 두 번째 sibling component의 setup/render가 throw하면 다음 상태가 될 수 있다.
-
-```text
-첫 번째 component setup 및 DOM 삽입 성공
-두 번째 component mount 실패
-host/fragment/root 실패 정리가 삽입 DOM 제거
-첫 번째 component가 provisional nextChildren에만 있어 cleanup은 호출되지 않음
-```
-
-이 동작은 **현재 구현**을 설명한 것이며 보존해야 할 lifecycle 계약이 아니다. 부분 mount 실패 cleanup은 현재 구현하지 않지만 나중에 구현해야 하는 **계획 기능**이다.
-
-향후 구현은 다음 계약을 만족해야 한다.
-
-1. 실패한 reconcile 중 setup까지 실행되어 cleanup을 등록한 모든 provisional component를 추적한다.
-2. 해당 render가 commit되지 못하면 추적한 component의 cleanup을 각각 정확히 한 번 실행한다.
-3. cleanup 하나가 throw하더라도 나머지 provisional component cleanup과 DOM 정리는 계속한다.
-4. 삽입된 provisional DOM은 지금과 마찬가지로 남기지 않는다.
-5. 이 보장은 실패 전에 수정된 모든 기존 text/attribute/state를 되돌리는 완전한 transactional rollback까지 요구하지 않는다. lifecycle에서 생성한 외부 자원을 정리하는 범위의 보장이다.
 
 ## 10. DOM node 생성과 props snapshot
 
@@ -304,7 +278,7 @@ snapshot은 같은 style/data object를 호출자가 제자리 수정해도 다�
 
 ### 10.3 `updateProps(target, newProps)`
 
-이 helper는 `dom-host.js`에서 export되고 `AEUI.__runtime.updateProps`와 `state.updateProps`에 같은 함수 참조로 노출된다. 현재 주 component render 경로는 `component-lifecycle.js`의 별도 `syncPropsTarget`을 사용하지만, internal ABI를 재현하려면 아래 알고리즘도 보존해야 한다.
+이 helper는 `dom-host.js`에서 export되고 `AEUI.__runtime.updateProps`와 `state.updateProps`에 같은 함수 참조로 노출된다. 주 component render 경로는 `component-lifecycle.js`의 별도 `syncPropsTarget`을 사용하며, internal ABI는 아래 알고리즘도 포함한다.
 
 ```js
 export function updateProps(target, newProps) {
@@ -313,7 +287,7 @@ export function updateProps(target, newProps) {
 }
 ```
 
-target identity는 유지하고 enumerable key를 먼저 지운 뒤 truthy `newProps`의 own enumerable property를 복사한다. 명시적인 target 타입 가드는 없다. 현재 JavaScript에서 nullish target의 `for...in` 자체는 항목 없이 끝나지만 truthy `newProps`까지 주면 `Object.assign(nullish, ...)`이 TypeError를 던진다. primitive target은 표준 coercion 규칙을 따르고, strict module에서 삭제할 수 없는 own property를 지우는 경우도 오류가 날 수 있으며 이 함수는 그런 오류를 catch하지 않는다. `for...in`은 상속된 enumerable key도 방문하지만 inherited property의 delete는 prototype property를 제거하지 못한다.
+target identity는 유지하고 enumerable key를 먼저 지운 뒤 truthy `newProps`의 own enumerable property를 복사한다. 명시적인 target 타입 가드는 없다. nullish target의 `for...in` 자체는 항목 없이 끝나지만 truthy `newProps`까지 주면 `Object.assign(nullish, ...)`이 TypeError를 던진다. primitive target은 표준 coercion 규칙을 따르고, strict module에서 삭제할 수 없는 own property를 지우는 경우도 오류가 날 수 있으며 이 함수는 그런 오류를 catch하지 않는다. `for...in`은 상속된 enumerable key도 방문하지만 inherited property의 delete는 prototype property를 제거하지 못한다.
 
 ## 11. `updateDomProps` 전체 알고리즘
 
@@ -337,29 +311,21 @@ old/new 모든 enumerable own key를 합쳐 삭제된 prop도 순회한다. 각 
 | `key === 'style'`이고 non-null object | `cssText=''` 후 `Object.assign(domNode.style, newValue)` |
 | `key === 'style'`이고 string | `domNode.style.cssText = newValue` |
 | `key === 'value'` | file 특례 또는 property+attribute 동기화 |
+| `key.startsWith('aria-')` | boolean은 문자열 attribute로 설정하고, nullish는 제거하며, 나머지는 `setAttribute`로 전달 |
 | `typeof newValue === 'boolean'` | 같은 이름의 DOM property 설정 후 true면 빈 attribute, false면 제거 |
 | `newValue == null` | 필요 시 boolean property를 false로 하고 attribute 제거 |
 | 나머지 | `setAttribute(key, newValue)` |
 
-event branch 외의 실제 branch는 현재 구현에서 `state.didMutate = true`로 설정한다. deep-equal skip 전에 실제 DOM 상태를 다시 읽지는 않으므로, 일반 prop은 외부 DOM 수정이 있어도 같은 props만으로 복구하지 않는다. `value`/`checked`의 지정된 controlled 경로만 별도로 복구한다.
+event branch 외의 실행 branch는 `state.didMutate = true`로 설정한다. deep-equal skip 전에 실제 DOM 상태를 다시 읽지는 않으므로 일반 prop은 외부 DOM 수정이 있어도 같은 props만으로 복구하지 않는다. `value`/`checked`의 controlled 경로만 별도로 복구한다.
 
 ### 11.2 class와 style
 
-- `className`은 DOM property로 쓰며 nullish 값은 빈 문자열이다. 별도의 `class -> className` alias 변환은 없고, `class`를 직접 주면 일반 attribute branch가 그대로 처리한다.
-- object style은 기존 `cssText`를 전부 비운 뒤 property를 assign하므로 새 객체에서 사라진 style도 제거된다.
+- `className`은 DOM property로 쓰며 nullish 값은 빈 문자열이다. 별도의 `class -> className` alias 변환은 없고, `class`를 직접 주면 일반 attribute branch가 처리한다.
+- object style은 `cssText`를 전부 비운 뒤 property를 assign하므로 새 객체에서 사라진 style도 제거된다.
 - string style은 `cssText`를 통째로 바꾼다.
 - style이 null이면 별도 style branch가 아니라 일반 attribute 제거 branch로 간다.
 
 ### 11.3 boolean과 일반 attribute
-
-현재 구현은 모든 boolean 값에 같은 규칙을 적용하며 HTML boolean attribute allowlist가 없다. 따라서 boolean `aria-*`도 property expando와 빈/제거 attribute 규칙을 따른다.
-
-```text
-aria-hidden={true}  -> aria-hidden="" 및 DOM property expando true
-aria-hidden={false} -> aria-hidden attribute 제거 및 DOM property expando false
-```
-
-이것은 **수정 필요** 상태다. ARIA attribute의 `true`와 `false`는 HTML boolean attribute의 존재/부재가 아니라 문자열 값으로 표현되어야 한다. 재구현 및 향후 수정의 목표 계약은 다음과 같다.
 
 ```text
 key가 aria-*이고 newValue === true  -> setAttribute(key, 'true')
@@ -367,28 +333,21 @@ key가 aria-*이고 newValue === false -> setAttribute(key, 'false')
 key가 aria-*이고 newValue가 nullish -> attribute 제거
 ```
 
-`aria-*` boolean 처리에서는 같은 이름의 임의 DOM expando property를 만들거나 수정하지 않는다. `disabled`, `checked` 같은 실제 HTML boolean property/attribute 처리는 기존 boolean branch를 유지한다. 즉 구현은 `aria-*`를 일반 boolean branch보다 먼저 분리해야 한다.
+`aria-*` boolean 처리에서는 같은 이름의 DOM expando property를 만들거나 수정하지 않는다. `disabled`, `checked` 같은 HTML boolean property/attribute는 일반 boolean branch로 처리한다. 따라서 `aria-*` 판정은 일반 boolean branch보다 먼저 실행해야 한다.
 
 null/undefined 제거 시 `typeof oldValue === 'boolean' || typeof domNode[key] === 'boolean'`이면 property도 `false`로 만든다. 일반 문자열/숫자/object는 `setAttribute`의 브라우저 문자열 변환에 맡긴다. `htmlFor -> for`, `dangerouslySetInnerHTML`, ref lifecycle 같은 별도 의미는 없다.
 
-## 12. 이벤트 prop
+## 12. 이벤트 prop 처리
 
-현재 구현은 `on`으로 시작하는 모든 key를 event prop으로 본다. 이름은 앞 두 글자를 제거하고 전체 소문자로 바꾼다.
+문자열 key에 대소문자를 구분해 `key.startsWith('on')`을 적용하고 결과가 `true`이면 event prop이다. 등록 가능한 DOM event 이름 목록과 대조하지 않으며 새 값의 타입도 분류 조건에 포함하지 않는다. 따라서 `onClick`, `onclick`, `once`는 각각 event prop이고 `OnClick`은 event prop이 아니다.
+
+event prop의 이름은 앞 두 글자를 제거하고 전체 소문자로 바꾼다.
 
 ```text
 onClick -> click
 onInput -> input
-once    -> ce   // 현재 startsWith 규칙의 결과
+once -> ce
 ```
-
-`once -> ce` 같은 변환은 **현재 구현**을 설명할 뿐 보존할 API 계약이 아니다. 일반 prop과 실제 event prop을 더 정확하게 구분하는 동작은 현재 구현하지 않았으며 **계획 기능**으로 분류한다.
-
-향후 판정 규칙은 최소한 다음 조건을 만족해야 한다.
-
-- `once`, `onion`처럼 우연히 `on`으로 시작하는 일반 key를 event로 취급하지 않는다.
-- `onClick`, `onInput`처럼 AEUI가 지원하는 event prop은 계속 같은 event name으로 연결한다.
-- 새 값이 함수가 아니더라도 이전 render에서 등록한 event prop이면 기존 proxy listener를 제거할 수 있어야 한다.
-- custom event와 소문자 `onclick` 같은 표기를 지원할지는 구현 전에 별도 event-name 계약으로 확정한다. 확정 전까지 현재 `startsWith('on')` 동작을 새로운 규범으로 확대하지 않는다.
 
 DOM node에는 두 저장소를 둔다.
 
@@ -401,59 +360,43 @@ domNode._aeuiProxyListeners[eventName] // 실제 addEventListener에 준 고정 
 
 proxy는 `state.dispatchDomEvent`가 함수면 그 bridge를 호출한다. 없으면 저장소의 최신 handler를 `handler.call(domNode, event)`로 직접 호출한다. 따라서 handler의 `this`는 DOM node다.
 
-현재 event handler 추가/교체/제거 branch 자체는 `didMutate`를 true로 만들지 않는다. handler 동작은 바뀌지만 polling backoff의 “DOM write 발생”으로는 세지 않는다.
+event handler 추가/교체/제거 branch는 `didMutate`를 true로 만들지 않는다. handler 동작은 바뀌지만 polling backoff의 DOM write로 세지 않는다.
 
 ## 13. value와 checked
 
 ### 13.1 `updateDomProps`의 value
 
-다음 render의 input type은 props가 own `type` key를 가지면 `props.type`, 아니면 현재 `domNode.type`에서 얻는다. 이를 `String(...).toLowerCase()`한 값이 `file`이고 대상 tagName이 `INPUT`이면 file-input value 특례다.
+다음 render의 input type은 props가 own `type` key를 가지면 `props.type`, 아니면 `domNode.type`에서 얻는다. 이를 `String(...).toLowerCase()`한 값이 `file`이고 대상 tagName이 `INPUT`이면 file-input value 특례다.
 
 - file 특례: `value` attribute만 제거하고 property에는 쓰지 않는다. old/new value가 deep-equal이어도 이 branch를 실행한다.
-- 나머지: nullish는 `''`, 그 외는 `String(newValue)`로 정규화해 `domNode.value`에 쓴다. nullish면 attribute 제거, 아니면 같은 문자열을 value attribute에도 쓴다.
+- 나머지: nullish는 `''`, 그 외는 `String(newValue)`로 정규화해 `domNode.value`에 쓴다. nullish면 attribute를 제거하고, 그 외에는 같은 문자열을 value attribute에도 쓴다.
 
 다음 type을 props에서 직접 읽으므로 `{ value, type: 'file' }`의 property 열거 순서와 무관하게 value 쓰기를 피한다. text에서 file로 바뀔 때 이전 value attribute도 제거해야 한다.
 
-#### **계획 기능**: 동일 file input props의 mutation 판정 최적화
-
-현재 file 특례는 `value` attribute가 이미 없고 old/new value가 같아도 `removeAttribute('value')`를 호출하고 `state.didMutate = true`로 만든다. 그 결과 실제 DOM 변화가 없는데도 scheduler의 polling backoff가 매번 1 frame으로 초기화될 수 있다.
-
-이는 **현재 구현**을 설명한 것이며, 동일 props에 대한 정확한 mutation 판정은 지금 구현하지 않았지만 나중에 구현해야 하는 **계획 기능**이다. 향후 계약은 다음과 같다.
-
-1. file input의 `value` property에는 사용자 값을 쓰지 않는다.
-2. `value` attribute가 실제로 존재하면 제거하고 이 branch가 `didMutate`를 true로 만든다.
-3. `value` attribute가 이미 없고 다른 DOM write도 없다면 이 branch는 `didMutate`를 true로 바꾸지 않는다.
-4. text input에서 file input으로 전환할 때 남아 있는 이전 `value` attribute는 반드시 제거한다.
-5. 다른 prop/child 처리에서 mutation이 있었다면 그 mutation 결과까지 false로 되돌리지는 않는다.
-
 ### 13.2 `syncHostControlledProps`
 
-host children reconcile 뒤 다음 값을 실제 property와 비교해 필요할 때만 복구한다.
+host tag와 input type은 두 DOM 갱신 경로에서 같은 case-insensitive 규칙으로 판정해야 한다.
 
 ```text
+tag = String(node.tag).toLowerCase()
+type = node.props가 own type을 가지면 node.props.type, 아니면 dom.type
+isFileInput = tag === 'input' && String(type).toLowerCase() === 'file'
+
 node.props가 own value를 가짐:
-  select 또는 textarea 또는 (input이고 node.props.type !== 'file')
+  tag가 select 또는 textarea이거나, tag가 input이고 isFileInput이 아님
   -> normalized String value와 dom.value가 다르면 property 갱신
 
-node.tag === 'input'이고 own checked를 가짐:
+tag가 input이고 own checked를 가짐:
   -> !!checked와 dom.checked가 다르면 property 갱신
 ```
 
-이 단계 때문에 사용자가 input/textarea/select value나 checkbox checked를 직접 바꿔도 같은 props로 다음 reconcile하면 원래 controlled 값으로 돌아온다. select value는 option children이 mount된 후 설정된다.
+정규화한 type이 `file`이면 `updateDomProps`와 `syncHostControlledProps` 모두 `value` property에 사용자 값을 쓰지 않는다. `file`, `FILE`, `File`처럼 대소문자만 다른 표기는 같은 결과를 내야 한다. 두 경로는 공통 helper 또는 의미상 동일한 단일 규칙을 사용해야 한다.
 
-현재 file 검사 방식은 두 함수에서 다르다. `updateDomProps`는 다음 type을 소문자화하지만 `syncHostControlledProps`는 `node.props.type !== 'file'`을 대소문자 구분으로 검사한다. 이 때문에 `type="FILE"`, `type="File"` 같은 실제 file input을 controlled 일반 input으로 잘못 판단하여 `dom.value`에 쓰려고 할 수 있다.
+사용자가 input/textarea/select value나 checkbox checked를 직접 바꿔도 같은 props로 다음 reconcile하면 controlled 값으로 돌아온다. select value는 option children이 mount된 후 설정된다.
 
-이 차이는 **수정 필요** 상태이며 호환 구현이 재현해서는 안 된다. 목표 계약은 다음과 같다.
+## 14. 적합성 요구사항
 
-1. host tag와 input type을 비교할 때 두 경로 모두 동일한 case-insensitive file-input 판정을 사용한다.
-2. 다음 props에 own `type`이 있으면 그 값을, 없으면 현재 DOM input type을 사용하고 `String(type).toLowerCase()`로 정규화한다.
-3. 정규화한 type이 `file`이면 `updateDomProps`와 `syncHostControlledProps` 모두 `value` property에 사용자 값을 쓰지 않는다.
-4. `file`, `FILE`, `File` 등 대소문자만 다른 표기는 같은 결과를 내야 한다.
-5. file 여부 판정은 공통 helper 또는 의미상 동일한 단일 규칙으로 구현해 두 경로가 다시 어긋나지 않게 한다.
-
-## 14. 검증 계약
-
-새 문서 우선 적합성 suite는 최종적으로 다음 항목을 상태에 맞게 검증해야 한다. 현재 `example/test`의 통과 여부만으로 이 계약을 입증할 수 없다.
+공식 적합성 suite는 다음 항목을 검증해야 한다.
 
 - 배열 길이 증감, null/boolean 제거가 정확한 DOM 수를 만든다.
 - keyed reorder/중간 삽입이 기존 DOM과 component state를 재사용한다.
@@ -462,12 +405,9 @@ node.tag === 'input'이고 own checked를 가짐:
 - 순서가 이미 맞으면 `insertBefore`를 호출하지 않는다.
 - host type 교체와 subtree 제거가 모든 component cleanup을 재귀 실행한다.
 - mutable style 객체를 같은 참조로 수정해도 snapshot 비교로 반영한다.
-- class/style/boolean/null/generic attribute branch의 현재 동작을 조사할 수 있어야 한다. 최종 계약에서는 boolean `aria-*`가 `"true"`/`"false"` 문자열 attribute가 되며 임의 expando property를 만들지 않아야 한다. 현재 구현은 이 ARIA 계약을 위반하는 **수정 필요** 상태다.
-- handler 교체는 proxy를 유지하고, 제거/비함수 전환은 listener를 해제하며, handler `this`는 DOM node다. 일반 `on...` key와 event prop을 정확히 구분하는 판정은 **계획 기능**이며, 현재 `once -> ce` 동작은 최종 계약이 아니다.
+- boolean `aria-*`는 `"true"`/`"false"` 문자열 attribute가 되며 임의 expando property를 만들지 않는다.
+- event prop은 대소문자를 구분하는 `startsWith('on')` 규칙으로 분류하며 `once` 같은 key도 이 규칙에 따라 event branch로 들어간다.
+- handler 교체는 proxy를 유지하고, 제거/비함수 전환은 listener를 해제하며, handler `this`는 DOM node다.
 - select value는 option 뒤에 동기화되고 input/textarea value와 checked는 같은 props render에서 복구된다.
-- file input에 value를 강제로 쓰지 않으며 text -> file 전환 시 이전 value attribute가 남지 않는다. 이 계약은 type 대소문자와 무관해야 하며, 현재 controlled sync의 대소문자 구분은 **수정 필요** 상태다.
-- 동일한 file input props에서 `value` attribute가 이미 없다면 file 특례만으로 mutation을 보고하지 않는 동작은 **계획 기능**이다.
-- 부분 mount 실패 전에 setup이 성공한 provisional component의 cleanup을 정확히 한 번 실행하는 동작은 **계획 기능**이다.
-- host child reconcile/controlled sync 실패와 fragment mount 실패는 local 정리로 삽입 DOM을 제거한다. host props snapshot 실패는 root-level `reconcileRoot` 경로가 global 미커밋 DOM 정리를 수행하며, 이 경로는 통상 public tick이 호출하지만 `AEUI.__runtime.reconcileRoot()`로도 직접 실행할 수 있다. lower-level `reconcile` 직접 호출에는 이 정리가 없다.
-
-현재 구현을 조사할 때 참고할 기존 테스트는 `example/test/src/__tests__/dom.test.js`, `component.test.jsx`, `component-lifecycle.test.js`다. 이 파일들은 새 적합성 suite가 아니며, 위 항목은 문서 상태와 목표 계약에서 처음부터 다시 작성한다.
+- file input에 value를 강제로 쓰지 않으며 text에서 file로 전환할 때 이전 value attribute가 남지 않는다. 이 계약은 type 대소문자와 무관하다.
+- host child reconcile/controlled sync 실패와 fragment mount 실패는 local 정리로 삽입 DOM을 제거한다. host props snapshot 실패는 root-level `reconcileRoot` 경로가 미커밋 DOM을 정리한다. lower-level `reconcile` 직접 호출에는 이 정리가 없다.

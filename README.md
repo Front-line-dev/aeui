@@ -15,7 +15,7 @@ function Counter() {
 }
 ```
 
-React의 `useState`나 Svelte의 컴파일러 없이, **일반 JavaScript 변수의 직접 수정**으로 반응성을 구현한다.
+별도의 상태 setter 없이, Babel 변환과 주기적인 값 비교를 이용해 **일반 JavaScript 변수의 직접 수정**을 화면에 반영한다.
 
 ---
 
@@ -49,8 +49,8 @@ npm run dev
 
 | 문서 | 설명 |
 |------|------|
-| [AEUI 구현 명세](docs/spec/README.md) | 코드가 따라야 하는 규범, 현재 구현, 계획 기능, 수정 필요 항목 |
-| [적합성 검증](docs/spec/10-conformance.md) | 문서 계약에서 새 테스트를 작성하고 추적하는 원칙 |
+| [AEUI 구현 명세](docs/spec/README.md) | 현재 코드가 따라야 하는 규범적 계약 |
+| [스펙 충족 여부 검증](docs/spec/10-conformance.md) | 스펙에서 테스트 기대값을 가져오고 연결하는 원칙 |
 
 ### 사용자 가이드
 
@@ -74,7 +74,7 @@ npm run dev
 
 | 문서 | 설명 |
 |------|------|
-| [로드맵](docs/roadmap.md) | 향후 계획 |
+| [작업 추적](docs/tracking/README.md) | 알려진 결함, 계획 기능과 구현 근거 |
 | [기여 가이드](docs/contributing.md) | 개발 환경 설정, 빌드, 테스트 |
 
 ---
@@ -90,9 +90,3 @@ aeui/
 ├── example/test/            테스트
 └── docs/                    문서
 ```
-
----
-
-## 라이선스
-
-MIT

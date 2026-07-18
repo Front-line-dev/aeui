@@ -36,10 +36,6 @@ Proxy나 Signal 기반 방식은 객체를 래핑해야 하므로 `let` 직접 �
 | 직접 변이(`push`, `splice` 등) 가능 | 변경 없어도 매 tick마다 비교 비용 발생 |
 | 코드가 일반 JavaScript처럼 자연스러움 | 복잡한 상태에서 `_deepEqual` 비용 증가 |
 
-### 향후 계획
-
-고정 1초 대신 **적응형 tick interval + DOM 이벤트 fast path**를 사용한다. 앞으로의 과제는 외부 비동기 변경까지 더 빠르게 포착할 보조 트리거를 추가할지 여부다.
-
 ---
 
 ## 2. Setup 1회 실행 + 렌더 함수 반복 실행 구조
@@ -91,19 +87,19 @@ Babel 플러그인은 기존 빌드 시스템(Vite, Webpack)에 쉽게 통합되
 
 ---
 
-## 4. Props 반응화: `__props` 패턴
+## 4. Props 반응화: 컴파일러가 만드는 props 저장 객체
 
 ### 결정
 
-props를 `__props`라는 중간 객체에 담아, **같은 객체 참조를 유지하면서 내용만 교체**하는 방식을 선택했다.
+컴파일러가 props를 보관할 내부 객체를 만들고, **같은 객체 참조를 유지하면서 내용만 교체**하는 방식을 선택했다. 이 객체의 식별자는 사용자 코드와 충돌하지 않도록 컴파일러가 정하며, 생성되는 이름은 공개 API가 아니다.
 
 ### 이유
 
 setup이 1회만 실행되므로 `function Comp({ name })`에서 `name`은 초기값으로 고정된다. 부모가 새 props를 전달해도 `name` 변수는 변하지 않는다.
 
-`__props` 객체를 통해:
-1. `updateProps(__props, newProps)`로 내용을 교체하면
-2. 렌더 함수에서 `__props.name`으로 접근할 때 항상 최신값을 얻는다
+컴파일러가 만든 props 저장 객체를 통해:
+1. `updateProps(propsTarget, newProps)`로 내용을 교체하면
+2. 렌더 함수가 `propsTarget`에서 값을 다시 읽을 때 항상 최신값을 얻는다
 3. 같은 객체 참조이므로 클로저가 끊어지지 않는다
 
 `updateProps`에서 기존 key를 delete 후 assign하는 방식은, 세밀한 비교를 하는 것보다 단순하다. 초기 코드 복잡성을 피하기 위한 설계이다.
@@ -155,10 +151,6 @@ watch(() => { ... }, [count]);            // 깔끔한 API
 
 현재 AEUI의 모든 코드는 여전히 동기 중심으로 실행되지만, nested component setup/render 복구를 위해 컨텍스트는 stack으로 관리한다.
 
-### 향후 계획
-
-비동기 렌더링이나 Concurrent Mode를 도입하게 되면 이 stack의 소유 범위를 app instance 쪽으로 더 좁히는 재설계가 필요할 수 있다. 현재 개념 기준은 `currentComponentNode`와 `currentComponentPhase`다.
-
 ---
 
 ## 7. RuntimeNode 기반 Reconciliation (선택적 key 지원)
@@ -182,10 +174,6 @@ watch(() => { ... }, [count]);            // 깔끔한 API
 | DOM ownership과 상태 ownership이 같은 트리 위에서 관리됨 | node 객체 수가 증가함 |
 | 선택적 key reorder에서 상태 보존 규칙이 자연스러움 | `firstDom/lastDom` 범위를 계속 유지해야 함 |
 | Fragment/배열을 같은 모델에서 처리 가능 | 런타임 구현 복잡도가 초기 모델보다 큼 |
-
-### 향후 계획
-
-현 모델은 comment anchor 없이 `firstDom/lastDom`로 DOM 범위를 추적한다. 장기적으로는 비동기 렌더링 도입 시 이 범위 추적과 현재 컴포넌트 컨텍스트 관리가 함께 재검토될 수 있다.
 
 ---
 

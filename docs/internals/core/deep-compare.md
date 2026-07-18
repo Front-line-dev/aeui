@@ -2,307 +2,400 @@
 
 ## 개요
 
-AEUI의 반응성 시스템(Dirty Checking)의 **핵심 유틸리티** 함수 두 개이다.
+AEUI의 Dirty Checking은 값을 주기적으로 확인하면서 **이전 값과 새 값의 내용**을 비교해 변경을 찾는 방식이다. 이때 두 내부 함수가 함께 사용된다.
 
-AEUI는 `setState` 같은 명시적 상태 변경 알림 없이, **현재 값과 이전 값을 비교**하여 변경을 감지한다. 이 비교에 `_deepEqual`이 사용되고, 이전 값의 **독립적 스냅샷**을 저장하는 데 `_deepClone`이 사용된다.
+- `_deepEqual`: 두 값이 같은 내용과 같은 참조 관계를 가지는지 비교한다.
+- `_deepClone`: 다음 비교에 사용할 독립적인 이전 값 스냅샷을 만든다.
 
-- `_deepEqual`: "이 두 값이 같은 내용인가?" → watcher 의존성 비교, DOM 속성 비교에 사용
-- `_deepClone`: "이 값의 독립적 복사본을 만들어라" → watcher의 이전 의존성 스냅샷 저장에 사용
+예를 들어 다음 코드는 배열 객체 자체를 바꾸지 않고 그 안의 내용만 바꾼다.
+
+```js
+let items = [1, 2, 3];
+items.push(4);
+```
+
+`items === items`만 확인하면 이런 변경을 찾을 수 없다. AEUI는 이전에 복제해 둔 `[1, 2, 3]`과 새 값 `[1, 2, 3, 4]`를 깊게 비교한다.
 
 ---
 
-## `_deepEqual(a, b, seen?)` — 깊은 비교
+## `_deepEqual(a, b, pairs?)` — 깊은 비교
 
-두 값이 **구조적으로 동일한지** 비교한다. 참조(메모리 주소)가 아닌 **내용(값)**을 비교한다.
+`_deepEqual`은 값의 내용뿐 아니라 객체 사이의 공유 참조와 순환 연결도 비교한다. 비교 결과는 인자 순서에 영향을 받지 않아야 한다.
 
-### 왜 참조 비교가 아닌 깊은 비교인가
-
-AEUI는 사용자가 객체나 배열을 직접 수정(mutate)하는 것을 허용한다:
-
-```javascript
-let items = [1, 2, 3];
-items.push(4);  // ← 같은 배열 참조를 직접 수정
-
-let user = { name: "A", age: 20 };
-user.name = "B";  // ← 같은 객체 참조를 직접 수정
+```js
+_deepEqual(a, b) === _deepEqual(b, a);
 ```
 
-참조 비교(`===`, `Object.is`)로는 같은 객체가 수정되었는지 알 수 없다 (`items === items`는 항상 `true`). 내용을 깊이 비교해야 `[1,2,3]`에서 `[1,2,3,4]`로의 변경을 감지할 수 있다.
+### 비교 흐름
 
-### 비교 순서
+비교는 다음 순서로 진행된다.
 
-`_deepEqual`은 타입을 순서대로 확인하여, 첫 번째로 매칭되는 분기에서 처리한다:
-
-```
-1. Object.is(a, b)         → 같은 참조이거나 같은 원시값이면 바로 true
-2. 둘 다 object 타입인지   → 아니면 false (타입이 다름)
-3. VNode marker 확인       → 같은 참조가 아닌 VNode는 deep compare 대상에서 제외
-4. 순환 참조 체크 (seen)   → 이미 비교 중인 쌍이면 동일 구조로 간주
-5. Array.isArray(a)        → 배열 비교
-6. a instanceof Date       → Date 비교
-7. a instanceof RegExp     → RegExp 비교
-8. a instanceof Map        → Map 비교
-9. a instanceof Set        → Set 비교
-10. (나머지)               → 일반 Object 비교
+```text
+1. 원시값·함수는 Object.is로 비교
+2. 객체라면 기존의 양방향 대응 관계를 확인
+3. 새로운 객체 쌍을 양방향 대응표에 등록
+4. 같은 객체 참조면 true
+5. VNode가 포함되면 false
+6. 양쪽 객체의 종류를 각각 분류하고, 종류가 다르면 false
+7. 같은 종류의 Array, Date, RegExp, Map, Set, 일반 object 규칙으로 비교
 ```
 
-### 타입별 비교 전략
+`null`은 객체처럼 보일 수 있지만 별도로 처리한다. 두 값 중 하나만 `null`이거나 하나만 객체이면 `false`다.
 
-#### 원시값 (number, string, boolean, null, undefined, Symbol, BigInt)
+### 원시값과 함수
 
-```javascript
-if (Object.is(a, b)) return true;
+원시값과 함수는 `Object.is`로만 비교한다.
+
+```js
+Object.is(NaN, NaN); // true
+Object.is(+0, -0);   // false
 ```
 
-`Object.is`는 `===`와 거의 같지만 두 가지 차이가 있다:
-- `Object.is(NaN, NaN)` → `true` (`===`는 `false`)
-- `Object.is(+0, -0)` → `false` (`===`는 `true`)
+함수도 같은 함수 객체를 가리킬 때만 같다. 내용이 같은 두 함수 표현식은 서로 다른 함수 객체이므로 같지 않다.
 
-#### 순환 참조 방어
+### 객체 연결 관계를 양쪽으로 기록하기
 
-```javascript
-if (seen.has(a)) return seen.get(a) === b;
-seen.set(a, b);
+깊은 비교에서는 개별 속성값만 같아서는 충분하지 않다. 객체들이 서로 연결된 방식도 같아야 한다.
+
+```js
+const shared = {};
+
+const a = { left: shared, right: shared };
+const b = { left: {}, right: {} };
+
+_deepEqual(a, b); // false
 ```
 
-`seen`은 `Map<object, object>`로, 이미 비교를 시작한 `(a, b)` 쌍을 기록한다. 같은 `a`를 다시 만나면 대응하는 `b`가 동일한지만 확인하고 재귀를 중단한다. 이를 통해 `obj.self = obj` 같은 순환 참조 구조에서도 무한 루프 없이 비교가 완료된다.
+`a.left`와 `a.right`는 같은 객체지만 `b.left`와 `b.right`는 서로 다른 객체다. 이 차이를 찾기 위해 비교 중인 객체 쌍을 두 방향으로 기록한다.
 
-#### VNode
+```js
+const pairs = {
+  forward: new Map(), // a 쪽 객체 -> b 쪽 객체
+  reverse: new Map(), // b 쪽 객체 -> a 쪽 객체
+};
+```
 
-```javascript
+새 객체 쌍 `(valueA, valueB)`을 비교할 때는 다음 규칙을 적용한다.
+
+```js
+if (pairs.forward.has(valueA)) {
+  return pairs.forward.get(valueA) === valueB
+    && pairs.reverse.get(valueB) === valueA;
+}
+
+if (pairs.reverse.has(valueB)) return false;
+
+pairs.forward.set(valueA, valueB);
+pairs.reverse.set(valueB, valueA);
+```
+
+한쪽 객체가 이미 다른 객체와 연결되어 있으면 `false`다. 양쪽 대응표를 함께 사용하므로 다음 두 불일치를 모두 찾는다.
+
+- 하나의 `a` 객체가 서로 다른 두 `b` 객체에 연결되는 경우
+- 서로 다른 두 `a` 객체가 하나의 `b` 객체에 연결되는 경우
+
+대응 관계를 재귀 전에 등록하면 자기 자신을 가리키는 객체도 무한 반복 없이 비교할 수 있다.
+
+```js
+const a = {};
+a.self = a;
+
+const b = {};
+b.self = b;
+
+_deepEqual(a, b); // true
+```
+
+같은 객체 참조를 만났을 때도 바로 `true`를 반환하기 전에 기존 양방향 대응과 충돌하는지 확인한다. 그래야 동일 참조가 중간에 나타나도 다른 경로의 공유 참조 불일치를 숨기지 않는다.
+
+### VNode
+
+VNode는 내용이 아니라 객체의 동일성만 비교한다.
+
+```js
 if (isVNode(a) || isVNode(b)) return false;
 ```
 
-VNode는 매 렌더마다 새로 생성되는 프레임워크 입력 객체이다. 따라서 VNode는 구조적으로 같은지 깊게 비교하지 않는다. 같은 참조인지 여부는 이미 1단계 `Object.is(a, b)`가 처리하므로, 서로 다른 VNode 객체는 내용이 같아 보여도 `false`로 판단한다. 이 규칙은 watcher 의존성 배열 안에 VNode가 들어왔을 때 프레임워크 객체를 사용자 상태 스냅샷처럼 취급하지 않기 위한 방어선이다.
+같은 VNode 참조는 앞 단계의 객체 대응과 동일 참조 검사에서 `true`가 된다. 구조가 같은 별도 VNode 객체는 `false`다. VNode를 일반 사용자 데이터처럼 재귀 비교하지 않기 위한 규칙이다.
 
-#### 배열
+### 양쪽 객체의 종류를 먼저 확인하기
 
-```javascript
-if (Array.isArray(a)) {
-  if (!Array.isArray(b) || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (!_deepEqual(a[i], b[i], seen)) return false;  // 각 요소를 재귀 비교
-  }
-  return true;
+객체는 양쪽 값을 각각 분류한 뒤 같은 종류끼리만 비교한다.
+
+```js
+function classify(value) {
+  if (Array.isArray(value)) return 'array';
+  if (value instanceof Date) return 'date';
+  if (value instanceof RegExp) return 'regexp';
+  if (value instanceof Map) return 'map';
+  if (value instanceof Set) return 'set';
+  return 'object';
 }
+
+if (classify(a) !== classify(b)) return false;
 ```
 
-길이가 같고 모든 요소가 같으면 동일하다고 판단한다. 요소 하나라도 다르면 즉시 `false`를 반환한다.
+따라서 빈 일반 객체와 빈 `Map`, 빈 `Set`, `Date`, `RegExp`, 배열은 enumerable key가 우연히 같아도 서로 같지 않다. `a`만 검사해 분기를 고르면 인자 순서에 따라 결과가 달라질 수 있으므로 반드시 양쪽을 분류한다.
+
+### 타입별 비교
+
+#### Array
+
+길이가 같고 `0`부터 `length - 1`까지 모든 값이 순서대로 같아야 한다.
+
+```js
+if (a.length !== b.length) return false;
+
+for (let i = 0; i < a.length; i += 1) {
+  if (!_deepEqual(a[i], b[i], pairs)) return false;
+}
+
+return true;
+```
+
+배열의 hole과 명시적인 `undefined`는 구별하지 않는다. 숫자 인덱스가 아닌 추가 enumerable property도 비교하지 않는다.
 
 #### Date
 
-```javascript
-if (a instanceof Date) {
-  return b instanceof Date && a.getTime() === b.getTime();
-}
-```
+양쪽의 timestamp를 `===`로 비교한다.
 
-`getTime()`은 1970년 1월 1일부터의 밀리초를 반환한다. 이 숫자가 같으면 같은 시각을 나타낸다.
+```js
+return a.getTime() === b.getTime();
+```
 
 #### RegExp
 
-```javascript
-if (a instanceof RegExp) {
-  return b instanceof RegExp && a.source === b.source && a.flags === b.flags;
-}
-```
+패턴과 플래그가 모두 같아야 한다.
 
-정규식의 패턴(`source`)과 플래그(`flags`, 예: `gi`)가 모두 같으면 동일하다.
+```js
+return a.source === b.source && a.flags === b.flags;
+```
 
 #### Map
 
-```javascript
-if (a instanceof Map) {
-  if (!(b instanceof Map) || a.size !== b.size) return false;
-  for (const [key, val] of a) {
-    if (!b.has(key) || !_deepEqual(val, b.get(key), seen)) return false;
-  }
-  return true;
+크기가 같고, `a`의 모든 key가 `b`에도 있어야 하며, 그 key에 연결된 value가 깊게 같아야 한다.
+
+```js
+if (a.size !== b.size) return false;
+
+for (const [key, valueA] of a) {
+  if (!b.has(key)) return false;
+  if (!_deepEqual(valueA, b.get(key), pairs)) return false;
 }
+
+return true;
 ```
 
-크기가 같고, 모든 key-value 쌍이 같으면 동일하다. value는 재귀적으로 깊은 비교한다.
+Map key에는 깊은 비교를 사용하지 않는다. 객체 key는 같은 객체 참조여야 하며, 원시 key는 `Map.prototype.has`의 표준 규칙을 따른다. key 객체는 양방향 객체 대응표에도 등록하지 않는다.
 
 #### Set
 
-```javascript
-if (a instanceof Set) {
-  if (!(b instanceof Set) || a.size !== b.size) return false;
+Set은 순서가 없으므로 같은 위치끼리 비교할 수 없다. `a`의 각 값을 `b`의 아직 사용하지 않은 값 하나와 대응시킨다.
+
+```js
+function clonePairs(pairs) {
+  return {
+    forward: new Map(pairs.forward),
+    reverse: new Map(pairs.reverse),
+  };
+}
+
+function replacePairs(target, source) {
+  target.forward.clear();
+  target.reverse.clear();
+
+  for (const [valueA, valueB] of source.forward) {
+    target.forward.set(valueA, valueB);
+  }
+
+  for (const [valueB, valueA] of source.reverse) {
+    target.reverse.set(valueB, valueA);
+  }
+}
+
+function compareSet(a, b, pairs) {
+  if (a.size !== b.size) return false;
 
   const remainingB = new Set(b);
-  const signatureCache = new Map();
-  let activeSeen = seen;
-  let preferFirstCandidate = true;
+  let activePairs = clonePairs(pairs);
 
-  for (const val of a) {
-    if (remainingB.delete(val)) continue;
-    if (!canDeepMatchSetValue(val)) return false;
+  for (const valueA of a) {
+    let match = null;
 
-    if (preferFirstCandidate) {
-      const firstCandidate = remainingB.values().next();
-      const trialSeen = new Map(activeSeen);
-      if (!firstCandidate.done && _deepEqual(val, firstCandidate.value, trialSeen)) {
-        remainingB.delete(firstCandidate.value);
-        activeSeen = trialSeen;
-        continue;
-      }
-      preferFirstCandidate = false;
-    }
+    for (const valueB of remainingB) {
+      // 후보 하나의 실패가 다음 후보에 영향을 주지 않게 두 Map을 모두 복제한다.
+      const trialPairs = clonePairs(activePairs);
 
-    const signature = getCachedSetMatchSignature(signatureCache, val);
-    let matchedValue = null;
-    let matchedSeen = null;
-
-    for (const candidate of remainingB) {
-      if (signature !== getCachedSetMatchSignature(signatureCache, candidate)) continue;
-
-      // Set 후보 매칭은 백트래킹이 필요하므로 seen 상태를 분리한다.
-      const trialSeen = new Map(activeSeen);
-      if (_deepEqual(val, candidate, trialSeen)) {
-        matchedValue = candidate;
-        matchedSeen = trialSeen;
+      if (_deepEqual(valueA, valueB, trialPairs)) {
+        match = { valueB, pairs: trialPairs };
         break;
       }
     }
 
-    if (!matchedSeen) return false;
+    if (match === null) return false;
 
-    remainingB.delete(matchedValue);
-    activeSeen = matchedSeen;
+    remainingB.delete(match.valueB);
+    activePairs = match.pairs;
   }
-  mergeSeen(seen, activeSeen);
+
+  replacePairs(pairs, activePairs);
   return remainingB.size === 0;
 }
 ```
 
-Set 비교는 먼저 `remainingB.delete(val)`로 **동일 primitive / 동일 객체 참조**를 제거한다. 이 경로는 일반적인 primitive Set을 O(n)에 가깝게 처리하고, 같은 객체 참조가 양쪽 Set에 들어 있는 경우도 후보 탐색 없이 끝낸다.
+여기서 `clonePairs`는 `forward`와 `reverse`를 모두 새 `Map`으로 복사한다. 실패한 후보의 순환·공유 참조 기록은 버리고, 성공한 후보의 기록만 다음 값 비교에 사용한다.
 
-남은 값은 서로 다른 객체 참조이므로 깊은 비교가 필요하다. deepClone처럼 양쪽 Set의 순서가 보존된 경우를 위해 먼저 `remainingB`의 첫 후보를 직접 비교한다. 첫 후보 직접 비교가 한 번 실패하면 순서가 어긋난 Set으로 보고 이후에는 이 fast path를 끈다. 그 다음에는 `getSetMatchSignature()`로 값의 큰 형태(Array 길이, Map/Set 크기, 일반 객체의 enumerable key와 data property shape)를 비교하여 명백히 다른 후보를 건너뛴다. 그래도 같은 shape의 객체끼리는 `_deepEqual`로 1:1 매칭을 시도하므로 최악의 경우는 여전히 O(n²)일 수 있다.
+원시값과 VNode 후보도 별도 구조 비교를 하지 않고 앞에서 정의한 동일성 규칙으로 비교한다. `remainingB`에서 성공한 값을 삭제하므로 같은 후보를 두 번 사용할 수 없다. 같은 객체 참조를 빠르게 찾는 최적화를 추가하더라도 양방향 대응 충돌 확인과 등록은 생략할 수 없다. 값의 종류나 크기로 만든 후보 분류값(signature)도 후보 수만 줄일 뿐, 최종 깊은 비교를 대신하지 않는다.
 
-**`remainingB` Set**: 이미 매칭된 b의 요소는 삭제한다. 이 덕분에 `Set([{a:1}, {a:1}])` vs `Set([{a:1}, {b:2}])`처럼 deep-equal 중복 요소가 있는 경우에도 같은 후보를 두 번 재사용하지 않는다.
+#### 일반 object
 
-**`trialSeen` 백트래킹**: 후보 매칭 시 `seen` 상태를 복사(`new Map(activeSeen)`)하여 시도한다. 매칭이 실패하면 `seen`이 오염되지 않고, 성공하면 그 상태를 `activeSeen`으로 승격한다.
+양쪽의 enumerable own string key 개수가 같고, 각 key가 `b`에도 enumerable own property로 존재하며, 모든 value가 깊게 같아야 한다. 여기서 enumerable own string key는 `Object.keys(object)`로 확인할 수 있는, 객체 자체에 저장된 문자열 key를 뜻한다.
 
-#### 일반 Object
-
-```javascript
+```js
 const keysA = Object.keys(a);
+const keysB = Object.keys(b);
 
-if (keysA.length !== Object.keys(b).length) return false;
+if (keysA.length !== keysB.length) return false;
 
 for (const key of keysA) {
-  if (!propertyIsEnumerable.call(b, key) || !_deepEqual(a[key], b[key], seen)) return false;
+  if (!Object.prototype.propertyIsEnumerable.call(b, key)) return false;
+  if (!_deepEqual(a[key], b[key], pairs)) return false;
 }
+
 return true;
 ```
 
-key 수가 같고, 모든 key에 대해 value가 같으면 동일하다.
-
-**key 순서는 무시**한다: `{a:1, b:2}`와 `{b:2, a:1}`은 동일하다고 판단한다.
-
-key 존재 여부는 `keysB.includes(key)`가 아니라 `propertyIsEnumerable.call(b, key)`로 확인한다. `keysB.includes()`는 key마다 배열을 선형 검색하므로 key 수가 많을 때 O(n²)이 되지만, `propertyIsEnumerable`은 b 객체의 enumerable own property 여부를 직접 확인한다.
-
-`Object.keys()`는 `enumerable` 속성만 반환하므로, `Symbol` 키, non-enumerable 속성, prototype chain의 속성은 비교하지 않는다.
-
-#### 함수
-
-함수는 1단계의 `Object.is(a, b)`에서 **참조 비교만** 수행된다. 같은 함수 객체를 가리키면 `true`, 아니면 `false`이다.
-
-인라인 함수(`() => ...`)는 매번 새 객체가 생성되므로 항상 "다름"으로 판단된다.  
-현재 이벤트 시스템은 이 차이를 감지하더라도 프록시 리스너를 재등록하지 않고 내부 핸들러 참조만 갱신한다.
+key 순서는 무시한다. Symbol key, non-enumerable property, prototype과 constructor는 비교하지 않는다.
 
 ---
 
 ## `_deepClone(v, seen?)` — 깊은 복사
 
-값의 **독립적인 복사본**을 생성한다. 원본과 복사본은 **별도의 메모리**를 차지하므로, 한쪽을 수정해도 다른 쪽에 영향을 주지 않는다.
-
-### 왜 깊은 복사가 필요한가
-
-watcher의 `oldDeps`에 이전 의존성 값을 저장할 때, 참조 복사(얕은 복사)를 하면 원본이 수정될 때 oldDeps도 함께 변경되어 변화를 감지하지 못한다. `_deepEqual`에서의 설명을 참조.
+`_deepClone`은 다음 변경 검사에 사용할 독립적인 스냅샷을 만든다. 원본 배열이나 객체를 나중에 직접 수정해도 이미 만든 스냅샷은 바뀌지 않는다.
 
 ### 복제 순서
 
+```text
+1. null 또는 object가 아닌 값 -> 그대로 반환
+2. Date -> 같은 timestamp의 새 Date
+3. RegExp -> 같은 source와 flags의 새 RegExp
+4. VNode -> 같은 참조 반환
+5. 이미 복제한 객체 -> seen에 저장된 복제본 반환
+6. Array -> 새 배열을 등록한 뒤 각 인덱스 값을 재귀 복제
+7. Map -> 새 Map을 등록한 뒤 key는 유지하고 value만 재귀 복제
+8. Set -> 새 Set을 등록한 뒤 각 value를 재귀 복제
+9. 일반 object -> {}를 등록한 뒤 enumerable own string property의 값을 재귀 복제
 ```
-1. null 또는 원시값       → 그대로 반환 (원시값은 복사가 불필요)
-2. Date                  → new Date(getTime())으로 같은 시각의 새 Date
-3. RegExp                → new RegExp(source, flags)으로 같은 패턴의 새 RegExp
-4. VNode                 → 복제하지 않고 참조 그대로 반환
-5. 순환 참조 체크 (seen)  → 이미 복제한 객체면 복제본을 반환
-6. Array                 → 빈 배열 생성 → seen에 등록 → 각 요소를 재귀 복사
-7. Map                   → 빈 Map 생성 → seen에 등록 → 각 key-value를 재귀 복사
-8. Set                   → 빈 Set 생성 → seen에 등록 → 각 요소를 재귀 복사
-9. 일반 Object           → 빈 Object 생성 → seen에 등록 → 각 key-value를 재귀 복사
-```
 
-### 코드
+### 전체 흐름
 
-```javascript
-function _deepClone(v, seen = new WeakMap()) {
-  if (v === null || typeof v !== 'object') return v;   // 원시값
-  if (v instanceof Date) return new Date(v.getTime());
-  if (v instanceof RegExp) return new RegExp(v.source, v.flags);
-  if (isVNode(v)) return v;
+```js
+function _deepClone(value, seen = new WeakMap()) {
+  if (value === null || typeof value !== 'object') return value;
+  if (value instanceof Date) return new Date(value.getTime());
+  if (value instanceof RegExp) return new RegExp(value.source, value.flags);
+  if (isVNode(value)) return value;
 
-  // 순환 참조 방어: 이미 복제한 객체면 그 복제본을 반환
-  if (seen.has(v)) return seen.get(v);
+  if (seen.has(value)) return seen.get(value);
 
-  if (Array.isArray(v)) {
+  if (Array.isArray(value)) {
     const cloned = [];
-    seen.set(v, cloned);                              // 빈 배열을 먼저 등록
-    v.forEach(item => cloned.push(_deepClone(item, seen)));
+    seen.set(value, cloned);
+
+    for (let i = 0; i < value.length; i += 1) {
+      cloned.push(_deepClone(value[i], seen));
+    }
+
     return cloned;
   }
 
-  if (v instanceof Map) {
+  if (value instanceof Map) {
     const cloned = new Map();
-    seen.set(v, cloned);
-    v.forEach((val, k) => cloned.set(k, _deepClone(val, seen)));
+    seen.set(value, cloned);
+
+    for (const [key, item] of value) {
+      cloned.set(key, _deepClone(item, seen));
+    }
+
     return cloned;
   }
 
-  if (v instanceof Set) {
+  if (value instanceof Set) {
     const cloned = new Set();
-    seen.set(v, cloned);
-    v.forEach(item => cloned.add(_deepClone(item, seen)));
+    seen.set(value, cloned);
+
+    for (const item of value) {
+      cloned.add(_deepClone(item, seen));
+    }
+
     return cloned;
   }
 
-  // 일반 Object
   const cloned = {};
-  seen.set(v, cloned);
-  for (const [k, val] of Object.entries(v)) {
-    cloned[k] = _deepClone(val, seen);
+  seen.set(value, cloned);
+
+  for (const [key, item] of Object.entries(value)) {
+    Object.defineProperty(cloned, key, {
+      value: _deepClone(item, seen),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
+
   return cloned;
 }
 ```
 
-### 순환 참조 보호
+### 순환 참조와 공유 참조
 
-`seen`은 `WeakMap<object, object>`로, 원본 객체 → 복제본 매핑을 유지한다. **빈 컨테이너를 먼저 생성하고 `seen`에 등록한 뒤** 내용을 채우는 패턴으로 순환 참조를 안전하게 처리한다:
+Array, Map, Set, 일반 object는 빈 복제본을 먼저 만들고 `seen`에 등록한 다음 내용을 채운다. 이 순서가 순환 참조와 공유 참조를 보존한다.
 
-```javascript
-const obj = { name: "test" };
-obj.self = obj;             // ← 순환 참조
+```js
+const source = { name: 'test' };
+source.self = source;
 
-const cloned = _deepClone(obj);
-cloned.self === cloned;     // ✅ true — 복제본도 자기 자신을 참조
+const cloned = _deepClone(source);
+
+cloned !== source;          // true
+cloned.self === cloned;     // true
 ```
 
-`Date`와 `RegExp`는 내부에 순환 참조를 가질 수 없으므로 `seen` 등록 없이 바로 반환한다.
+VNode는 복제하지 않으므로 원래 참조를 유지한다. Map key도 복제하지 않고 원래 key를 유지하며 value만 복제한다.
 
-VNode도 복제하지 않고 참조 그대로 반환한다. VNode marker는 `createVNode`가 non-enumerable `Symbol`로 직접 부여하므로, `{ tag, props, children }` 형태의 일반 객체와 충돌하지 않는다.
+### `__proto__`를 객체 자체의 데이터 속성으로 복제하기
 
-### 복제되지 않는/잘못 처리되는 타입
+일반 객체를 `cloned[key] = value`로 채우면 `key`가 `"__proto__"`일 때 상속된 setter가 실행되어 복제본의 prototype이 바뀔 수 있다. 따라서 일반 대입 대신 `Object.defineProperty`를 사용한다. 이 방법은 복제본 객체 자체에 값을 직접 저장하는 enumerable data property를 만든다.
 
-| 타입 | 동작 | 이유 |
-|------|------|------|
-| Function | 참조 그대로 반환 | 함수는 복제할 수 없다 (1단계에서 원시값으로 간주되어 그대로 반환) |
-| WeakMap, WeakRef | 일반 Object 분기로 처리 → 잘못된 복사 | `instanceof` 체크가 없어 8단계(Object)로 빠짐 |
-| DOM 요소 | 일반 Object 분기로 처리 → 에러 가능 | DOM 요소를 `Object.entries`로 처리하면 예상치 못한 동작 발생 |
+```js
+Object.defineProperty(cloned, key, {
+  value: _deepClone(item, seen),
+  enumerable: true,
+  writable: true,
+  configurable: true,
+});
+```
 
-이 타입들을 watcher의 의존성으로 사용하는 것은 권장하지 않는다.
+이 규칙에 따라 `"__proto__"`도 다른 key와 똑같이 복제된다.
+
+```js
+Object.hasOwn(cloned, '__proto__');              // true
+Object.getPrototypeOf(cloned) === Object.prototype; // true
+```
+
+`"__proto__"`의 값이 객체이거나 원본 자신을 가리키는 순환 참조여도 value는 재귀 복제되고, 복제본의 실제 prototype은 `Object.prototype`으로 유지된다.
+
+### 특수 처리하지 않는 값
+
+깊은 연산이 별도 의미를 정의하는 객체 종류는 Array, Date, RegExp, Map, Set, VNode다. 그 밖의 객체에는 일반 object 규칙이 적용된다.
+
+| 값 | `_deepEqual` | `_deepClone` |
+| --- | --- | --- |
+| Function | 같은 함수 참조인지 `Object.is`로 비교 | object가 아니므로 참조 그대로 반환 |
+| WeakMap, WeakSet, WeakRef | 내부 슬롯이 아니라 enumerable own string property만 비교 | enumerable own string property를 가진 일반 `{}`로 복제 |
+| DOM 객체와 그 밖의 내장 객체 | enumerable own string property만 비교 | enumerable own string property를 가진 일반 `{}`로 복제 |
+
+따라서 이 값들의 플랫폼 내부 상태, prototype, constructor, Symbol key, non-enumerable property는 깊은 연산의 대상이 아니다. 일반 object의 accessor는 값을 읽어 비교하며, 복제할 때는 getter 반환값을 일반 data property로 저장한다.
 
 ---
 
@@ -310,22 +403,25 @@ VNode도 복제하지 않고 참조 그대로 반환한다. VNode marker는 `cre
 
 ### `_deepEqual` 사용처
 
-| 사용처 | 용도 | 설명 |
-|--------|------|------|
-| `runComponentWatchers` | watcher 의존성 변경 감지 | `getDeps()` 결과와 `oldDeps`를 비교 |
-| `updateDomProps` | DOM 속성 변경 감지 | 새 props와 이전 props의 각 속성을 비교하여, 실제로 변경된 속성만 DOM에 적용 |
+| 사용처 | 용도 |
+| --- | --- |
+| `runComponentWatchers` | `getDeps()`의 새 결과와 저장된 `oldDeps`를 비교해 watcher 실행 여부 결정 |
+| `updateDomProps` | 새 prop과 이전 prop을 비교해 실제로 달라진 DOM 속성만 갱신 |
+
+함수형 event handler prop은 함수 참조로 비교한다. 새 함수로 바뀌면 event handler 저장소의 값이 갱신된다.
 
 ### `_deepClone` 사용처
 
-| 사용처 | 용도 | 설명 |
-|--------|------|------|
-| `runComponentWatchers` | oldDeps 스냅샷 저장 | callback 실행 후, 현재 deps 값의 독립적 복사본을 oldDeps에 저장 |
-| `watch` 등록 (`hook-registry.js`) | 초기 deps 스냅샷 | watcher 등록 시 초기 의존성 값의 복사본을 oldDeps에 저장 |
+| 사용처 | 용도 |
+| --- | --- |
+| `registerWatch` | watcher를 등록할 때 최초 의존성 스냅샷 저장 |
+| `runComponentWatchers` | callback 실행 뒤 다음 비교에 사용할 의존성 스냅샷 저장 |
+| host prop 처리 | 객체 prop을 제자리에서 수정해도 다음 렌더에서 차이를 찾을 수 있도록 이전 값 저장 |
 
 ---
 
-## 관련 코드 위치
+## 관련 코드와 스펙
 
-- `_deepEqual`: `packages/core/src/deep-compare.js`
-- `_deepClone`: `packages/core/src/deep-compare.js`
-- VNode marker: `packages/core/src/vnode-marker.js`, `packages/core/src/core.js`
+- 구현: `packages/core/src/deep-compare.js`
+- VNode marker: `packages/core/src/vnode-marker.js`
+- 규범적 계약: `docs/spec/02-vnode-and-deep-data.md` §7~8

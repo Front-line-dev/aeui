@@ -1,6 +1,6 @@
 # 02. VNode와 깊은 데이터 연산 명세
 
-이 문서는 `packages/core/src`의 의도된 동작을 다른 코드베이스에서 재현하기 위한 규범적 명세다. 여기서 “해야 한다”는 호환 구현이 지켜야 하는 동작을 뜻한다. **현재 구현**으로 표시한 내용은 마이그레이션과 결함 재현을 위한 사실 기록일 뿐 보존할 규범이 아니며, **수정 필요** 항목은 함께 적은 목표 계약이 최종 기준이다. React의 VNode나 일반적인 deep-equal 구현을 유추해서 빈 부분을 채우지 말고, 아래에 적힌 AEUI 고유 규칙과 목표 계약을 따른다.
+이 문서는 VNode와 깊은 데이터 연산의 AEUI 고유 규칙을 규범적 스펙으로 정의한다. React의 VNode나 일반적인 deep-equal 구현에서 동작을 유추하지 않고 아래 계약을 따른다.
 
 ## 1. 책임과 모듈 경계
 
@@ -85,7 +85,7 @@ function createVNode(tag, props, ...children) {
 7. 호출자가 `props.children`을 전달했더라도 정규화한 `validChildren`으로 덮어쓴다.
 8. shallow copy만 수행한다. props 내부 객체의 참조는 이 단계에서 복제하지 않는다.
 
-원본 props 비변이는 현재 계약의 일부다. 같은 props 객체를 여러 VNode에 재사용해도 각 VNode가 독립된 props 객체를 가져야 하며, frozen props를 전달해도 `children` 주입 때문에 예외가 나면 안 된다.
+원본 props 비변이는 이 계약의 일부다. 같은 props 객체를 여러 VNode에 재사용해도 각 VNode가 독립된 props 객체를 가져야 하며, frozen props를 전달해도 `children` 주입 때문에 예외가 나면 안 된다.
 
 ### 3.2 `createElement`
 
@@ -158,101 +158,13 @@ text 값은 `String(vnode)`로 즉시 문자열화한다. 이 분류는 엄격�
 
 ## 7. `_deepEqual`
 
-### 7.1 **수정 필요 — AEUI-DATA-FIX-001**: 비대칭 비교와 단방향 그래프 대응
+### 7.1 공통 비교와 객체 그래프 대응
 
-현재 `_deepEqual(a, b, seen = new Map())`은 첫 번째 인자 `a`의 종류만 기준으로 분기하고, 순환 참조 기록도 `a -> b` 한 방향으로만 저장한다. 그 결과 값의 같음이 인자 순서에 따라 달라질 수 있고, 한쪽의 공유 참조를 다른 쪽의 서로 다른 객체 여러 개와 대응시키는 경우도 놓친다. 이는 보존할 AEUI 동작이 아니라 수정해야 할 결함이다.
+`_deepEqual`은 지원하는 모든 값 `a`, `b`에 대해 `_deepEqual(a, b) === _deepEqual(b, a)`를 만족해야 한다.
 
-현재 코드는 다음과 같이 서로 반대인 결과를 낸다.
+원시값과 함수는 `Object.is`로 비교한다. 따라서 `NaN`은 같고 `0`과 `-0`은 다르며, 함수는 같은 참조일 때만 같다. 두 값 중 하나만 `null`이거나 객체가 아니면 `false`다.
 
-```js
-_deepEqual({}, new Date(0)); // true  — 잘못된 현재 결과
-_deepEqual(new Date(0), {}); // false
-```
-
-빈 일반 객체와 `Date`는 서로 다른 종류이므로 두 방향 모두 `false`여야 한다. 공유 참조 그래프에서도 같은 문제가 발생한다.
-
-```js
-const shared = {};
-const duplicated = { left: {}, right: {} };
-const aliased = { left: shared, right: shared };
-
-_deepEqual(duplicated, aliased); // true  — 잘못된 현재 결과
-_deepEqual(aliased, duplicated); // false
-```
-
-watcher는 `deepEqual(newDeps, oldDeps)` 방향으로 변경 여부를 판단한다. 따라서 이 비대칭성은 단순한 내부 구현 차이가 아니라, 값이 실제로 바뀌었는데도 callback을 실행하지 않는 사용자 관찰 가능 결함이 될 수 있다.
-
-### 7.2 **현재 구현, 비규범**: 공통 비교 순서
-
-이 절부터 §7.4까지는 결함을 재현하고 기존 코드에서 마이그레이션하기 위한 사실 기록이다. 호환 구현이 따라야 할 최종 계약은 §7.5다.
-
-현재 비교 순서는 다음과 같다.
-
-```text
-1. Object.is(a, b)이면 true
-2. 어느 한쪽이라도 null이거나 object가 아니면 false
-3. 어느 한쪽이라도 VNode marker를 가지면 false
-4. seen에 a가 있으면 seen.get(a) === b 반환
-5. seen.set(a, b)
-6. a의 타입에 따라 Array -> Date -> RegExp -> Map -> Set 순서로 분기
-7. 나머지는 일반 object의 enumerable own string key 비교
-```
-
-이 순서 때문에 같은 VNode 참조만 1단계에서 같고, 구조가 같은 별도 VNode는 3단계에서 다르다. 함수도 같은 참조만 `Object.is`에서 같고 서로 다른 함수는 2단계에서 다르다. `NaN`은 같고 `0`과 `-0`은 다르다.
-
-현재 `seen`은 `a -> b` 방향의 `Map` 하나다. 이미 본 `a`가 다시 나오면 이전에 대응시킨 정확히 같은 `b`인지 확인해 순환을 끝내지만, 이미 본 `b`가 다른 `a`와 대응했는지는 확인하지 않는다. 또한 같은 객체 참조는 `seen`에 등록하기 전 `Object.is`에서 바로 반환하므로, 일부 alias 불일치는 단방향 검사만 양방향으로 추가해도 남을 수 있다.
-
-### 7.3 **현재 구현, 비규범**: 타입별 비교
-
-| 첫 번째 인자 `a`의 타입 | 현재 비교 방식 |
-| --- | --- |
-| Array | `b`도 Array이고 길이가 같아야 하며, 인덱스 `0..length-1`을 순서대로 재귀 비교 |
-| Date | `b instanceof Date`이고 `getTime()`이 `===` |
-| RegExp | `b instanceof RegExp`, `source`와 `flags`가 모두 `===` |
-| Map | `b`도 Map이고 size가 같아야 함. `a`의 각 key는 `b.has(key)`로 참조/원시 key 일치해야 하고 value만 재귀 비교 |
-| Set | size 확인 후 §7.4의 1:1, 순서 비의존 매칭 사용 |
-| 나머지 object | `Object.keys` 개수와 key 집합이 같고 각 값을 재귀 비교 |
-
-Array의 hole과 명시적 `undefined`는 인덱스 접근 결과가 같으므로 구별하지 않는다. Array의 추가 enumerable property는 비교하지 않는다. Map key는 deep compare하지 않는다. 일반 object fallback은 prototype, constructor, Symbol key, non-enumerable property를 비교하지 않는다. 특히 분기가 `a`의 타입만 기준으로 이루어져, `a`가 일반 객체이고 `b`가 `Date`, `RegExp`, `Map`, `Set` 같은 내장 객체일 때 `b`의 종류를 확인하지 않고 일반 object 비교로 내려갈 수 있다.
-
-일반 object의 key 존재 확인은 현재 다음 방식으로 enumerable own property 여부를 검사한다.
-
-```js
-Object.prototype.propertyIsEnumerable.call(b, key)
-```
-
-이 검사는 목표 계약에서도 유지한다. 단순히 `key in b`를 사용하면 상속 property를 잘못 같은 것으로 판정한다.
-
-### 7.4 **현재 구현, 비규범**: Set 후보 매칭
-
-현재 Set 비교는 값의 순서와 무관하게 deep-equal 객체를 1:1로 소비하려고 다음 알고리즘을 사용한다.
-
-1. `remainingB = new Set(b)`를 만든다.
-2. `a`의 각 값 `valA`를 순회한다.
-3. `remainingB.delete(valA)`가 성공하면 SameValueZero 기준 직접 일치로 소비하고 다음 값으로 간다.
-4. 직접 일치하지 않은 값이 원시값 또는 VNode면 즉시 `false`다.
-5. 초기에는 현재 `remainingB`의 첫 후보를 별도 signature 검사 없이 한 번 시도한다. 성공하면 소비하고 이 빠른 경로를 유지한다. 한 번 실패하면 이후에는 signature 필터 경로만 사용한다.
-6. 값 종류/모양으로 만든 signature가 같은 후보만 순회한다.
-7. 후보마다 현재 단방향 cycle map을 복사한 `trialSeen`으로 `_deepEqual`을 수행한다. 실패한 후보의 cycle 기록이 다음 후보를 오염시키지 않게 한다.
-8. 첫 성공 후보를 `remainingB`에서 제거하고 그 `trialSeen`을 active cycle map으로 채택한다.
-9. 후보가 없으면 `false`, 모두 끝난 뒤 `remainingB.size === 0`이면 `true`다.
-10. 성공한 active cycle map의 엔트리를 원래 `seen`에 합친다.
-
-signature는 primitive/VNode/Array 길이/Date 값/RegExp source와 flags/Map size/Set size/일반 객체의 정렬된 key 및 own data-property shape를 사용한다. signature는 일치 가능성이 없는 후보를 거르는 최적화일 뿐 최종 동일성 판정이 아니다.
-
-### 7.5 목표 계약
-
-`AEUI-DATA-FIX-001`을 해결한 `_deepEqual`은 다음을 모두 만족해야 한다.
-
-1. **대칭성**: 지원하는 모든 값 `a`, `b`에 대해 `_deepEqual(a, b) === _deepEqual(b, a)`여야 한다.
-2. **종류 일치**: Array, Date, RegExp, Map, Set, 일반 object를 먼저 양쪽에서 분류해야 한다. 두 값의 분류가 다르면 enumerable key가 우연히 같더라도 `false`다.
-3. **양방향 1:1 대응**: 재귀 비교 대상 object graph의 기록은 `a -> b`와 `b -> a`를 함께 관리해야 한다. 이미 본 `a`가 다른 `b`와 대응하거나, 이미 본 `b`가 다른 `a`와 대응하면 즉시 `false`다. 기존 계약대로 identity만 확인하는 Map key는 이 재귀 graph 대응 대상에 포함하지 않는다.
-4. **동일 참조도 대응에 포함**: object인 `a`와 `b`가 `Object.is(a, b)`를 만족하더라도, 기존 양방향 대응과 충돌하는지 먼저 확인하고 대응을 등록한 뒤 `true`를 반환해야 한다. primitive의 `Object.is` 빠른 경로에는 이 graph 기록이 필요 없다.
-5. **순환과 alias 구조 보존**: 같은 cycle과 같은 공유 참조 구조는 종료 가능하게 비교해 `true`로 판정하고, 한쪽만 공유 객체를 재사용하거나 cycle 연결 위치가 다른 그래프는 두 비교 방향 모두 `false`로 판정해야 한다.
-6. **기존 타입별 의미 유지**: 위 결함과 충돌하지 않는 범위에서 `Object.is`의 원시값 의미, VNode identity-only, Array index 비교, Date/RegExp 값 비교, Map key identity와 value 재귀 비교, Set의 순서 비의존 1:1 매칭, enumerable own string key 비교를 유지한다.
-7. **Set 분기 격리**: Set 후보를 시험할 때는 양방향 대응 기록을 모두 복제한 독립 trial 상태를 사용한다. 실패한 후보의 두 방향 기록은 폐기하고, 성공한 후보의 두 방향 기록만 active 상태에 반영한다. `remainingB.delete(valA)` 같은 동일 참조 빠른 경로로 object 후보를 소비할 때도 §7.5의 4번에 적은 대응 충돌 확인과 양방향 등록을 생략하면 안 된다.
-
-양방향 대응은 구현상 두 개의 map으로 표현할 수 있다.
+객체 비교는 양방향 1:1 대응을 유지해야 한다.
 
 ```js
 const pairs = {
@@ -261,11 +173,51 @@ const pairs = {
 };
 ```
 
-정확한 자료구조 이름은 내부 구현 세부사항이지만, 두 방향이 항상 같은 1:1 관계를 나타내야 한다. `forward.set(a, b)`만 하고 `reverse` 확인을 생략하는 구현은 목표 계약을 만족하지 않는다.
+- 이미 본 `a`가 다른 `b`와 대응하거나 이미 본 `b`가 다른 `a`와 대응하면 `false`다.
+- 객체인 두 값이 같은 참조여도 기존 대응과 충돌하는지 확인하고 대응을 등록한 뒤 `true`를 반환한다.
+- 같은 순환 구조와 공유 참조 구조는 종료 가능하게 비교해 `true`로 판정한다.
+- 한쪽만 참조를 공유하거나 순환 연결 위치가 다르면 `false`다.
+- Map key는 identity로만 비교하므로 재귀 객체 그래프 대응에 등록하지 않는다.
 
-### 7.6 필수 회귀 테스트
+VNode는 identity-only 값이다. 같은 VNode 참조만 같고 구조가 같은 별도 VNode는 다르다.
 
-새 적합성 suite는 최소한 다음을 검증해야 한다.
+### 7.2 타입별 비교
+
+Array, Date, RegExp, Map, Set, 일반 object를 양쪽에서 먼저 분류한다. 분류가 다르면 enumerable key가 같아도 `false`다.
+
+| 분류 | 비교 계약 |
+| --- | --- |
+| Array | 길이가 같아야 하며 인덱스 `0..length-1`을 순서대로 재귀 비교한다. |
+| Date | 양쪽 `getTime()` 결과를 `===`로 비교한다. |
+| RegExp | `source`와 `flags`가 모두 같아야 한다. |
+| Map | size가 같아야 한다. 각 key는 `b.has(key)`로 identity/원시값 일치를 확인하고 value만 재귀 비교한다. |
+| Set | size가 같아야 하며 §7.3의 순서 비의존 1:1 매칭을 사용한다. |
+| 일반 object | enumerable own string key 집합이 같아야 하며 각 값을 재귀 비교한다. |
+
+Array의 hole과 명시적 `undefined`는 구별하지 않으며 추가 enumerable property는 비교하지 않는다. 일반 object는 prototype, constructor, Symbol key, non-enumerable property를 비교하지 않는다. key 존재 확인은 다음과 같이 enumerable own property 여부를 검사해야 한다.
+
+```js
+Object.prototype.propertyIsEnumerable.call(b, key)
+```
+
+### 7.3 Set 후보 매칭
+
+Set은 값의 순서와 무관하게 각 값을 정확히 한 번씩 대응시킨다.
+
+1. 두 Set의 size가 다르면 `false`다.
+2. `b`의 아직 소비하지 않은 값 집합을 만든다.
+3. `a`의 각 값에 대해 대응 가능한 후보를 찾는다.
+4. 원시값과 VNode는 identity 규칙으로만 대응한다.
+5. 객체 후보는 양방향 대응 기록을 복제한 독립 trial 상태에서 비교한다.
+6. 실패한 후보의 대응 기록은 폐기하고 성공한 후보의 양방향 기록만 active 상태에 반영한다.
+7. 같은 객체 참조를 빠르게 소비하는 경로도 기존 대응 충돌 확인과 양방향 등록을 생략하면 안 된다.
+8. 모든 값이 1:1로 소비되었을 때만 `true`다.
+
+후보 signature 같은 사전 필터를 사용할 수 있지만, 필터는 최종 동일성 판정을 대신할 수 없다.
+
+### 7.4 적합성 요구사항
+
+공식 적합성 suite는 최소한 다음을 검증해야 한다.
 
 - `{}`와 `new Date(0)`, `{}`와 `/x/`, `{}`와 빈 `Map`, `{}`와 빈 `Set`, `[]`와 일반 객체를 양쪽 순서로 비교하면 모두 `false`다.
 - 지원 타입과 중첩 구조를 생성해 `_deepEqual(a, b) === _deepEqual(b, a)`를 확인하는 대칭성 property test를 수행한다.
@@ -279,30 +231,9 @@ const pairs = {
 
 ## 8. `_deepClone`
 
-### 8.1 **수정 필요 — AEUI-DATA-FIX-002**: `"__proto__"` own property 손실과 clone prototype 변경
+### 8.1 복제 순서
 
-현재 일반 object 복제는 `cloned[key] = value`로 값을 기록한다. key가 정확히 `"__proto__"`이면 이 대입은 own data property 생성이 아니라 상속된 `Object.prototype.__proto__` setter 호출이 될 수 있다. 그 결과 입력의 enumerable own property가 사라지고, 복제 결과 자체의 prototype이 입력 데이터로 바뀐다.
-
-```js
-const source = {};
-Object.defineProperty(source, '__proto__', {
-  value: { marker: true },
-  enumerable: true,
-  writable: true,
-  configurable: true,
-});
-
-const cloned = _deepClone(source);
-
-Object.hasOwn(cloned, '__proto__');       // false — 잘못된 현재 결과
-Object.getPrototypeOf(cloned).marker;    // true  — 잘못된 현재 결과
-```
-
-이는 전역 `Object.prototype`을 변경하는 형태의 오염은 아니지만, clone의 데이터와 prototype 경계를 깨뜨리는 결함이다. 현재 결과를 호환 동작으로 보존해서는 안 된다.
-
-### 8.2 **현재 구현, 비규범**: 복제 순서
-
-현재 복제 순서는 다음과 같다. 이 절은 결함 재현을 위한 사실 기록이며, `"__proto__"` 처리의 최종 기준은 §8.3이다.
+복제는 다음 순서를 따른다.
 
 ```text
 1. null 또는 object가 아닌 값 -> 그대로 반환
@@ -313,27 +244,24 @@ Object.getPrototypeOf(cloned).marker;    // true  — 잘못된 현재 결과
 6. Array -> 새 배열 등록 후 각 인덱스 값을 재귀 clone
 7. Map -> 새 Map 등록 후 key는 유지하고 value만 재귀 clone
 8. Set -> 새 Set 등록 후 각 value를 재귀 clone
-9. 일반 object -> {} 등록 후 Object.entries의 값을 재귀 clone하고 일반 대입
+9. 일반 object -> {} 등록 후 Object.entries의 값을 재귀 clone해 own data property로 정의
 ```
 
-현재 구현의 중요한 결과는 다음과 같다.
+세부 계약은 다음과 같다.
 
 - VNode는 복제하지 않는다. watcher deps 안의 VNode도 원래 참조를 유지한다.
 - 함수, Symbol, bigint 등 object가 아닌 값은 그대로 유지한다.
 - Map key는 복제하지 않고 value만 복제한다.
 - Array hole은 인덱스 루프와 `push` 때문에 명시적 `undefined` 원소가 된다. 추가 property는 복제하지 않는다.
 - 일반 object는 `{}`로 만들어 원본 prototype을 보존하지 않는다.
-- `Object.entries`가 반환하는 enumerable own string key만 순회한다. Symbol key와 non-enumerable key는 순회하지 않는다. accessor는 descriptor를 복제하지 않고 getter를 한 번 읽어 그 반환값을 재귀 복제한 뒤 일반 대입한다.
-- `"__proto__"` key는 own property로 보존되지 않을 수 있고, 복제된 값이 object 또는 `null`이면 clone의 prototype을 바꿀 수 있다.
+- `Object.entries`가 반환하는 enumerable own string key만 순회한다. Symbol key와 non-enumerable key는 순회하지 않는다. accessor는 descriptor를 복제하지 않고 getter를 한 번 읽어 그 반환값을 재귀 복제한다.
 - WeakMap, WeakSet처럼 `Object.entries`에 값이 나오지 않는 내장 객체는 빈 일반 객체가 된다.
 - `seen` 덕분에 Array, Map, Set, 일반 객체의 순환 참조를 보존한다.
 
-### 8.3 목표 계약
-
-`AEUI-DATA-FIX-002`를 해결한 일반 object clone은 다음을 만족해야 한다.
+### 8.2 일반 object property 정의
 
 1. `Object.entries(source)`로 관찰되는 모든 key를 clone의 enumerable own data property로 생성해야 하며, `"__proto__"`도 예외가 아니다.
-2. property를 기록할 때 prototype setter를 호출할 수 있는 일반 대입에 의존해서는 안 된다. 예를 들어 다음과 같은 own-property 정의를 사용할 수 있다.
+2. property를 기록할 때 prototype setter를 호출할 수 있는 일반 대입에 의존해서는 안 된다. 다음과 같은 own-property 정의를 사용할 수 있다.
 
    ```js
    Object.defineProperty(cloned, key, {
@@ -344,20 +272,20 @@ Object.getPrototypeOf(cloned).marker;    // true  — 잘못된 현재 결과
    });
    ```
 
-3. 일반 object clone을 `{}`로 만드는 현재 의미를 유지한다면, `"__proto__"` 데이터가 있어도 `Object.getPrototypeOf(cloned) === Object.prototype`이어야 한다. null-prototype 객체로 정책을 바꾸려면 이 문서의 일반 object 계약을 별도로 변경해야 한다.
+3. 일반 object clone은 `{}`로 만들며, `"__proto__"` 데이터가 있어도 `Object.getPrototypeOf(cloned) === Object.prototype`이어야 한다.
 4. `"__proto__"` value도 다른 value와 같은 규칙으로 재귀 복제해야 한다. object 값은 원본과 다른 clone이어야 하고, cycle이면 이미 등록한 clone을 참조해야 한다.
-5. Symbol/non-enumerable key를 제외하고 accessor 반환값을 일반 data property로 만드는 등, 이 결함과 관계없는 현재 복제 의미는 유지한다.
+5. Symbol/non-enumerable key는 제외하고 accessor 반환값은 일반 data property로 만든다.
 
-### 8.4 필수 회귀 테스트
+### 8.3 적합성 요구사항
 
-새 적합성 suite는 최소한 다음을 검증해야 한다.
+공식 적합성 suite는 최소한 다음을 검증해야 한다.
 
 - enumerable own `"__proto__"`를 가진 입력을 복제하면 `Object.hasOwn(cloned, '__proto__')`가 `true`다.
 - 해당 property descriptor는 enumerable/writable/configurable인 own data descriptor이고, 값은 재귀 복제되어 원본과 같은 참조가 아니다.
 - `"__proto__"` 값이 object 또는 `null`이어도 clone의 prototype은 `Object.prototype`에서 바뀌지 않는다.
 - 중첩된 일반 object 안의 `"__proto__"` key도 같은 방식으로 안전하게 보존된다.
 - `source.__proto__` own value가 `source` 자신을 가리키는 cycle은 `cloned.__proto__ === cloned`로 보존되며, 이 property 접근이 clone의 실제 prototype을 뜻하지 않는다.
-- 일반 key, VNode, Map key, Symbol/non-enumerable key, accessor 처리의 기존 계약이 함께 회귀하지 않는다.
+- 일반 key, VNode, Map key, Symbol/non-enumerable key, accessor 처리의 위 계약이 함께 유지된다.
 
 ## 9. 깊은 연산의 런타임 사용처
 
@@ -368,17 +296,11 @@ Object.getPrototypeOf(cloned).marker;    // true  — 잘못된 현재 결과
 | event handler prop | 함수는 참조 비교되며 최신 함수가 달라지면 handler 저장소만 교체 |
 | VNode가 포함된 데이터 | VNode는 identity-only이므로 매 렌더 새 VNode면 변경으로 판정 |
 
-## 10. 검증 계약
+## 10. VNode 적합성 요구사항
 
-재구현 시 최소한 다음 성질을 테스트해야 한다.
+공식 적합성 suite는 최소한 다음 성질을 검증해야 한다.
 
 - `Object.keys(vnode)`에는 세 공개 필드만 있고 marker Symbol은 별도로 존재한다.
 - `props.children === vnode.children`이며 원본/frozen props를 수정하지 않는다.
 - null/undefined/boolean child가 제거되고 한 단계 배열만 평탄화된다.
-- `_deepEqual`은 `AEUI-DATA-FIX-001`의 §7.5 목표 계약과 §7.6 필수 회귀 테스트를 만족한다. 현재 구현의 비대칭 결과를 합격 기대값으로 사용하지 않는다.
-- Set 내부 deep-equal 객체는 순서와 무관하되 양방향 graph 대응까지 포함해 1:1로 매칭된다.
 - 별도 생성된 동형 VNode는 다르고 같은 VNode 참조는 같다.
-- deep clone은 순환 구조를 보존하고 VNode/Map key 참조를 유지한다.
-- 일반 object clone은 `AEUI-DATA-FIX-002`의 §8.3 목표 계약과 §8.4 필수 회귀 테스트를 만족한다. `"__proto__"`를 잃거나 clone의 prototype을 바꾸는 현재 결과는 결함 재현용 characterization test에서만 조사하고 적합성 기대값으로 승인하지 않는다.
-
-현재 구현의 참고 근거는 `example/test/src/__tests__/unit.test.js`와 `example/test/src/__tests__/vnode-helpers.test.js`다. 이 기존 테스트는 새 문서 우선 적합성 suite가 아니며, §10의 항목은 새 suite를 처음부터 작성할 때 독립적으로 검증해야 한다.

@@ -2,7 +2,7 @@
 
 ## 1. 목적
 
-01~09는 동작 계약을 중심으로 설명한다. 이 문서는 같은 구현을 현재 저장소와 동일한 파일 경계로 다시 나눌 때 필요한 **모듈·심볼 manifest**다. 알고리즘은 각 연결 문서가 규범이며, 여기서는 함수 이름, 공개 여부, 의존 방향과 파일 배치를 고정한다.
+01~09는 동작 계약을 중심으로 설명한다. 이 문서는 AEUI source repository의 파일 경계에 적용되는 **모듈·심볼 manifest 스펙**을 정의한다. 알고리즘은 각 연결 문서가 규범이며, 여기서는 함수 이름, 공개 여부, 의존 방향과 파일 배치를 고정한다.
 
 ## 2. 코어 소스 트리
 
@@ -32,7 +32,7 @@ src/
 └── vite-plugin.js
 ```
 
-파일을 합쳐도 런타임 결과만 같으면 되는 일반 라이브러리 설명과 달리, 이 프로젝트의 문서 우선 개발에서는 이 경계도 유지보수 계약이다. 새 책임을 추가할 때 기존 파일에 무관한 코드를 누적하지 말고 manifest를 먼저 바꾼다.
+위 20개 파일과 각 파일의 책임 경계는 source layout 계약이다. 한 파일은 아래 절에서 배정한 책임과 의존 방향만 소유해야 한다.
 
 ## 3. 공개 진입과 조립 모듈
 
@@ -42,7 +42,7 @@ src/
 | `core.js` | `AEUI` | `createVNode`, `Fragment` | 01 §3, 02 §2~4 |
 | `app-runtime.js` | `createAppRuntime` | `bindRuntimeState` | 01 §4, 03 §2 |
 
-`createAppRuntime`은 package root에서 re-export하지 않는다. `core.js`만 이 팩토리로 기본 singleton `AEUI`를 만들며, source-level test는 팩토리를 직접 import할 수 있다.
+`createAppRuntime`은 source module export이지만 package root에서 re-export하지 않는다. `core.js`만 이 팩토리로 기본 singleton `AEUI`를 만든다.
 
 ## 4. VNode와 값 연산 모듈
 
@@ -52,7 +52,7 @@ src/
 | `vnode-helpers.js` | `getVNodeKey`, `isFragmentVNode`, `getFragmentChildren` | `resolveFragmentComponent` | 02 §5 |
 | `deep-compare.js` | `_deepEqual`, `_deepClone` | `isVNode`, `canDeepMatchSetValue`, `primitiveSignature`, `getValueShape`, `getOwnDataPropertyShape`, `getSetMatchSignature`, `getCachedSetMatchSignature`, `mergeSeen`, cached `propertyIsEnumerable` | 02 §7~8 |
 
-위 private 심볼은 현재 구현 inventory다. deep compare의 signature helper는 Set 1:1 후보 선택 최적화에 관여하지만, `AEUI-DATA-FIX-001`을 구현할 때 단방향 `seen` 구조나 `mergeSeen` 모양까지 보존해서는 안 된다. 목표 구현은 02 §7.4의 현재 후보 격리 방식을 참고하되 §7.5의 양방향 대응과 독립 trial 상태를 만족하도록 helper와 manifest를 함께 갱신한다.
+위 private 심볼은 `deep-compare.js` 안에서만 사용하며 다른 source module이나 package entry에서 export하지 않는다. signature helper는 Set 후보의 1:1 선택과 trial 비교를 지원해야 하며 동작 규범은 02 §7을 따른다.
 
 ## 5. RuntimeNode와 컴포넌트 모듈
 
@@ -67,7 +67,7 @@ src/
 | `hooks.js` | `watch`, `clean` | 없음 | 01 §6, 05 §10 |
 | `compiler-runtime.js` | `runComponentWatchersBridge`, `runRenderPhaseBridge` | 없음 | 03 §7, 06 §11 |
 
-`syncPropsTarget`과 `dom-host.js`의 `updateProps`는 현재 별도 함수다. 두 함수가 같은 delete-then-assign 형태여도 하나를 import해 공유하지 않는다. 전자는 null/object guard를 두지만 후자는 target guard가 없다는 차이를 보존한다.
+`syncPropsTarget`과 `dom-host.js`의 `updateProps`는 별도 함수로 유지한다. 두 함수가 같은 delete-then-assign 형태여도 하나를 import해 공유하지 않는다. 전자는 null/object guard를 두고 후자는 target guard를 두지 않는다.
 
 ## 6. DOM과 reconciliation 모듈
 
@@ -245,7 +245,7 @@ createParserPlugins
 
 ## 11. 패키지 주변 파일
 
-`packages/core`에서 source 외 재현 대상은 다음과 같다.
+`packages/core`에서 source 외 스펙 대상은 다음과 같다.
 
 ```text
 package.json
@@ -295,26 +295,3 @@ vite-plugin
 ```
 
 `component-lifecycle`은 `component-watchers`, `runtime-context`, `vnode-helpers`를 import한다. source 모듈은 `app-runtime`의 singleton을 역으로 import하지 않으므로 각 runtime state를 인자로 받아 격리된다.
-
-## 13. 재구현 순서
-
-동일 저장소를 빈 디렉터리에서 만들 때 다음 순서를 권장한다.
-
-1. marker, VNode helper, deep compare와 `core.js` VNode 팩토리
-2. runtime state/context, node factory와 component lifecycle
-3. DOM host와 reconciler
-4. scheduler, hook registry/watcher와 app-runtime 조립
-5. Babel plugin과 compiler runtime ABI
-6. router와 Vite plugin
-7. public types, Rollup와 package export map
-8. create CLI/template
-9. `docs/spec` 계약에서 처음부터 작성한 새 적합성 suite와 reference apps
-
-각 단계에서 다음 단계의 임시 stub을 공개 API로 남기지 않는다. 최종 package root export는 01과 08의 세 값으로 돌아와야 한다.
-
-## 14. manifest 변경 규칙
-
-- source 파일을 추가·삭제·이름 변경하면 이 문서를 먼저 갱신한다.
-- export를 바꾸면 01의 public/private 경계와 08의 package/type 계약을 함께 검토한다.
-- private helper를 합치거나 나눌 때도 관련 알고리즘 단계가 사라지지 않았는지 문서 계약을 먼저 검토한다. 새 적합성 suite가 준비된 뒤에는 그 계약을 직접 가리키는 테스트로 확인한다. 기존 legacy suite 통과만으로는 알고리즘 계약 보존을 증명하지 않는다.
-- 새 build artifact는 08의 Rollup output, package `files`, dry-run tarball 목록을 함께 바꾼다.

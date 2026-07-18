@@ -2,7 +2,7 @@
 
 ## 1. 역할과 범위
 
-예제는 프레임워크 공개 API의 추가 명세가 아니라, 여러 기능이 실제 번들 및 브라우저에서 함께 동작하는지 확인하는 참조 애플리케이션이다. 호환 구현은 동일한 상태 흐름과 검증 시나리오를 재현해야 한다. 문구, 그림자, 여백 같은 시각 세부는 별도 UI 변경이 없는 한 그대로 유지하는 편이 좋지만 코어 적합성 기준은 아니다.
+예제는 여러 AEUI 기능이 실제 bundle과 browser에서 함께 동작함을 보장하는 통합 계약이다. 각 reference application은 아래에 정의한 build 방식, 사용자 상호작용, 데이터 흐름과 cleanup 경계를 만족해야 한다. 문구, 그림자와 여백 같은 시각 세부는 명시한 동작에 영향을 주지 않는 한 이 계약의 범위가 아니다.
 
 | 예제 | 주 역할 |
 |---|---|
@@ -11,11 +11,10 @@
 | `example/commerce-admin` | `aeui/vite`, 디렉터리 라우터, alias, 전역 mutable store, 실제 CRUD 흐름 |
 | `example/letProps` | Babel Standalone에서 부모 local `let`과 자식 props 전달 |
 | `example/shoppingCart` | Babel Standalone에서 배열 직접 변이, keyed component, computed watch |
-| `example/test` | 현재 구현 회귀를 조사하는 기존 suite. 적합성 suite는 문서 기준으로 처음부터 다시 작성할 예정이며 상세 원칙은 10 문서 참조 |
 
 ## 2. 공통 빌드 방식
 
-`vite-demo`와 `deep-compare-test`는 Vite의 React 플러그인을 JSX 변환 운반체로만 사용한다. React 런타임은 사용하지 않는다.
+`vite-demo`와 `deep-compare-test`는 Vite의 React plugin을 JSX 변환 운반체로만 사용해야 하며 React runtime을 사용해서는 안 된다.
 
 ```text
 include: /\.[jt]sx$/
@@ -26,9 +25,9 @@ pragma: AEUI.createElement
 pragmaFrag: AEUI.Fragment
 ```
 
-두 앱의 `main.js`는 `AEUI`와 `App`을 import하고 `AEUI.init(App, document.getElementById('root'))`를 호출한다.
+두 앱의 `main.js`는 `AEUI`와 `App`을 import하고 `AEUI.init(App, document.getElementById('root'))`를 호출해야 한다.
 
-`commerce-admin`은 `plugins: [aeui()]`만 사용한다. `index.html`에는 `#root`만 있고 수동 module script가 없으므로 Vite 플러그인이 가상 entry, route glob, style import와 init을 생성한다.
+`commerce-admin`은 `plugins: [aeui()]`만 사용해야 한다. `index.html`에는 `#root`만 두고 수동 module script를 두지 않으며, AEUI Vite plugin이 virtual entry, route glob, style import와 init을 생성해야 한다.
 
 ## 3. Vite Demo
 
@@ -64,12 +63,10 @@ App
 
 `App`은 네 개의 `TestSection`을 렌더한다.
 
-1. **Watch Deduplication**: 2초 후 `state = { count: 1 }`로 새 참조지만 같은 내용을 할당한다. 현재 runtime 의미상 초기 snapshot은 callback을 실행하지 않으므로 목표 계약은 4초 시점 trigger 0이다. 다만 현재 진단 UI는 역사적 문구를 보존해 trigger가 0이면 `PASS: Watch did not re-trigger`, 1이면 `PASS: Watch triggered once (initial) and ignored duplicate.`, 2 이상이면 FAIL로 표시한다. 이 UI 문구는 적합성 판정 기준이 아니며 새 suite는 문서의 목표 계약을 직접 검증해야 한다.
+1. **Watch Deduplication**: 2초 후 `state = { count: 1 }`로 새 참조지만 같은 내용을 할당한다. 초기 snapshot은 callback을 실행하지 않으며 4초 시점까지 trigger count는 0이어야 한다.
 2. **Set In-Place Mutation**: `new Set([1])`에 2초 후 `add(2)` 한다. watcher는 정확히 한 번 실행되어야 한다.
 3. **Object In-Place Mutation**: `{ a: 1, nested: { b: 2 } }`의 `nested.b`를 3으로 바꾼다. watcher는 한 번 이상 실행되어야 한다.
 4. **DOM Prop Test**: `{ style: 'color: blue' }`의 `style` 값을 2초 후 `'color: red'`로 직접 바꾸고 DOM style 변화를 보여준다.
-
-이 앱의 세 interval과 DOM Prop Test의 timeout은 기존 참조 구현에서 cleanup하지 않는다. 페이지 수명 동안 실행되는 진단 fixture라는 현재 동작을 재현하되, 새 기능 설계의 모범 cleanup 예시로 간주하지 않는다.
 
 ## 5. Commerce Admin
 
@@ -177,7 +174,7 @@ parse 오류, key 부재, version 불일치는 null로 처리한다. 초기 데�
 - Modal overlay는 click target과 currentTarget이 같을 때만 닫힌다.
 - confirm action은 `state.modal.type === 'confirm'`일 때만 저장된 `onConfirm`을 호출한다.
 
-### 5.8 필수 수동 시나리오
+### 5.8 필수 통합 시나리오
 
 1. Admin Products에서 새 상품을 만든다.
 2. Store에서 새 상품을 확인하고 cart에 담는다.
@@ -190,7 +187,7 @@ parse 오류, key 부재, version 불일치는 null로 처리한다. 초기 데�
 
 ## 6. Babel Standalone 예제
 
-`letProps/index.html`과 `shoppingCart/index.html`은 CDN Babel Standalone을 로드하고 다음 순서로 실행한다.
+`letProps/index.html`과 `shoppingCart/index.html`은 CDN Babel Standalone을 로드하고 다음 순서로 실행해야 한다.
 
 1. core source의 `AEUI`, `watch`, `clean`과 Babel plugin source를 ESM import한다.
 2. 세 runtime 값을 `window`에 둔다.
@@ -200,4 +197,4 @@ parse 오류, key 부재, version 불일치는 null로 처리한다. 초기 데�
 
 두 embedded source는 `/** @jsx AEUI.createVNode */` pragma를 가진다. `letProps`는 부모 count를 자식 callback으로 변경하고 최신 props를 확인한다. `shoppingCart`는 세 고정 상품의 quantity를 직접 바꾸고 total watcher와 20,000원 이상 무료배송 조건을 확인한다.
 
-이 두 HTML은 외부 CDN과 eval을 사용하는 개발 진단용이다. npm 배포 템플릿이나 production 보안 모델로 복제하지 않는다.
+이 두 HTML은 외부 CDN과 eval을 사용하는 개발 진단용이며 npm 배포 템플릿 및 production 보안 스펙의 범위 밖이다.

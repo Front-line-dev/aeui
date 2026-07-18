@@ -1,6 +1,6 @@
 # 05. 스케줄러, 훅, 오류 처리 명세
 
-이 문서는 AEUI의 dirty-checking 루프, DOM 이벤트 fast path, runtime state, `watch`/`clean` 훅, 오류 격리 규칙을 규정한다. 일반 `let` 변경에는 setter가 없으므로 DOM 이벤트 예약과 주기적 polling이 함께 있어야 현재 동작을 재현할 수 있다.
+이 문서는 AEUI의 dirty-checking 루프, DOM 이벤트 fast path, runtime state, `watch`/`clean` 훅, 오류 격리 규칙을 규정한다. 일반 `let` 변경에는 setter가 없으므로 스펙은 DOM 이벤트 예약과 주기적 polling을 함께 사용하도록 요구한다.
 
 ## 1. 모듈 경계
 
@@ -142,8 +142,6 @@ return didMutate;
 
 `didMutate`는 “상태가 바뀌었는가”가 아니라 이번 cycle에서 런타임이 추적하는 DOM write/move/remove가 있었는가를 나타낸다. text write, element 삽입/이동/제거, 일반 DOM prop branch, controlled property 복구가 true로 만든다. event handler 저장소만 교체한 경우는 true로 만들지 않는다.
 
-현재 file input의 `value` 특례는 attribute가 이미 없는 동일 props render에서도 `removeAttribute`를 호출하고 `didMutate=true`로 만든다. 이것은 **현재 구현** 설명이며 최종 mutation 의미가 아니다. 정확한 file-input mutation 판정은 6.1의 **계획 기능**으로 분리한다.
-
 ## 6. polling backoff
 
 최대 간격은 60 frame이다.
@@ -160,27 +158,6 @@ framesUntilNextTick = frameDelay - 1;
 - `framesUntilNextTick > 0`인 RAF에서는 tick하지 않고 1만 감소시킨다.
 
 이 값은 시간 milliseconds가 아니라 RAF callback 횟수다.
-
-### 6.1 **계획 기능**: 동일 file input props에서 backoff 유지
-
-현재 file input에 `value` prop이 있으면 실제 `value` attribute가 이미 없더라도 DOM host가 매 render를 mutation으로 보고할 수 있다. 따라서 사용자 상태와 DOM이 모두 안정되어 있어도 다음 흐름이 반복될 수 있다.
-
-```text
-file input의 동일 props reconcile
-실제 DOM 변화 없음
-현재 구현은 didMutate=true 보고
-frameDelay=1로 초기화
-다음 RAF에서 다시 tick
-```
-
-이 최적화는 현재 구현하지 않았으며 나중에 구현해야 하는 **계획 기능**이다. 목표 계약은 다음과 같다.
-
-- `didMutate`는 file input의 `value` attribute가 실제로 제거되는 경우에만 그 branch 때문에 true가 된다.
-- attribute가 이미 없고 다른 DOM write도 없으면 tick은 `false`를 반환할 수 있어야 한다.
-- 무변화 cycle은 일반 backoff 규칙에 따라 `1 -> 2 -> 4 -> ... -> 60`으로 진행한다.
-- text input에서 file input으로 전환해 기존 value attribute를 실제로 제거한 cycle은 mutation으로 보고하고 delay를 1로 되돌린다.
-
-이 항목은 현재 동작 호환 요구가 아니라 향후 polling 비용을 줄이기 위한 목표다.
 
 ## 7. scheduler 제어
 
@@ -275,7 +252,7 @@ AEUI.__runtime.watch(callback, () => [currentDeps]);
 
 ### 10.2 `clean`
 
-public fallback은 현재 active runtime context를 읽어 `registerCleanup(runtime, callback)`을 호출한다. 정상 compiled path는 `AEUI.__runtime.clean(callback)`으로 직접 현재 앱 state에 등록한다.
+public fallback은 active runtime context를 읽어 `registerCleanup(runtime, callback)`을 호출한다. 정상 compiled path는 `AEUI.__runtime.clean(callback)`으로 직접 해당 앱 state에 등록한다.
 
 ## 11. 훅 등록 phase
 
@@ -374,19 +351,16 @@ component unmount 시작 시 등록 순서대로 각 cleanup을 호출한다. �
 | DOM event handler | 원래 error 전파 | finally에서 interactive render 요청 |
 | router teardown/init의 tick 밖 코드 | 별도 catch 없음 | 호출자에게 전파 |
 
-render 실패 후 scheduler가 살아 있으므로 같은 실패가 이후 polling마다 다시 로그될 수 있다. 현재 오류 처리는 error boundary나 이전 UI의 완전한 transactional 복원을 제공하지 않는다.
-
-완전한 transactional 복원과, 실패 전에 setup이 성공한 provisional component의 cleanup 보장은 구분한다. 후자는 현재 구현하지 않았지만 나중에 구현해야 하는 **계획 기능**이다. 향후에는 render commit이 실패해도 해당 시도에서 등록된 cleanup을 정확히 한 번 실행해야 한다. 이 요구는 기존 text/attribute/state까지 모두 이전 값으로 되돌리는 error boundary나 전체 rollback을 뜻하지 않는다. 상세 계약은 `04-reconciliation-and-dom.md` 9.3을 따른다.
+render 실패 후 scheduler가 살아 있으므로 같은 실패가 이후 polling마다 다시 로그될 수 있다. 오류 처리는 error boundary나 이전 UI의 완전한 transactional 복원을 제공하지 않는다.
 
 ## 15. 검증 계약
 
-새 문서 우선 적합성 suite는 최종적으로 다음 항목을 상태에 맞게 검증해야 한다. 현재 legacy suite 통과는 이 계약의 증거가 아니다.
+공식 적합성 suite는 다음 항목을 검증해야 한다.
 
 - runtime state 기본값과 reset 후 scheduling/render flag가 정확하다.
 - reset은 주입 helper를 유지하고 router teardown을 호출한다.
 - init은 이전 root cleanup, container clear, 초기 tick, scheduler 시작 순서를 따른다.
 - 무변화 polling은 1/2/4 frame으로 backoff하고 변화 시 1로 돌아오며 60을 넘지 않는다.
-- 동일한 file input props에서 실제 attribute 제거가 없을 때 backoff를 유지하는 검증은 **계획 기능**에 속한다. 현재 구현은 이 목표를 아직 만족하지 않는다.
 - interactive 요청은 남은 polling countdown과 무관하게 다음 RAF에서 tick한다.
 - `AEUI.render()`는 동기 렌더 결과 boolean을 반환한다.
 - DOM 이벤트 뒤 다음 frame 자동 렌더, 여러 이벤트의 한 frame coalescing, handler `this`와 error-finally 예약이 동작한다.
@@ -394,8 +368,5 @@ render 실패 후 scheduler가 살아 있으므로 같은 실패가 이후 polli
 - watcher 오류가 다음 watcher/render를 막지 않는다.
 - render-phase 훅은 등록되지 않고 uncompiled watch는 compile guard error를 낸다.
 - cleanup 오류가 나머지 cleanup과 재귀 unmount를 막지 않는다.
-- 부분 mount 실패 전에 setup이 성공한 provisional component cleanup을 정확히 한 번 실행하는 검증은 **계획 기능**에 속한다. 현재 구현은 이 목표를 아직 만족하지 않는다.
 - setup/render 오류 뒤 active component context와 `isRendering`이 복원된다.
 - 실패 render의 새 DOM이 다음 render마다 누적되지 않는다.
-
-현재 구현을 조사할 때 참고할 기존 테스트는 `runtime-state.test.js`, `runtime-context.test.js`, `app-runtime.test.js`, `dom.test.js`, `component-lifecycle.test.js`, `component.test.jsx`, `babel-plugin.test.js`다. 이 파일들은 새 적합성 suite가 아니며 위 항목을 문서 상태별로 다시 작성해야 한다.

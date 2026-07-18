@@ -1,6 +1,6 @@
 # 03. 컴포넌트 런타임과 RuntimeNode 명세
 
-이 문서는 VNode 입력을 생명주기를 가진 RuntimeNode 트리로 바꾸고, 컴포넌트의 setup/render/props/cleanup을 실행하는 현재 구현을 규정한다. 컴포넌트 함수가 매 렌더마다 호출되는 React식 모델이 아니라, 컴파일러가 만든 render factory를 장기 보관하는 모델임을 전제로 한다.
+이 문서는 VNode 입력을 생명주기를 가진 RuntimeNode 트리로 바꾸고 컴포넌트의 setup/render/props/cleanup을 실행하는 계약을 규정한다. 컴포넌트 함수가 매 렌더마다 호출되는 React식 모델이 아니라, 컴파일러가 만든 render factory를 장기 보관하는 모델임을 전제로 한다.
 
 ## 1. 모듈별 책임
 
@@ -10,7 +10,7 @@
 | `runtime-state.js` | 앱별 mutable state의 초기 shape와 reset |
 | `node-factory.js` | root 및 일반 RuntimeNode shell 생성 |
 | `component-lifecycle.js` | component setup, render, commit, cleanup |
-| `runtime-context.js` | 현재 runtime/component/phase를 stack으로 관리 |
+| `runtime-context.js` | active runtime/component/phase를 stack으로 관리 |
 | `compiler-runtime.js` | Babel 생성 코드와 component lifecycle 사이의 bridge |
 | `component-watchers.js` | component watcher 실행 |
 | `hook-registry.js` | setup 중 watch/clean 등록 |
@@ -43,11 +43,11 @@ createAppRuntime({
 }
 ```
 
-`AEUI` 최상위에는 과거의 `_tick`, `_didMutate` 같은 underscore helper를 노출하지 않는다. `__runtime`은 Babel 출력, router, 테스트가 사용하는 compiler/private surface다.
+`AEUI` 최상위에는 `_tick`, `_didMutate` 같은 underscore helper를 노출하지 않는다. `__runtime`은 Babel 출력과 router 통합이 사용하는 compiler/framework-private surface다.
 
 ### 2.1 `__runtime` 메서드 집합
 
-현재 internal runtime에는 다음 항목이 있다.
+internal runtime은 다음 항목을 제공해야 한다.
 
 ```text
 state, deepEqual, deepClone,
@@ -61,7 +61,7 @@ watch, clean,
 unmountNode, reconcile, dispatchDomEvent
 ```
 
-각 함수는 공용 모듈 함수에 이 앱의 `state`를 첫 인자로 바인딩한다. state에도 렌더 경로가 요구하는 helper를 연결한다. 이때 일부 state helper는 `internalRuntime` 메서드를 다시 호출하도록 만든다. 따라서 테스트에서 `internalRuntime.tick` 등을 교체하면 state 경유 호출에도 반영된다.
+각 함수는 공용 모듈 함수에 이 앱의 `state`를 첫 인자로 바인딩한다. state에도 렌더 경로가 요구하는 helper를 연결한다. 일부 state helper는 호출할 때마다 대응하는 `internalRuntime` 메서드를 다시 조회해야 하므로, 해당 메서드의 함수 참조가 바뀌면 이후 state 경유 호출도 바뀐 참조를 사용한다.
 
 ## 3. RuntimeNode 공통 모델
 
@@ -90,7 +90,7 @@ VNode는 매 render의 입력이고 RuntimeNode는 render 사이에 유지되는
 | `parentDom` | 이 node의 DOM range가 직접 속한 DOM 부모 |
 | `children` | 논리 자식 RuntimeNode 목록 |
 | `firstDom`, `lastDom` | 이 node가 차지하는 직접 형제 DOM 범위 |
-| `isMounted` | 생성 시 `true`, unmount 시 `false`; 현재 업데이트 경로가 이 값을 가드로 검사하지는 않음 |
+| `isMounted` | 생성 시 `true`, unmount 시 `false`; 업데이트 경로의 실행을 차단하는 가드로는 사용하지 않음 |
 
 ### 3.1 kind별 추가 필드
 
@@ -146,7 +146,7 @@ root의 `children[0]`만 앱의 루트 component RuntimeNode로 사용한다.
 ```text
 null/boolean                  -> null
 비객체                        -> text node
-배열 또는 현재 Fragment VNode -> fragment node
+배열 또는 `vnode.tag === state.Fragment`인 VNode -> fragment node
 문자열 tag VNode              -> host node
 그 외 object                  -> component node
 ```
@@ -202,7 +202,7 @@ return withComponentContext(state, node, 'setup', () => {
 
 정상적인 Babel 변환 컴포넌트는 setup 함수 본문을 실행한 뒤 함수인 render factory를 반환하므로 이후 render에서는 setup이 재실행되지 않는다. 컴포넌트의 local `let`, 등록된 watcher/cleanup, 기타 setup closure가 이 함수 객체에 유지된다.
 
-현재 cache 가드는 별도 boolean이 아니라 `if (node.renderFactory)`다. 따라서 아래 경계 동작도 그대로 재현해야 한다.
+setup cache 가드는 별도 boolean이 아니라 `if (node.renderFactory)`다. 아래 경계 동작도 컴포넌트 런타임 스펙에 포함된다.
 
 - 함수 또는 다른 truthy 값을 반환하면 setup은 한 번만 실행된다.
 - `null`, `undefined`, `false`, `0`, `''`를 반환하면 다음 render에서 setup이 다시 실행된다.
@@ -261,7 +261,7 @@ invokeComponentRenderFactory
 
 ### 7.3 props target 동기화
 
-compiler가 setup closure에 만든 `__props` 같은 object를 `propsTarget`이라 한다. 동기화는 객체 identity를 유지하지만, 모든 own key와 descriptor를 완전히 교체하는 연산은 아니다. 현재 구현은 아래 두 JavaScript 연산의 의미를 그대로 가진다.
+compiler가 컴포넌트의 setup 함수 안에 만든 props 저장 객체를 `propsTarget`이라 한다. 동기화는 객체 identity를 유지하지만 모든 own key와 descriptor를 완전히 교체하지는 않으며, 아래 두 JavaScript 연산의 의미를 따른다.
 
 ```js
 for (const key in propsTarget) delete propsTarget[key];
@@ -278,7 +278,7 @@ if (nextProps) Object.assign(propsTarget, nextProps);
 
 - `nextProps`가 truthy일 때만 `Object.assign`을 실행한다.
 - `Object.assign`은 `nextProps`의 enumerable own string key와 enumerable own Symbol key를 읽어 target에 할당한다. descriptor 자체는 복제하지 않으며 getter와 setter가 실행될 수 있다.
-- 삭제 단계에서 제외된 기존 Symbol key와 non-enumerable own key는 같은 key가 할당 단계에서 덮어써지지 않는 한 남는다. 특히 이전 enumerable Symbol prop이 다음 props에서 빠져도 현재 코드만으로는 삭제되지 않는다.
+- 삭제 단계에서 제외된 기존 Symbol key와 non-enumerable own key는 같은 key가 할당 단계에서 덮어써지지 않는 한 남는다. 특히 이전 enumerable Symbol prop이 다음 props에서 빠져도 삭제되지 않는다.
 
 `propsTarget`이 null이거나 `typeof !== 'object'`면 아무 일도 하지 않는다. compiler가 정상적으로 만드는 plain object와 일반 JSX string-key props 경로에서는 결과적으로 이전 enumerable own string props가 제거되고 다음 props가 채워진다. 하지만 이를 일반적인 의미의 “내용 완전 교체”로 확대해서는 안 된다. 이 동기화가 watcher보다 먼저 일어나므로 watcher와 render는 같은 tick의 최신 일반 props를 본다.
 
@@ -338,12 +338,12 @@ cleanup 하나가 실패해도 나머지 cleanup은 계속 실행한다. 별도 
 - component 함수 또는 key가 달라지면 이전 node를 unmount하고 새 setup을 실행한다.
 - component instance별 node/render factory/watchStates/cleanups가 독립되어야 한다.
 - setup/render 예외가 나도 context stack과 `currentComponentNode/currentComponentPhase`는 복원되어야 한다.
-- `isMounted`는 현재 관찰 상태일 뿐 render/update를 차단하는 독립 가드는 아니다.
+- `isMounted`는 생명주기 상태를 기록하지만 render/update를 차단하는 독립 가드는 아니다.
 - host/text node를 일반 unmount해도 `node.dom` 필드 자체는 null로 지우지 않는다. DOM range와 children은 지우며, 실패한 host mount 경로만 추가로 `node.dom = null`을 수행한다.
 
 ## 11. 검증 계약
 
-재구현은 적어도 다음을 입증해야 한다.
+스펙 적합성은 적어도 다음을 입증해야 한다.
 
 - 두 `createAppRuntime` 호출의 state가 서로 다르다.
 - `createNode`는 component shell만 만들고 setup을 즉시 실행하지 않는다.
@@ -353,5 +353,3 @@ cleanup 하나가 실패해도 나머지 cleanup은 계속 실행한다. 별도 
 - 중첩된 서로 다른 runtime context가 바깥 context를 복원한다.
 - setup/render throw 뒤 current context가 남지 않는다.
 - cleanup은 교체/조건부 제거/root 재초기화에서 한 번 실행되고, 하나가 throw해도 나머지와 자식 정리가 계속된다.
-
-현재 구현의 참고 근거는 `component-lifecycle.test.js`, `runtime-context.test.js`, `runtime-state.test.js`, `app-runtime.test.js`, `component.test.jsx`, `dom.test.js`다. 이 기존 테스트들은 새 문서 우선 적합성 suite가 아니며, 이 장의 계약은 새 suite에서 처음부터 다시 검증한다.

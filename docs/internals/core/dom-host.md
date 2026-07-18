@@ -41,13 +41,13 @@ DOM 속성 diff를 수행하고 실제 DOM에 반영한다. `children`, `key`, `
 1. `<select>`는 `<option>` children이 모두 렌더된 뒤에야 `value`를 설정할 수 있다.
 2. `<input type="file">`의 `value`는 보안상 DOM property에 직접 쓸 수 없다.
 
-`updateDomProps()`도 같은 규칙을 따른다. `input`이 이전 렌더의 `type="text"`에서 이번 렌더의 `type="file"`로 바뀌는 경우, props 순서와 무관하게 다음 `type`을 기준으로 file input 여부를 판단하고 `value` attribute를 제거한다.
+`updateDomProps()`도 같은 규칙을 따른다. `input`이 이전 렌더의 `type="text"`에서 이번 렌더의 `type="file"`로 바뀌는 경우, props 순서와 무관하게 다음 `type`을 기준으로 file input 여부를 판단하고 `value` attribute를 제거한다. tag와 type을 소문자로 정규화하므로 `file`, `FILE`, `File`은 모두 같은 file input으로 처리한다.
 
 ---
 
 ## `updateProps(target, newProps)`
 
-컴포넌트의 반응형 props 객체(`__props`)를 업데이트한다. 같은 객체를 유지하면서 내용만 교체하는 이유는 setup 클로저가 이 객체의 참조를 들고 있기 때문이다.
+컴파일러가 만든 props 저장 객체의 내용을 업데이트한다. 같은 객체를 유지하면서 내용만 교체하는 이유는 setup 클로저가 이 객체의 참조를 들고 있기 때문이다. 생성되는 식별자 이름은 현재 스코프와 충돌하지 않도록 컴파일러가 정하며 공개 API가 아니다.
 
 ---
 

@@ -1,48 +1,92 @@
-# 01. 공개 API와 런타임 조립 명세
+# 01. AEUI를 불러오고 앱을 실행하는 규칙
 
-이 문서는 현재 `packages/core` 구현을 다시 작성할 수 있도록 패키지 진입점, 공개 `AEUI` 객체, 앱 런타임 팩토리, 내부 런타임 경계와 앱 마운트 계약을 명세한다. 설명의 기준은 다음 소스다.
+이 장은 앱 코드와 빌드 설정에서 AEUI를 불러오는 방법을 정의한다. 먼저 코드에 적을 수 있는 세 주소와 각 주소에서 얻는 기능을 설명한다. 이어서 `AEUI.init()`이 지정한 HTML 요소 안에 첫 화면을 표시하고, 각 앱의 화면 구조와 화면의 한 부분을 만드는 컴포넌트 함수가 사용하는 값을 다른 앱과 섞이지 않게 보관하는 방법을 정의한다.
 
-- `packages/core/package.json`
-- `packages/core/src/index.js`
-- `packages/core/src/core.js`
-- `packages/core/src/app-runtime.js`
-- `packages/core/src/runtime-state.js`
-- `packages/core/src/runtime.js`
-- `packages/core/src/hooks.js`
-- `packages/core/types/index.d.ts`
+## 1. AEUI를 불러오는 세 주소
 
-디렉터리 라우터는 AEUI core 제품 계약이며 별도 공개 router package로 분리하지 않는다. 파일 규칙과 History 동작은 `docs/spec/07-directory-router.md`에서 이어서 명세한다.
+설치한 AEUI 패키지는 `aeui`, `aeui/vite`, `aeui/babel-plugin`의 세 주소를 제공한다. 여기서 주소는 `import ... from '주소'` 또는 `require('주소')` 안에 적는 문자열이다. 세 주소는 한 파일에 모두 작성하는 사용 예가 아니다.
 
-## 1. 패키지 진입점
+일반적인 Vite 프로젝트는 앱 소스에서 `aeui`를 사용하고, `vite.config.js`에서 `aeui/vite`를 사용한다. Vite 없이 Babel을 직접 구성하는 프로젝트는 `aeui/vite` 대신 `aeui/babel-plugin`을 사용한다.
 
-`packages/core/package.json`은 세 개의 export 경로를 제공한다.
+### 1.1 `aeui`: 앱에서 사용하는 실행 기능
 
-| export 경로 | ESM | CommonJS | 타입 | 역할 |
+`aeui`는 `App.jsx`나 컴포넌트처럼 앱의 화면과 동작을 작성하는 소스 파일에서 사용한다. 이 주소에서 가져온 코드는 빌드 결과에 포함되어 브라우저에서 실행된다.
+
+```js
+// App.jsx 또는 컴포넌트 파일
+import { AEUI, watch, clean } from 'aeui';
+```
+
+`aeui`에서 가져올 수 있는 값은 다음 세 개다.
+
+| 이름 | 하는 일 |
+| --- | --- |
+| `AEUI` | VNode를 만들고, 앱을 HTML 요소에 붙이고, DOM을 갱신한다. |
+| `watch` | 지정한 값이 바뀌었을 때 실행할 작업을 등록한다. |
+| `clean` | 컴포넌트가 화면에서 제거될 때 실행할 정리 작업을 등록한다. |
+
+한 파일에서 세 값을 항상 전부 가져올 필요는 없다. 해당 파일에서 실제로 사용하는 값만 import한다. `AEUI`, `watch`, `clean`의 정확한 타입은 2절, 런타임 동작은 3절부터 6절까지에서 각각 정의한다.
+
+### 1.2 `aeui/vite`: Vite 프로젝트 설정
+
+`aeui/vite`는 Vite를 사용하는 프로젝트의 `vite.config.js`에서 사용한다. 브라우저에서 실행되는 앱 API가 아니라, Vite 개발 서버를 시작하거나 배포 파일을 만들 때 실행되는 빌드 플러그인이다.
+
+```js
+// vite.config.js
+import { defineConfig } from 'vite';
+import aeui from 'aeui/vite';
+
+export default defineConfig({
+  plugins: [aeui()]
+});
+```
+
+`aeui()`를 Vite의 `plugins` 목록에 넣으면 다음 작업이 연결된다.
+
+- AEUI Babel 변환과 JSX 변환을 소스 파일에 적용한다.
+- 앱을 시작하는 가상 진입 코드를 만들고 HTML에 연결한다.
+- `src/pages`의 파일 구조를 읽어 URL과 페이지를 연결한다.
+- 필요한 스타일 import와 기본 `@` 경로 별칭을 준비한다.
+
+`aeui/vite`가 `aeui/babel-plugin`을 내부에서 이미 등록하므로 Vite 프로젝트에서 두 플러그인을 함께 등록하지 않는다. Vite hook, 가상 진입 코드와 변환 대상의 정확한 규칙은 [08. Vite 플러그인, 타입, 빌드와 패키지 계약](08-vite-plugin-and-build.md)이 정의한다.
+
+### 1.3 `aeui/babel-plugin`: Babel 직접 설정
+
+`aeui/babel-plugin`은 `aeui/vite`를 사용하지 않고 Babel 설정을 직접 구성할 때 사용한다. 앱의 브라우저 코드에서 호출하는 API가 아니라, 빌드 중에 앱 소스를 변환하는 컴파일러 플러그인이다.
+
+```js
+// Babel 설정 파일
+import aeuiTransform from 'aeui/babel-plugin';
+```
+
+이 플러그인은 컴포넌트 함수를 setup과 render로 나누고, props와 `watch`·`clean` 호출을 AEUI 런타임에 맞게 변환한다. 변환 결과에 `AEUI`가 필요하지만 올바른 import가 없으면 `import { AEUI } from 'aeui'`도 추가한다.
+
+이 플러그인만으로 JSX가 JavaScript 호출로 바뀌지는 않는다. Babel을 직접 구성하는 사용자는 JSX를 `AEUI.createElement(...)` 호출로 바꾸는 JSX 변환 플러그인도 함께 설정해야 한다. 판별 조건과 전체 변환 순서는 [06. Babel 컴파일러와 컴파일러 런타임 ABI](06-babel-compiler.md)가 정의한다.
+
+### 1.4 배포 파일 연결
+
+`packages/core/package.json`의 `exports`는 앞의 세 주소를 실제 배포 파일과 연결한다.
+
+| 코드에 적는 주소 | `exports` 경로 | import용 JavaScript | require용 JavaScript | TypeScript 설명 파일 |
 | --- | --- | --- | --- | --- |
-| `.` | `dist/aeui.esm.js` | `dist/aeui.cjs` | `types/index.d.ts` | 프레임워크 런타임과 훅 |
-| `./babel-plugin` | `dist/babel-plugin.js` | `dist/babel-plugin.cjs` | `types/babel-plugin.d.ts` | AEUI 컴파일러 플러그인 |
-| `./vite` | `dist/vite-plugin.js` | `dist/vite-plugin.cjs` | `types/vite.d.ts` | Vite 통합과 자동 부트스트랩 |
+| `aeui` | `.` | `dist/aeui.esm.js` | `dist/aeui.cjs` | `types/index.d.ts` |
+| `aeui/vite` | `./vite` | `dist/vite-plugin.js` | `dist/vite-plugin.cjs` | `types/vite.d.ts` |
+| `aeui/babel-plugin` | `./babel-plugin` | `dist/babel-plugin.js` | `dist/babel-plugin.cjs` | `types/babel-plugin.d.ts` |
 
-루트 번들의 Rollup 입력은 `src/index.js`다. 이 파일은 오직 다음 두 모듈의 named export를 다시 내보낸다.
+앱과 설정 코드는 표의 `dist/...` 파일이나 `packages/core/src/...` 파일을 직접 지정하지 않는다. 패키지 안에 파일이 있더라도 `exports`에 없는 주소에서는 불러올 수 없다.
+
+`aeui` 배포 파일의 소스 진입점인 `src/index.js`는 다음 두 모듈의 공개 값을 다시 내보낸다.
 
 ```javascript
 export * from './core.js';
 export * from './hooks.js';
 ```
 
-따라서 루트 패키지의 명시적 공개 값은 다음 세 개다.
+`createAppRuntime`, `createRouteTable`, `matchRoute`, `createDirectoryRouter`는 구현 파일 안에는 있지만 `import { ... } from 'aeui'`로 가져올 수 없다. `Router`, `Link`, `navigate`라는 공개 값과 `aeui/router` 주소도 없다. 디렉터리 라우터는 `aeui/vite`가 가상 진입 코드를 만들 때 연결하며, 파일 이름과 URL 규칙은 [07. 디렉터리 라우터](07-directory-router.md)가 정의한다.
 
-| 이름 | 종류 | 계약 |
-| --- | --- | --- |
-| `AEUI` | 객체 | 기본 런타임 인스턴스. VNode 생성, 앱 마운트, 수동 렌더를 제공한다. |
-| `watch` | 함수 | 소스 호환용 compile guard. 정상 앱 코드는 Babel 플러그인이 이 호출을 `AEUI.__runtime.watch`로 바꿔야 한다. |
-| `clean` | 함수 | 현재 setup 중인 컴포넌트에 unmount cleanup을 등록한다. |
+## 2. `aeui`의 TypeScript 타입
 
-`createAppRuntime`, `createRouteTable`, `matchRoute`, `createDirectoryRouter`는 소스 모듈에서는 export되지만 `src/index.js`나 package export map을 통해 공개하지 않는다. `Router`, `Link`, `navigate`도 공개 API에 존재하지 않는다.
-
-## 2. 공개 타입 표면
-
-`types/index.d.ts`가 정의하는 핵심 타입은 다음과 같다.
+`types/index.d.ts`는 `aeui`에서 가져오는 값의 TypeScript 타입을 정의한다. `props`는 부모 컴포넌트가 자식 컴포넌트에 전달하는 값이고, `Renderable`은 화면에 표시할 수 있는 값이다. 관련 타입은 다음과 같다.
 
 ```typescript
 type PrimitiveRenderable = string | number | bigint;
@@ -62,7 +106,7 @@ type Component<P = Record<string, unknown>> =
   (props: P) => Renderable | RenderFunction<P>;
 ```
 
-`AeuiApp`의 공개 모양은 다음과 같다.
+`AEUI` 객체가 제공하는 함수와 값은 다음과 같다.
 
 ```typescript
 interface AeuiApp {
@@ -75,20 +119,20 @@ interface AeuiApp {
 }
 ```
 
-`__runtime` 속성은 객체에 실제로 존재하지만 compiler와 프레임워크 통합을 위한 internal namespace다. 타입은 `watch`, `clean`, `runRenderPhase`만 구체적으로 선언하고 나머지는 `[key: string]: unknown`으로 감춘다. 앱 코드용 안정적 public API로 간주하지 않는다.
+`__runtime` 속성은 Babel 플러그인과 AEUI 내부 코드가 서로 호출할 때 사용한다. 일반 앱 코드가 직접 사용하도록 제공하는 값이 아니다. TypeScript 선언은 `watch`, `clean`, `runRenderPhase`만 구체적으로 적고 나머지는 `[key: string]: unknown`으로 표시한다.
 
-## 3. `core.js`: 기본 런타임 구성
+## 3. `core.js`가 기본 `AEUI` 객체에 넣는 기능
 
 ### 3.1 `createVNode(tag, props, ...children)`
 
-기본 런타임에 주입되는 VNode 팩토리는 다음 순서로 동작해야 한다.
+`AEUI.createVNode(tag, props, ...children)`은 화면 구조를 저장할 VNode 객체를 다음 순서로 만든다.
 
-1. rest parameter로 받은 `children`을 `Array.prototype.flat()` 기본 깊이인 1단계만 펼친다.
+1. `...children`으로 모은 배열을 `Array.prototype.flat()`의 기본 깊이인 1단계만 펼친다.
 2. 값이 `null` 또는 `undefined`인 자식과 타입이 `boolean`인 모든 자식을 버린다.
-3. 원래 `props`를 직접 수정하지 않고 얕게 복사한다.
+3. 원래 `props`를 직접 수정하지 않고 최상위 속성만 새 객체로 복사한다.
 4. 복사한 props의 `children`을 2단계에서 만든 배열로 덮어쓴다.
 5. `{ tag, props: finalProps, children: validChildren }` 객체를 만든다.
-6. `VNODE_MARKER` symbol 속성을 값 `true`, `enumerable: false`로 정의한다. 별도 옵션을 주지 않으므로 이 속성은 writable/configurable도 false다.
+6. AEUI 내부에서 VNode인지 구분할 표식인 `VNODE_MARKER` Symbol 속성을 값 `true`, `enumerable: false`로 정의한다. 별도 옵션을 주지 않으므로 이 속성은 `writable`과 `configurable`도 `false`다.
 
 동등한 구현은 다음과 같다.
 
@@ -109,11 +153,11 @@ function createVNode(tag, props, ...children) {
 }
 ```
 
-중요한 불변식은 `vnode.props.children === vnode.children`이라는 참조 동일성과, 호출자가 넘긴 props 객체가 변하지 않는다는 점이다. 문자열, 숫자, bigint, 객체와 중첩 깊이가 2 이상인 배열은 이 함수 자체에서 추가 정규화하지 않는다.
+항상 `vnode.props.children`과 `vnode.children`은 같은 배열 객체여야 하며, 호출자가 넘긴 props 객체는 바뀌지 않아야 한다. 문자열, 숫자, bigint, 객체와 두 단계 이상 중첩된 배열은 이 함수에서 추가로 바꾸거나 걸러내지 않는다.
 
 ### 3.2 `Fragment`
 
-기본 Fragment는 첫 번째 setup 인자를 사용하지 않고 render 함수를 반환한다.
+`Fragment`는 여러 자식을 감싸는 실제 HTML 요소를 만들지 않고 한 묶음으로 다루는 기능이다. 이 함수는 처음 받은 값을 사용하지 않고, 화면을 갱신할 때 받은 `props.children`을 반환하는 함수를 만든다.
 
 ```javascript
 function Fragment(initialProps) {
@@ -121,11 +165,11 @@ function Fragment(initialProps) {
 }
 ```
 
-이 함수 자체를 직접 호출하면 반환 render가 호출 시점의 `props.children`을 돌려준다. 그러나 정상 Fragment VNode은 node factory가 일반 component보다 먼저 fragment kind로 분류하므로 이 함수의 setup/render를 실행하지 않는다. reconciler는 매 render에 생성된 Fragment VNode의 `children` 배열을 직접 사용하고 별도 DOM wrapper를 만들지 않는다.
+이 함수 자체를 직접 호출하면 반환된 함수가 호출 시점의 `props.children`을 돌려준다. JSX에서 만든 Fragment VNode는 일반 컴포넌트보다 먼저 Fragment로 분류하므로 이 함수를 직접 실행하지 않는다. 화면 갱신 코드는 Fragment VNode의 `children` 배열을 바로 사용하며 자식을 감싸는 별도 HTML 요소를 만들지 않는다.
 
-### 3.3 기본 `AEUI` 인스턴스
+### 3.3 기본 `AEUI` 객체
 
-`core.js`는 다음 의존성을 주입해 런타임 하나를 만들고, 그 결과를 named export `AEUI`로 고정한다.
+`core.js`는 다음 다섯 값을 `createAppRuntime()`에 전달해 기본 `AEUI` 객체 하나를 만들고, 이름 `AEUI`로 export한다.
 
 ```javascript
 export const AEUI = createAppRuntime({
@@ -137,27 +181,27 @@ export const AEUI = createAppRuntime({
 });
 ```
 
-즉 `AEUI.createElement`와 `AEUI.createVNode`는 같은 함수 참조다. 이 `AEUI`는 루트 패키지에서 공유하는 기본 singleton이지만, `createAppRuntime()` 자체는 호출마다 격리된 state를 만들 수 있는 팩토리다.
+`AEUI.createElement`와 `AEUI.createVNode`는 이름만 다르고 정확히 같은 함수다. `aeui`를 import한 코드는 모두 이 기본 `AEUI` 객체를 공유한다. 반면 `createAppRuntime()`을 다시 호출하면 다른 앱과 값을 공유하지 않는 새 실행 상태를 만들 수 있다.
 
 ## 4. `createAppRuntime(config)`
 
-### 4.1 입력 계약
+### 4.1 `config`로 받는 값
 
-팩토리는 객체 구조분해로 다음 값을 받는다.
+`createAppRuntime(config)`는 `config` 객체에서 다음 값을 꺼내 사용한다.
 
 | 필드 | 필수 여부 | 사용처 |
 | --- | --- | --- |
-| `deepEqual` | 필수 | watcher와 dirty comparison에 저장 |
-| `deepClone` | 필수 | dependency snapshot 등에 저장 |
+| `deepEqual` | 필수 | watcher가 이전 값과 새 값을 비교할 때 사용 |
+| `deepClone` | 필수 | watcher가 나중 비교를 위해 현재 값을 복사해 둘 때 사용 |
 | `createVNode` | 필수 | 루트, 컴포넌트, 라우터 VNode 생성 |
 | `createElement` | 선택 | 생략하면 `createVNode`를 사용 |
 | `Fragment` | 필수 | Fragment 식별과 공개 API |
 
-팩토리 자체는 런타임 타입 검증을 하지 않는다. config가 `undefined`이면 매개변수 구조분해에서 즉시 실패하고, 필수 함수가 잘못되었으면 실제 사용 시 JavaScript 오류가 발생한다.
+이 함수는 `config`와 각 필드의 타입을 미리 검사하지 않는다. `config`가 `undefined`이면 매개변수에서 값을 꺼낼 때 즉시 실패하고, 필수 함수가 잘못되었으면 해당 함수를 처음 사용할 때 JavaScript 오류가 발생한다.
 
-### 4.2 state 생성
+### 4.2 앱의 실행 상태를 저장할 객체 생성
 
-첫 단계는 `createRuntimeState({ deepEqual, deepClone })` 호출이다. 새 호출마다 아래 모양의 새 mutable 객체를 만들어야 한다.
+여기서 `state`는 한 앱의 루트 컴포넌트, 현재 실행 중인 컴포넌트, 화면 갱신 예약과 라우터 정리 함수를 함께 저장하는 객체다. 첫 단계에서 `createRuntimeState({ deepEqual, deepClone })`를 호출하며, 호출할 때마다 아래 모양의 새 객체를 만들어야 한다. 이 객체의 필드는 앱이 실행되는 동안 바뀐다.
 
 ```javascript
 {
@@ -179,11 +223,11 @@ export const AEUI = createAppRuntime({
 }
 ```
 
-state는 모듈 전역 변수가 아니다. 런타임 인스턴스 A의 `frameDelay`, root, watcher context, router teardown을 바꾸어도 인스턴스 B의 state에는 영향을 주지 않아야 한다.
+`state`는 모든 앱이 함께 쓰는 변수가 아니다. 앱 A의 `frameDelay`, root, 현재 watcher 정보와 router 정리 함수를 바꾸어도 앱 B의 `state`에는 영향을 주지 않아야 한다.
 
-### 4.3 `internalRuntime` 조립
+### 4.3 `state`를 사용하는 내부 함수 모음 만들기
 
-팩토리는 엔진 모듈의 state-first 함수를 현재 state에 바인딩해 `internalRuntime`을 만든다. 구현 시 아래 필드와 연결 방향을 유지한다.
+`internalRuntime`은 AEUI 내부 함수들을 한 객체에 모은 값이다. 원래 내부 함수는 첫 번째 인자로 `state`를 받는다. `createAppRuntime()`은 각 함수를 감싸 현재 앱의 `state`를 자동으로 첫 인자로 넘기며, 아래 이름으로 저장한다.
 
 | 필드 | 연결 대상과 동작 |
 | --- | --- |
@@ -221,9 +265,9 @@ init(state, Root, containerElement);
 attach(containerElement);
 ```
 
-초기 URL 매칭과 라우터 객체 생성은 공통 `init`보다 먼저 일어나고, click/popstate listener 부착은 초기 동기 렌더와 scheduler 시작보다 나중에 일어난다. 이 bridge는 `{ Root, attach, router }`나 다른 값을 호출자에게 반환하지 않으므로 반환값은 `undefined`다.
+첫 URL에 맞는 페이지를 찾고 라우터 객체를 만드는 작업은 공통 `init`보다 먼저 실행한다. click과 `popstate` listener는 첫 화면을 그린 뒤 화면 갱신 예약을 시작하고 나서 붙인다. `initDirectoryRouter`는 `{ Root, attach, router }`나 다른 값을 호출자에게 돌려주지 않으므로 반환값은 `undefined`다.
 
-### 4.4 state에 엔진 함수 연결
+### 4.4 `state`에서도 내부 함수를 호출할 수 있게 연결
 
 `bindRuntimeState(state, internalRuntime, shared)`는 엔진 내부 함수들이 다시 `state.*`를 통해 서로 호출할 수 있게 다음 필드를 붙인다.
 
@@ -246,9 +290,9 @@ state.onAnimationFrame   -> internalRuntime.onAnimationFrame
 state.tick               -> internalRuntime.tick
 ```
 
-뒤쪽 함수들은 `internalRuntime`의 속성을 호출할 때마다 다시 조회하는 wrapper다. 따라서 테스트가 `internalRuntime.tick` 같은 메서드를 spy나 대체 함수로 바꾸면 `state.tick()` 경로도 그 변경을 보게 된다.
+뒤쪽 함수들은 호출할 때마다 대응하는 `internalRuntime` 속성을 다시 조회해야 한다. 따라서 속성에 저장된 함수 참조가 바뀌면 이후 `state.*` 호출은 바뀐 참조를 사용한다.
 
-### 4.5 반환 객체
+### 4.5 호출자에게 돌려주는 객체
 
 팩토리는 다음 객체를 반환한다.
 
@@ -263,39 +307,39 @@ state.tick               -> internalRuntime.tick
 }
 ```
 
-`init`과 `render`만 public scheduler 진입점이다. 나머지 엔진 함수는 top level에 복제하지 않는다.
+앱 코드가 `AEUI`의 최상위에서 호출할 수 있는 화면 갱신 함수는 `init`과 `render`뿐이다. 나머지 내부 함수는 `AEUI.__runtime` 밖에 같은 이름으로 다시 제공하지 않는다.
 
-## 5. 앱 마운트 계약
+## 5. 지정한 HTML 요소 안에 앱의 첫 화면 표시
 
 ### 5.1 `AEUI.init(RootComponent, containerElement)`
 
-정상 호출은 DOM `Element`인 container와 함수형 RootComponent를 받는다. 구현은 별도 입력 검증 없이 다음 순서를 동기 실행한다.
+정상 호출은 앱을 넣을 HTML 요소인 `containerElement`와 첫 화면을 만드는 함수인 `RootComponent`를 받는다. 두 값을 별도로 검사하지 않고 다음 순서를 한 번에 이어서 실행한다.
 
-1. 현재 scheduler의 예약을 취소하고 `state.rafId = null`로 만든다.
-2. `state.routerTeardown`이 함수이면 호출해 기존 라우터의 listener를 제거한다.
-3. 기존 root wrapper에 첫 번째 자식이 있으면 `unmountNode`로 전체 이전 앱을 정리한다. 이 과정에서 컴포넌트 cleanup도 실행된다.
+1. 화면을 다시 확인할 시간을 예약하는 scheduler의 기존 예약을 취소하고 `state.rafId = null`로 만든다.
+2. `state.routerTeardown`이 함수이면 호출해 기존 라우터가 등록한 click과 `popstate` 처리 함수를 제거한다.
+3. 앱 전체 트리를 담는 root node에 첫 번째 자식이 있으면 `unmountNode`로 이전 앱 전체를 제거한다. 이 과정에서 컴포넌트가 등록한 정리 함수도 실행한다.
 4. `RootComponent`와 `containerElement`를 state에 저장한다.
 5. `createRootNode(containerElement)`로 새 root wrapper를 만든다.
-6. `containerElement.innerHTML = ''`로 기존 DOM을 전부 제거한다. hydration은 하지 않는다.
+6. `containerElement.innerHTML = ''`로 기존 HTML 요소를 전부 제거한다. 서버가 미리 만든 HTML을 재사용하지 않는다.
 7. `interactiveRenderRequested = false`로 초기화한다.
-8. `tick()`을 즉시 한 번 호출해 첫 화면을 동기 렌더한다.
-9. 첫 tick의 `didMutate` 결과로 polling 간격을 계산한다. 변경이 있으면 1프레임, 없으면 현재 `frameDelay`를 두 배로 늘리되 최대 60프레임이다.
-10. RAF가 있으면 `requestAnimationFrame`, 없으면 16ms `setTimeout`으로 scheduler를 시작한다.
+8. `tick()`을 즉시 한 번 호출하고, `init()`이 반환되기 전에 첫 화면을 그린다.
+9. 첫 `tick()`에서 DOM을 바꿨는지를 나타내는 `didMutate`로 다음 확인 간격을 계산한다. 변경이 있으면 1프레임 뒤, 없으면 현재 `frameDelay`를 두 배로 늘리되 최대 60프레임 뒤에 다시 확인한다.
+10. 브라우저가 `requestAnimationFrame`을 제공하면 이를 사용하고, 없으면 16ms `setTimeout`을 사용해 다음 화면 확인을 예약한다.
 
-`init` 자체는 값을 반환하지 않는다. 같은 런타임에서 다시 호출하면 이전 scheduler, router listener와 컴포넌트 트리를 정리한 뒤 새 앱을 마운트하고 새로운 scheduler 예약을 만든다.
+`init` 자체는 값을 반환하지 않는다. 같은 `AEUI` 객체에서 다시 호출하면 이전 화면 갱신 예약, 라우터의 이벤트 처리 함수와 컴포넌트 트리를 제거한 뒤 새 앱의 첫 화면을 표시하고 다음 갱신을 예약한다.
 
 container가 `null`이거나 `innerHTML`을 지원하지 않으면 6단계에서 오류가 그대로 전파된다. RootComponent가 함수인지도 선검증하지 않는다.
 
-### 5.2 루트 렌더 경로
+### 5.2 첫 화면 트리를 만들고 DOM을 갱신하는 순서
 
 `tick()`은 다음 조건이면 아무 작업 없이 `false`를 반환한다.
 
 - RootComponent, container, root wrapper 중 하나가 없음
 - 이미 `state.isRendering === true`임
 
-그 외에는 `isRendering`을 true로 두고 `reconcileRoot()`를 실행한다. `reconcileRoot()`는 다음 VNode를 항상 `state.createVNode(state.RootComponent)`로 생성하므로 public `init`에는 root props를 전달하는 인자가 없다.
+그 외에는 `isRendering`을 `true`로 두고 `reconcileRoot()`를 실행한다. 이 함수는 이전 화면 트리와 새 VNode를 비교해 필요한 DOM만 바꾼다. 루트 VNode는 항상 `state.createVNode(state.RootComponent)`로 만들기 때문에 `AEUI.init()`에는 루트 컴포넌트의 props를 전달하는 인자가 없다.
 
-reconciliation 성공 시 root wrapper는 새 child를 0개 또는 1개만 소유하고 그 child의 `firstDom`/`lastDom` 범위를 복사한다. 실패 시 렌더 전에 존재하던 committed DOM 집합을 기준으로 새로 삽입되었으나 커밋되지 않은 DOM을 제거한 뒤 오류를 다시 던진다.
+비교와 DOM 갱신에 성공하면 root node는 새 자식을 0개 또는 1개만 가지며, 그 자식의 첫 DOM과 마지막 DOM을 `firstDom`과 `lastDom`에 저장한다. 실패하면 작업 시작 전에 이미 화면에 반영을 끝낸 DOM은 유지하고, 이번 작업에서 새로 넣었지만 끝까지 반영하지 못한 DOM만 제거한 뒤 오류를 다시 던진다.
 
 ### 5.3 렌더 오류
 
@@ -322,7 +366,7 @@ cleanup callback의 예외는 unmount 구현이 각각 `[AEUI] Cleanup error:`�
 
 ### 5.4 `AEUI.render()`
 
-`render()`는 현재 앱을 즉시 동기 tick하는 수동 API다.
+`render()`는 예약된 시간을 기다리지 않고 현재 앱의 `tick()`을 즉시 실행하는 함수다.
 
 1. RootComponent 또는 container가 없으면 `false`를 반환한다.
 2. 대기 중인 interactive 요청을 false로 지운다.
@@ -333,13 +377,13 @@ cleanup callback의 예외는 unmount 구현이 각각 `[AEUI] Cleanup error:`�
 
 컴포넌트 오류는 `tick()`의 정책에 따라 로그로 처리되므로 보통 `render()`에서 throw되지 않고 `didMutate` 값을 반환한다.
 
-### 5.5 `requestRender()`와 public `render()`의 차이
+### 5.5 즉시 실행하는 `render()`와 다음 프레임을 예약하는 `requestRender()`
 
-`requestRender()`는 internal API다. 유효한 마운트가 없으면 `false`를 반환한다. 마운트가 있으면 `interactiveRenderRequested = true`로 표시하고 scheduler만 보장한 뒤 `true`를 반환한다. 즉시 tick하지 않는다.
+`requestRender()`는 AEUI 내부 코드에서만 사용한다. 표시 중인 앱이 없으면 `false`를 반환한다. 앱이 있으면 `interactiveRenderRequested = true`로 표시하고 다음 화면 확인을 예약한 뒤 `true`를 반환한다. `tick()`을 즉시 실행하지 않는다.
 
-DOM 이벤트 bridge, 라우터 click, `popstate`는 이 함수를 사용해 polling backoff와 무관하게 다음 animation frame 렌더를 요청한다. 여러 요청은 하나의 boolean flag와 하나의 RAF 예약으로 합쳐진다.
+DOM 이벤트 처리, 라우터 click과 `popstate`는 이 함수를 사용해 현재의 주기적 확인 간격과 관계없이 다음 화면 프레임에 갱신을 요청한다. 여러 요청이 연속해서 와도 하나의 boolean 값과 하나의 `requestAnimationFrame` 예약으로 합친다.
 
-## 6. 공개 훅과 compiler 경계
+## 6. `watch`와 `clean`을 Babel 변환 코드에 연결
 
 ### 6.1 `watch`
 
@@ -349,15 +393,15 @@ DOM 이벤트 bridge, 라우터 click, `popstate`는 이 함수를 사용해 pol
 [AEUI] watch(callback, deps) must be compiled by the AEUI Babel plugin.
 ```
 
-정상 컴파일에서는 Babel 플러그인이 `watch(callback, deps)`를 `AEUI.__runtime.watch(callback, depsGetter)`로 바꾼다. internal 등록기는 setup phase의 현재 component node가 있을 때만 watcher를 추가한다. callback이 함수가 아니거나 deps가 없거나, deps/그 반환값이 배열이 아니면 TypeError를 던진다.
+정상 컴파일에서는 Babel 플러그인이 `watch(callback, deps)`를 `AEUI.__runtime.watch(callback, depsGetter)`로 바꾼다. 내부 등록 함수는 컴포넌트를 처음 만들고 있는 동안에만 watcher를 추가한다. `callback`이 함수가 아니거나 `deps`가 없거나, `deps` 또는 그 반환값이 배열이 아니면 `TypeError`를 던진다.
 
 ### 6.2 `clean`
 
-공개 `clean(callback)`은 runtime context stack의 최상단 state를 읽어 `registerCleanup`으로 전달한다. 현재 setup 중인 component가 없으면 조용히 아무 작업도 하지 않는다. 컴파일된 코드는 `AEUI.__runtime.clean`을 직접 사용할 수도 있으며 같은 등록기를 공유한다.
+`clean(callback)`은 현재 실행 중인 컴포넌트를 기록한 목록의 맨 위에서 `state`를 찾고 `registerCleanup`에 전달한다. 지금 처음 만드는 중인 컴포넌트가 없으면 아무 작업도 하지 않는다. Babel이 변환한 코드는 `AEUI.__runtime.clean`을 호출하며 같은 등록 함수를 사용한다.
 
-runtime context는 중첩 component setup/render마다 stack에 push하고 `finally`에서 pop한다. 따라서 여러 `createAppRuntime()` 인스턴스가 있어도 현재 실행 중인 인스턴스에 cleanup이 등록된다.
+컴포넌트를 처음 만들거나 다시 그리기 시작하면 해당 컴포넌트와 `state`를 목록의 맨 위에 추가하고, 성공하거나 오류가 나도 `finally`에서 제거한다. 따라서 `createAppRuntime()`으로 여러 앱을 만들더라도 정리 함수는 지금 실행 중인 앱에 등록된다.
 
-## 7. 모듈 의존 및 호출 흐름
+## 7. 파일과 함수가 호출되는 순서
 
 ### 7.1 일반 앱
 
@@ -394,11 +438,11 @@ aeui/vite virtual entry
         -> window popstate listener
 ```
 
-라우터도 별도 renderer를 만들지 않고 동일한 root reconciliation과 scheduler를 사용한다.
+라우터도 별도의 화면 갱신기를 만들지 않고 일반 앱과 같은 root 비교·DOM 갱신 함수와 다음 갱신 예약을 사용한다.
 
-## 8. 재구현 불변식
+## 8. 항상 지켜야 하는 조건
 
-다음 항목이 달라지면 현재 구현과 호환되지 않는다.
+AEUI core는 다음 조건을 항상 지켜야 한다.
 
 - package root는 `AEUI`, `watch`, `clean`을 named export하고 router helper를 공개 export하지 않는다.
 - `createVNode`는 props를 복사하며 caller props를 수정하지 않는다.
@@ -410,19 +454,3 @@ aeui/vite virtual entry
 - component 렌더 오류는 `[AEUI] Render error:`로 기록되며 scheduler 생명주기를 중단시키지 않는다.
 - public `render()`는 동기 실행, internal `requestRender()`는 다음 프레임 예약이다.
 - 디렉터리 라우터 bridge는 공통 `init()` 후 listener를 붙이며 값을 반환하지 않는다.
-
-## 9. 기존 테스트의 참고 매핑
-
-아래 파일은 현재 구현을 조사할 때 참고할 수 있는 기존 회귀 테스트다. 이 목록을 새 적합성 계약으로 간주하지 않으며, 이 장의 규범은 `10-conformance.md`의 원칙에 따라 새 suite에서 처음부터 다시 검증한다.
-
-- `example/test/src/__tests__/app-runtime.test.js`
-  - 두 팩토리 호출의 state가 격리된다.
-  - polling backoff가 남아 있어도 `requestRender()`가 interactive lane에서 다음 frame tick을 실행한다.
-- `example/test/src/__tests__/component.test.jsx`
-  - 기본 앱의 동기 초기 마운트와 setup 1회 실행.
-  - `init()` 재호출 시 이전 컴포넌트 cleanup.
-  - 라우터 bridge가 page/layout을 공통 runtime으로 렌더.
-- `example/test/src/__tests__/dom.test.js`
-  - `init()`이 scheduler를 만들고 재호출 시 새 예약을 만든다.
-  - `AEUI.render()`가 DOM mutation 여부를 반환한다.
-  - 렌더 실패 시 미커밋 DOM이 누적되지 않고 오류가 기록된다.

@@ -1,6 +1,6 @@
 # 09. `create-aeui-app` CLI와 생성 템플릿
 
-이 문서는 `packages/create-aeui-app/index.js`, package manifest, `template/**`의 현재 구현을 그대로 재현하기 위한 명세다. 대화형 도구가 아니라 단일 positional argument를 받는 동기식 파일 복사 CLI다.
+이 문서는 `create-aeui-app`의 실행 규칙, package manifest와 `template/**` 구조를 CLI 스펙으로 정의한다. CLI는 대화형 도구가 아니라 단일 positional argument를 받는 동기식 파일 복사 도구다.
 
 ## 1. package와 실행 진입점
 
@@ -46,7 +46,7 @@ npx create-aeui-app my-app
 
 ## 2. 초기화와 argument 해석
 
-ESM의 현재 파일 위치는 다음 방식으로 구한다.
+ESM 실행 파일의 디렉터리는 다음 방식으로 구한다.
 
 ```js
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -179,7 +179,7 @@ copyDir(src, dest):
       fs.copyFileSync(srcPath, destPath)
 ```
 
-이름이 정확히 `gitignore`인 entry는 어느 depth에서든 `.gitignore`로 바뀐다. 현재 template에서는 root의 한 파일만 해당한다. directory 이외 entry는 모두 `copyFileSync` 경로로 간다.
+이름이 정확히 `gitignore`인 entry는 어느 depth에서든 `.gitignore`로 바뀐다. 제공하는 template에서는 root의 한 파일만 해당한다. directory 이외 entry는 모두 `copyFileSync` 경로로 간다.
 
 복사는 전부 동기식이며 예외를 catch하거나 rollback하지 않는다. mkdir, read, copy, JSON parse/write 중 실패하면 Node 오류가 그대로 전파되고 이미 만든 target이나 복사된 일부 파일은 남는다.
 
@@ -209,7 +209,7 @@ CLI는 dependency 설치, Git 초기화, package manager 선택, dev server 실�
 
 ## 7. 생성 파일 트리
 
-현재 template의 전체 결과:
+template이 생성하는 전체 결과:
 
 ```text
 <projectName>/
@@ -367,7 +367,7 @@ dist/
 
 ## 13. CLI package tarball
 
-`files: ["index.js", "template"]`와 npm의 자동 manifest 포함 규칙으로 현재 dry-run tarball은 다음 10 entry로 구성된다.
+`files: ["index.js", "template"]`와 npm의 자동 manifest 포함 규칙에 따라 tarball은 다음 10 entry로 구성된다.
 
 ```text
 index.js
@@ -384,7 +384,7 @@ template/src/pages/products/[id].jsx
 
 template의 `gitignore`가 tarball에서는 아직 dotfile이 아니고, 앱 생성 시에만 바뀌는 점을 보존해야 한다.
 
-## 14. 재구현 시 보존할 경계
+## 14. CLI 스펙 경계
 
 - help flag는 위치와 무관하게 다른 모든 검증보다 먼저 처리한다.
 - positional project name은 정확히 하나만 허용한다.
@@ -400,7 +400,7 @@ template의 `gitignore`가 tarball에서는 아직 dotfile이 아니고, 앱 생
 
 ## 15. 검증 기준
 
-현재 repository에는 CLI 전용 automated test suite가 없다. 새 문서 우선 적합성 suite를 처음부터 작성할 때 최소한 별도 임시 디렉터리에서 다음을 독립적으로 검증해야 한다.
+CLI 적합성은 별도 임시 디렉터리에서 다음 항목을 독립적으로 검증한다.
 
 ```text
 --help / -h -> stderr usage, exit 0, filesystem 변경 없음

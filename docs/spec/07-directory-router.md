@@ -1,16 +1,6 @@
 # 07. 디렉터리 라우터 명세
 
-이 문서는 AEUI core 제품에 포함되는 디렉터리 라우터의 목표 계약과 현재 구현을 함께 설명한다. 라우터는 선택적 외부 통합이 아니며 공식 Vite bootstrap과 `create-aeui-app`의 기본 앱 구조를 구성한다. 공개 `Router`, `Link`, `navigate` API는 제공하지 않고, `aeui/vite`가 만든 숨은 entry, 일반 `<a href>`와 `AEUI.__runtime.initDirectoryRouter` 내부 bridge로 동작한다. 상태는 **규범**, **현재 구현**, **계획 기능**, **수정 필요**로 구분한다. **수정 필요**로 표시한 현재 동작은 재구현 시 보존하지 않고 목표 계약에 맞게 고쳐야 한다.
-
-기준 소스는 다음과 같다.
-
-- `packages/core/src/vite-plugin.js`
-- `packages/core/src/router.js`
-- `packages/core/src/app-runtime.js`
-- `packages/core/src/runtime.js`
-- `packages/core/src/runtime-state.js`
-- `example/test/src/__tests__/router.test.js`
-- `example/test/src/__tests__/component.test.jsx`
+이 문서는 AEUI core 제품에 포함되는 디렉터리 라우터의 규범 계약을 정의한다. 라우터는 공식 Vite bootstrap과 `create-aeui-app`의 기본 앱 구조를 구성한다. 공개 `Router`, `Link`, `navigate` API는 제공하지 않고, `aeui/vite`가 만든 숨은 entry, 일반 `<a href>`와 `AEUI.__runtime.initDirectoryRouter` 내부 bridge로 동작한다.
 
 ## 1. 전체 경계
 
@@ -39,7 +29,7 @@ index.html
 
 ## 2. Vite 자동 부트스트랩
 
-이 절은 라우터가 받는 hidden-entry handoff를 한 문서에서 이해하기 위한 요약이다. alias, HTML attribute parser, virtual module, source transform의 규범적 원본은 08 §2~10이다. 중복 설명이 달라지면 08의 plugin mechanics를 먼저 고치고 이 절을 동기화한다. 3절 이후의 route table/runtime 의미는 이 문서가 규범적 원본이다.
+이 절은 라우터가 Vite 플러그인에서 앱 시작 코드를 받는 규칙을 요약한다. alias, HTML attribute parser, virtual module과 source transform은 08 §2~10이 정의하고, 3절 이후의 route table과 runtime 동작은 이 문서가 정의한다.
 
 ### 2.1 플러그인 기본값
 
@@ -61,7 +51,7 @@ replacement는 `path.resolve(rootDir, aliasDir)`로 계산하며 project root co
 
 ### 2.2 HTML entry 주입
 
-`transformIndexHtml`은 `order: 'pre'`에서 실행된다. 목표 계약에서는 다음 중 하나면 원래 HTML 문자열을 그대로 반환한다.
+`transformIndexHtml`은 `order: 'pre'`에서 실행된다. 다음 중 하나면 원래 HTML 문자열을 그대로 반환한다.
 
 1. internal id `virtual:aeui-entry`가 이미 사용됨
 2. 실제 `<script type="module">`의 `src`가 public path `/@aeui-entry` 또는 internal id `virtual:aeui-entry`임
@@ -81,19 +71,9 @@ entry 검사는 attribute 순서와 큰따옴표/작은따옴표/unquoted 값을
 
 `resolveId`는 `virtual:aeui-entry`와 `/@aeui-entry`를 모두 NUL prefix가 붙은 `\0virtual:aeui-entry`로 해석한다. `load`는 이 resolved id에만 bootstrap source를 반환한다.
 
-#### **수정 필요**: public entry 중복 주입
-
-현재 구현은 raw HTML에 `virtual:aeui-entry`가 포함되었는지만 검사하고 public path `/@aeui-entry`는 검사하지 않는다. 따라서 사용자가 이미 다음 tag를 넣었어도 plugin이 같은 public entry를 한 번 더 주입할 수 있다.
-
-```html
-<script type="module" src="/@aeui-entry"></script>
-```
-
-이는 보존할 동작이 아니다. 수정 구현은 internal id와 public path를 모두 기존 AEUI entry로 판정해야 한다.
-
 ### 2.3 router mode 선택
 
-plugin이 resolve한 project root 아래 `src/pages`를 재귀 순회한다. 목표 계약에서 router mode를 선택할 수 있는 공식 확장자는 다음 여섯 개뿐이다.
+plugin이 resolve한 project root 아래 `src/pages`를 재귀 순회한다. router mode를 선택할 수 있는 공식 확장자는 다음 여섯 개뿐이다.
 
 ```text
 .js .jsx .ts .tsx .mjs .cjs
@@ -120,10 +100,6 @@ AEUI.__runtime.initDirectoryRouter(
 ```
 
 detector, eager glob, source transform filter, parser 선택, runtime route parser는 모두 `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`라는 하나의 공식 목록을 공유해야 한다. 이 목록 밖의 `.mts`, `.cts`, `.mjsx`, `.cjsx` 등은 route mode를 선택하지 않고 route table 후보도 아니며 AEUI Vite source transform 대상도 아니다.
-
-#### **수정 필요**: detector/parser와 eager glob의 확장자 불일치
-
-현재 detector와 runtime route parser의 `/\.[cm]?[jt]sx?$/`는 12개 suffix를 허용하지만 eager glob은 공식 여섯 개만 import한다. 예를 들어 `index.mts`만 있으면 현재 구현은 router mode를 선택하면서도 해당 module을 route map에 넣지 못하고 TypeScript parser도 활성화하지 못한다. 이 불일치는 현재 잘못된 부분이며 재구현 시 유지하지 않는다.
 
 `{ eager: true }`이므로 모든 route module은 시작 시점에 평가되고 module namespace object map이 생성된다. lazy import나 route별 code splitting은 하지 않는다.
 
@@ -170,8 +146,6 @@ Vite plugin은 query를 제거한 id가 공식 여섯 확장자 중 하나이고
 
 - `options.rootDir`가 truthy이면 backslash를 slash로 바꾸고 trailing slash를 모두 제거한 뒤 leading slash를 보장한다.
 - option이 없으면 `/src/pages`를 사용한다.
-- 현재 `inferRootDir`은 key를 확인하지만 다른 root를 실제로 추론하지는 않는다. 명시 option이 없으면 항상 `/src/pages`다.
-
 각 key를 root-relative path로 바꾸는 순서는 다음과 같다.
 
 1. backslash를 slash로 바꾼다.
@@ -180,7 +154,7 @@ Vite plugin은 query를 제거한 id가 공식 여섯 확장자 중 하나이고
 4. 아니면 key에서 마지막 `/pages/` marker를 찾아 그 뒤만 사용한다.
 5. marker도 없으면 앞의 `./` 또는 `/` 하나를 제거한 전체 key를 사용한다.
 
-이 fallback은 absolute test fixture나 Windows-normalized key도 처리하기 위한 것이다. root 밖의 key를 무조건 거부하는 보안 경계는 아니다.
+이 fallback은 absolute path와 Windows-normalized key도 처리한다. root 밖의 key를 무조건 거부하는 보안 경계는 아니다.
 
 ### 3.2 component export 선택
 
@@ -196,13 +170,13 @@ const component = mod && (mod.default || mod.Page || mod);
 
 ### 4.1 공식 지원 확장자 제거
 
-목표 runtime parser는 detector와 같은 공식 여섯 확장자만 제거한다. 의미상 패턴은 다음과 같다.
+runtime parser는 detector와 같은 공식 여섯 확장자만 제거한다. 의미상 패턴은 다음과 같다.
 
 ```javascript
 const ROUTE_EXT_RE = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 ```
 
-relative path가 이 정규식으로 끝나지 않으면 route 후보가 아니다. 일치한 마지막 확장자를 제거하고 `/`로 나눈 뒤 빈 segment를 버린다. detector와 runtime parser가 서로 다른 정규식을 별도로 관리해서는 안 되며 2.3의 공식 목록을 공유해야 한다. 현재 runtime의 넓은 `/\.[cm]?[jt]sx?$/`는 위 **수정 필요** 항목의 일부다.
+relative path가 이 정규식으로 끝나지 않으면 route 후보가 아니다. 일치한 마지막 확장자를 제거하고 `/`로 나눈 뒤 빈 segment를 버린다. detector와 runtime parser는 2.3의 공식 목록을 공유한다.
 
 ### 4.2 파일 규칙
 
@@ -422,7 +396,7 @@ const router = {
 
 `currentHref()`는 browser에서 `pathname + search + hash`, browser가 없으면 `/`다. `syncFromLocation()`만 `router.current`를 현재 location의 새 match로 교체한다.
 
-반환값은 `{ Root, attach, router }`다. 이 함수 자체는 소스 내부 테스트/조립용이고 package root public export는 아니다. app-runtime bridge는 `Root`와 `attach`만 사용하고 반환 객체를 외부에 돌려주지 않는다.
+반환값은 `{ Root, attach, router }`다. 이 함수는 package root public export가 아니다. app-runtime bridge는 `Root`와 `attach`만 사용하고 반환 객체를 외부에 돌려주지 않는다.
 
 ### 8.2 `Root` component
 
@@ -517,7 +491,7 @@ click target에 `closest` 함수가 있어야 하며 `target.closest('a[href]')`
 
 router는 오직 delegated click과 `popstate`에서 `syncFromLocation()`을 호출한다. 앱 코드가 직접 `history.pushState()` 또는 `history.replaceState()`만 호출하면 location은 바뀌지만 `router.current`는 바뀌지 않는다. 그 상태에서 `AEUI.render()`만 호출해도 Root는 truthy인 기존 `router.current`를 사용한다.
 
-직접 History API를 사용할 때는 별도로 `popstate`를 dispatch하는 등 sync 경로를 실행해야 한다. 이 제한은 imperative `navigate` API가 없다는 현재 설계의 일부다.
+직접 History API를 사용할 때는 별도로 `popstate`를 dispatch하는 등 sync 경로를 실행해야 한다. 이 제한은 imperative `navigate` API가 없는 설계의 일부다.
 
 ## 11. teardown과 재마운트
 
@@ -536,11 +510,11 @@ state.routerTeardown = () => {
 정상 생명주기에서 이 closure는 다음 두 경로로 호출된다.
 
 - `runtime.js:init()` 시작부: 새 일반 앱 또는 새 router 앱을 마운트하기 전
-- `runtime-state.js:resetRuntimeState()`: 테스트나 명시적 runtime reset 시
+- `runtime-state.js:resetRuntimeState()`: 명시적 runtime reset 시
 
 `initDirectoryRouter`는 `init()`을 먼저 호출하므로 기존 router의 listener가 제거된 뒤 새 listener가 attach된다. 일반 `AEUI.init()`으로 router 앱을 교체해도 listener가 남지 않는다.
 
-`resetRuntimeState()`는 router teardown을 호출하고 모든 mount/scheduler/router field를 초기값으로 되돌리지만, 실행 중인 RAF 취소 자체는 하지 않는다. component tree unmount, component cleanup, container DOM 제거도 하지 않는다. 정상 테스트 cleanup은 먼저 `stopScheduler()`와 필요한 unmount를 수행해야 한다.
+`resetRuntimeState()`는 router teardown을 호출하고 모든 mount/scheduler/router field를 초기값으로 되돌리지만, 실행 중인 RAF 취소 자체는 하지 않는다. component tree unmount, component cleanup, container DOM 제거도 하지 않는다. 호출자는 먼저 `stopScheduler()`와 필요한 unmount를 수행해야 한다.
 
 `createDirectoryRouter(...).attach()`를 공통 `init()` 없이 임의로 여러 번 부르는 것은 지원 계약이 아니다. 새 teardown이 이전 closure를 덮어써 listener가 누적될 수 있다.
 
@@ -570,24 +544,7 @@ page/layout setup 또는 render 중 예외는 공통 runtime `tick()`이 `[AEUI]
 
 404는 render fallback일 뿐 HTTP response status와 무관하다.
 
-## 13. 예제에서 확인하는 구성
-
-### create-aeui-app template
-
-- `vite.config.js`는 `plugins: [aeui()]`만 설정한다.
-- `index.html`은 `<div id="root"></div>`만 두고 manual main script가 없다.
-- `src/pages/index.jsx`, `about.jsx`, `products/[id].jsx`가 route가 된다.
-- navigation은 모두 일반 `<a href>`다.
-- 동적 page는 `route.params.id`를 읽는다.
-
-### commerce-admin
-
-- root `_layout.jsx`가 `App` shell을 import해 `<App route={route}>{children}</App>`로 모든 page와 404를 감싼다.
-- shell은 `route.pathname`으로 active navigation과 admin layout을 계산한다.
-- `products/[id].jsx`는 같은 page component에서 id가 바뀔 수 있으므로 watcher로 `route.params.id` 변경을 처리한다.
-- root `404.jsx`는 requested `route.pathname`을 표시하고 일반 anchor로 홈에 돌아간다.
-
-## 14. 재구현 불변식
+## 13. 라우터 스펙 불변식
 
 - router는 `aeui/vite`의 hidden virtual entry와 `AEUI.__runtime` bridge 뒤에 숨고 public router API를 추가하지 않는다.
 - route modules는 eager glob으로 시작 시 모두 로드한다.
@@ -604,33 +561,3 @@ page/layout setup 또는 render 중 예외는 공통 runtime `tick()`이 `[AEUI]
 - listener closure는 `state.routerTeardown` 하나로 소유하며 다음 `init` 전에 제거한다.
 - route detector, eager glob, Vite transform/parser와 runtime parser는 `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` 여섯 확장자만 동일하게 지원한다.
 - 이미 internal `virtual:aeui-entry` 또는 public `/@aeui-entry`가 있으면 hidden entry를 중복 주입하지 않는다.
-
-## 15. **현재 구현** 테스트가 제공하는 참고 증거
-
-`example/test/src/__tests__/router.test.js`는 현재 구현의 다음 경로를 독립 검증한다. 이 목록은 새 명세 기반 test suite가 완성되기 전의 참고 증거일 뿐 최종 적합성 계약이 아니다. 새 suite 작성은 별도의 **계획 기능**이다.
-
-- root index, static, dynamic, catch-all, query, fallback
-- `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` route file
-- static이 dynamic보다 먼저 매칭
-- index와 empty catch-all remainder 분리
-- malformed dynamic/catch-all decode의 fallback
-- percent-encoded static literal match
-- 마지막이 아닌 catch-all 제외
-- same-origin anchor와 browser 기본 동작을 유지할 click 분리
-- hidden entry 주입과 manual main entry 보존
-- `data-*` attribute false positive 방지
-- default alias와 사용자 alias 보존
-- router bootstrap eager glob 생성
-- JSX/TSX/TS route source transform
-
-확장자와 hidden entry 결함을 수정할 때는 다음 계약도 자동 검증해야 한다.
-
-- `.mts`, `.cts`, `.mjsx`, `.cjsx`만 있는 `src/pages`는 router mode를 선택하지 않음
-- 공식 여섯 확장자는 detector, glob, transform과 runtime parser에서 동일하게 처리됨
-- HTML에 `/@aeui-entry` 또는 `virtual:aeui-entry`가 이미 있으면 추가 tag를 주입하지 않음
-
-`example/test/src/__tests__/component.test.jsx`의 통합 테스트는 다음 실제 흐름을 고정한다.
-
-- initial location의 page와 root layout 렌더
-- anchor click으로 pathname, params, query와 DOM 변경
-- `popstate`로 unknown URL의 custom 404 렌더

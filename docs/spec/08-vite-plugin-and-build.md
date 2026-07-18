@@ -1,10 +1,10 @@
 # 08. Vite 플러그인, 타입, 빌드와 패키지 계약
 
-이 문서는 `packages/core/src/vite-plugin.js`, `packages/core/rollup.config.js`, `packages/core/package.json`, `packages/core/types/**`의 목표 계약과 현재 구현을 함께 설명한다. Vite hook 순서부터 npm export map과 tarball 포함 파일까지 하나의 배포 계약으로 다룬다. 상태는 **규범**, **현재 구현**, **계획 기능**, **수정 필요**로 구분한다. **수정 필요**로 표시한 현재 동작은 재구현 시 보존하지 않고 목표 계약에 맞게 고쳐야 한다.
+이 문서는 Vite hook 순서, npm export map, 타입 선언, 빌드 산출물과 tarball 포함 파일을 하나의 배포 계약으로 정의한다.
 
 ## 1. 공개 진입점과 패키지 이름
 
-실제 npm package manifest의 이름은 `a-easy-ui`이고 현재 버전은 `0.0.1`, module type은 `module`이다. 그러나 소스와 생성 코드의 module specifier는 `aeui`다. 소비 앱은 npm alias로 이 이름을 제공한다.
+npm package manifest의 이름은 `a-easy-ui`, 버전은 `0.0.1`, module type은 `module`이다. 소스와 생성 코드의 module specifier는 `aeui`이며 소비 앱은 npm alias로 이 이름을 제공한다.
 
 ```json
 {
@@ -24,7 +24,7 @@ import aeui from 'aeui/vite';
 
 ## 2. Vite 플러그인 상수와 공식 확장자
 
-목표 계약의 개념 상수는 다음과 같다. 공식 source/route 확장자는 하나의 목록으로 선언하고 detector, eager glob, transform filter, parser 선택과 runtime route parser가 이 목록을 공유해야 한다.
+개념 상수는 다음과 같다. 공식 source/route 확장자는 하나의 목록으로 선언하고 detector, eager glob, transform filter, parser 선택과 runtime route parser가 이 목록을 공유해야 한다.
 
 ```js
 const VIRTUAL_ENTRY_ID = 'virtual:aeui-entry';
@@ -37,8 +37,6 @@ const DEFAULT_ROUTER_DIR = 'src/pages';
 const DEFAULT_ALIAS = '@';
 const DEFAULT_ALIAS_DIR = 'src';
 ```
-
-현재 소스의 `ROUTE_EXT_RE = /\.[cm]?[jt]sx?$/`는 이 목표 계약보다 넓다. 그 결과 생기는 detector/glob/parser 불일치는 7절의 **수정 필요** 항목이다. 넓은 정규식은 보존 대상이 아니다.
 
 `normalizePath(value)`는 `String(value || '')`의 모든 backslash를 slash로 바꾼다.
 
@@ -55,7 +53,7 @@ export default function aeui(options = {}) {
 }
 ```
 
-공개 타입과 실제 기본값은 다음과 같다.
+공개 타입과 기본값은 다음과 같다.
 
 ```ts
 export interface AeuiViteOptions {
@@ -133,7 +131,7 @@ attribute 순서, `/base/` prefix, query/hash는 무관하며 확장자 문자�
 
 ### 5.2 주입 규칙
 
-목표 계약은 internal id와 public path를 모두 기존 AEUI entry로 감지한다.
+internal id와 public path를 모두 기존 AEUI entry로 감지한다.
 
 ```text
 if hasExistingAeuiEntry(html) OR hasManualModuleEntry(html):
@@ -150,23 +148,13 @@ if hasExistingAeuiEntry(html) OR hasManualModuleEntry(html):
 }
 ```
 
-`hasExistingAeuiEntry(html)`의 목표 판정은 다음과 같다.
+`hasExistingAeuiEntry(html)`의 판정은 다음과 같다.
 
-1. 현재 동작과의 호환을 위해 raw HTML에 internal id `virtual:aeui-entry`가 포함되어 있으면 `true`다.
+1. raw HTML에 internal id `virtual:aeui-entry`가 포함되어 있으면 `true`다.
 2. 실제 `<script>` opening tag를 순회한다. `type`을 소문자로 바꾼 값이 `module`인 tag만 본다.
 3. 실제 `src` attribute에서 query/hash를 제거하고 backslash를 slash로 바꾼다.
 4. 정규화한 `src`가 internal id `virtual:aeui-entry` 또는 public path `/@aeui-entry`와 정확히 같으면 `true`다.
 5. `data-src`나 주석 안의 public path 문자열만으로는 existing entry로 판정하지 않는다.
-
-#### **수정 필요**: public entry 중복 주입
-
-현재 구현은 `html.includes("virtual:aeui-entry")`만 검사한다. 실제 module script가 이미 public path를 사용해도 이를 발견하지 못한다.
-
-```html
-<script type="module" src="/@aeui-entry"></script>
-```
-
-위 HTML에 현재 plugin을 적용하면 동일한 public path tag가 추가될 수 있다. 이 중복 주입은 현재 잘못된 동작이며 재구현 시 유지하지 않는다. 수정 구현은 internal id와 public path를 모두 감지해야 한다.
 
 ## 6. virtual module 해석
 
@@ -182,7 +170,7 @@ if hasExistingAeuiEntry(html) OR hasManualModuleEntry(html):
 
 ## 7. route file 존재 검사
 
-`hasRouteFile(dir)`는 동기 filesystem API로 재귀 탐색한다. 목표 구현은 2절의 공식 여섯 확장자만 route file로 판정한다.
+`hasRouteFile(dir)`는 동기 filesystem API로 재귀 탐색하며 2절의 공식 여섯 확장자만 route file로 판정한다.
 
 ```text
 if fs.existsSync(dir)가 false: false
@@ -195,24 +183,7 @@ return false
 
 `readdirSync` 오류는 catch하지 않는다. symlink가 directory/file로 판정되지 않으면 탐색하지 않는다.
 
-#### **수정 필요**: 12개 detector suffix와 6개 glob/parser의 불일치
-
-현재 소스의 넓은 정규식이 문법상 인정하는 suffix는 12개다.
-
-```text
-.js .jsx .ts .tsx
-.cjs .cjsx .cts .ctsx
-.mjs .mjsx .mts .mtsx
-```
-
-하지만 eager glob이 실제 import하는 공식 지원 확장자는 `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` 여섯 개다. 예를 들어 `index.mts`만 있으면 현재 구현은 route branch를 선택하지만 glob에는 모듈이 들어오지 않고 TypeScript parser도 켜지지 않는다.
-
-이 동작은 호환 경계가 아니라 현재 잘못된 부분이다. 수정 구현은 다음을 만족해야 한다.
-
-- `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`만 공식 지원한다.
-- `hasRouteFile`, eager glob, source transform filter와 runtime route parser가 동일한 목록을 사용한다.
-- `.mts`, `.cts`, `.mjsx`, `.cjsx` 등 목록 밖 파일만 존재하면 router mode를 선택하지 않는다.
-- 목록 밖 파일은 AEUI Vite transform 대상이나 runtime route 후보가 아니다.
+`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`만 공식 지원한다. `hasRouteFile`, eager glob, source transform filter와 runtime route parser는 동일한 목록을 사용한다. 목록 밖 파일만 존재하면 router mode를 선택하지 않으며, 해당 파일은 AEUI Vite transform 대상이나 runtime route 후보가 아니다.
 
 ## 8. style import
 
@@ -273,7 +244,7 @@ if filePath.includes('/node_modules/'): false
 otherwise: true
 ```
 
-route directory에 한정하지 않고 공식 여섯 확장자의 source 전체를 변환한다. query만 제거하고 hash는 제거하지 않는다. separator normalize 전에 `/node_modules/`를 검사한다. 현재 넓은 `ROUTE_EXT_RE`가 `.mts`, `.cts` 등을 통과시키는 동작은 7절의 **수정 필요** 항목이며 목표 계약이 아니다.
+route directory에 한정하지 않고 공식 여섯 확장자의 source 전체를 변환한다. query만 제거하고 hash는 제거하지 않는다. separator normalize 전에 `/node_modules/`를 검사한다.
 
 ### 10.2 parser
 
@@ -353,7 +324,7 @@ outputs:
 plugins: [nodeResolve()]
 ```
 
-`src/index.js`는 `core.js`와 `hooks.js`를 re-export한다. 현재 CJS runtime의 top-level export key는 `AEUI`, `watch`, `clean`이다.
+`src/index.js`는 `core.js`와 `hooks.js`를 re-export한다. CJS runtime의 top-level export key는 `AEUI`, `watch`, `clean`이다.
 
 ### 12.2 Babel plugin
 
@@ -386,7 +357,7 @@ plugins: [nodeResolve()]
 
 ### 13.1 runtime types
 
-`types/index.d.ts`는 다음 선언 shape를 그대로 제공한다. 제네릭 기본값, optional props 인자, Fragment의 두 단계 함수형, 두 JSX namespace를 생략하면 현재 타입 계약을 재현한 것이 아니다.
+`types/index.d.ts`는 다음 선언 shape를 그대로 제공한다. 제네릭 기본값, optional props 인자, Fragment의 두 단계 함수형, 두 JSX namespace를 생략하면 타입 계약을 위반한다.
 
 ```ts
 export type PrimitiveRenderable = string | number | bigint;
@@ -507,7 +478,7 @@ package는 `sideEffects: false`이며 `files`를 정확히 whitelist한다.
 ]
 ```
 
-npm은 `package.json`도 자동 포함한다. `dist` 전체가 아니라 whitelist이므로 로컬의 예전 산출물 `dist/aeui.js`는 tarball에 들어가지 않는다. 현재 dry-run 기준 구성은 위 12개 dist 파일, 전체 `src`, 세 `.d.ts`, `package.json`이다.
+npm은 `package.json`도 자동 포함한다. `dist` 전체가 아니라 whitelist이므로 목록 밖 산출물은 tarball에 들어가지 않는다. tarball은 위 12개 dist 파일, 전체 `src`, 세 `.d.ts`, `package.json`으로 구성된다.
 
 ## 15. scripts와 dependency 경계
 
@@ -535,7 +506,7 @@ npm은 `package.json`도 자동 포함한다. `dist` 전체가 아니라 whiteli
 
 ### 15.2 core package metadata와 scripts
 
-기능 진입점 외 metadata도 현재 manifest 재현 범위다.
+기능 진입점 외 metadata도 package manifest 스펙에 포함된다.
 
 ```json
 {
@@ -583,41 +554,7 @@ npm run typecheck     -> core typecheck
 npm run pack:core     -> core npm pack --dry-run
 ```
 
-## 16. **현재 구현** 테스트 증거와 재현 검증
-
-`example/test/src/__tests__/router.test.js`의 기존 `aeui/vite plugin` suite는 현재 다음 경로를 실행한다. 기존 suite 자체는 최종 적합성 계약이 아니며 새 명세 기반 test suite 작성은 별도의 **계획 기능**이다.
-
-- 수동 main이 없을 때 `/@aeui-entry` 주입
-- script attribute 순서, base prefix, query/hash와 무관하게 `src/main.*` 보존
-- `data-src`/`data-type` false positive 방지
-- 기본 `@ -> src` alias
-- 기존 `@` alias 비덮어쓰기
-- `src/pages/index.tsx`가 있을 때 router bootstrap과 6개 확장자 glob
-- JSX/TSX classic AEUI JSX transform
-- `.ts`의 `AEUI.createVNode` component도 render phase wrapper로 변환
-
-현재 suite에는 public entry 중복 방지와 넓은 suffix 불일치 경로가 없다. 두 결함을 수정할 때는 다음을 목표 계약 테스트로 추가해야 한다.
-
-- HTML에 module script `src="/@aeui-entry"`가 이미 있으면 tag를 추가하지 않음
-- internal `virtual:aeui-entry`도 기존 entry로 감지함
-- `data-src="/@aeui-entry"`나 주석의 문자열은 public entry로 오인하지 않음
-- 공식 여섯 확장자는 detector, glob, transform filter와 runtime parser에서 동일하게 처리됨
-- `.mts`, `.cts`, `.mjsx`, `.cjsx`만 있는 route directory는 router mode를 선택하지 않음
-- 공식 목록 밖 source id는 AEUI transform 대상에서 제외됨
-
-배포 재현의 최소 검증:
-
-```text
-npm run build:core
-npm run typecheck
-npm test
-npm run pack:core
-ESM/CJS root import smoke
-ESM/CJS babel-plugin default export smoke
-ESM/CJS vite default export smoke
-```
-
-## 17. 재구현 시 보존할 경계
+## 16. 배포 스펙 경계
 
 - Vite plugin은 `name: 'aeui:vite'`, `enforce: 'pre'`다.
 - alias는 기존 config를 덮어쓰지 않는다.
@@ -625,7 +562,6 @@ ESM/CJS vite default export smoke
 - internal `virtual:aeui-entry`와 public `/@aeui-entry`를 모두 기존 hidden entry로 감지해 중복 주입하지 않는다.
 - route directory는 고정이고 route 유무에 따라 router/App bootstrap을 선택한다.
 - route detector, eager glob, transform filter, parser 선택과 runtime route parser는 `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`라는 하나의 공식 목록을 공유한다.
-- 현재 12 suffix detector와 6 suffix glob의 차이는 보존할 경계가 아니라 **수정 필요** 항목이다.
 - transform은 route file에 한정되지 않고 matching source 전체에 적용된다.
 - 별도 TypeScript strip plugin은 없고, AEUI rewrite 뒤 남은 TypeScript syntax의 최종 제거는 Vite에 맡긴다.
 - AEUI Babel plugin이 classic JSX plugin보다 먼저 실행된다.

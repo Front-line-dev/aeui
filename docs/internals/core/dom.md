@@ -53,11 +53,14 @@ DOM 요소의 **속성(attribute, property)을 업데이트**한다. 새 props�
 
 2. 각 key에 대해 순서대로:
    ├── key가 children, key, ref → 건너뜀 (DOM 속성이 아님)
-   ├── 새 값과 이전 값이 같으면 (`deepEqual`) → 건너뜀
+   ├── file-input value 특례인지 계산
+   ├── 새 값과 이전 값이 같고 file-input value 특례가 아니면 (`deepEqual`) → 건너뜀
    ├── key가 on으로 시작 + 함수값 → 이벤트 핸들러 처리
    ├── key === "className" → className 처리
    ├── key === "style" + 객체값 → style 객체 처리
    ├── key === "style" + 문자열 → style 문자열 처리
+   ├── key === "value" → controlled value 처리
+   ├── key가 aria-로 시작 → ARIA attribute 처리
    ├── boolean 값 → boolean attribute 처리
    ├── null/undefined 값 → attribute 제거
    └── 그 외 → setAttribute로 설정
@@ -92,7 +95,7 @@ if (key === 'children' || key === 'key' || key === 'ref') continue;
 |-----|------|
 | `children` | `createVNode`이 children을 props에도 저장하지만, 이것은 DOM 속성이 아니다. 자식 요소 처리는 `reconcile`이 담당한다 |
 | `key` | reconciliation에서 형제 노드를 식별하는 내부 힌트다. DOM 속성으로 설정하면 안 된다 |
-| `ref` | 향후 DOM 참조 기능에 사용될 예정. DOM 속성으로 설정하면 안 된다 |
+| `ref` | AEUI 내부용으로 예약한 값이므로 DOM 속성으로 설정하지 않는다 |
 
 ### 변경 감지 (불필요한 DOM 조작 방지)
 
@@ -214,7 +217,45 @@ if (key === "style" && typeof newValue === "string") {
 
 ---
 
-### boolean 속성 처리
+### `value`와 file input 처리
+
+`value`는 DOM property와 attribute를 함께 갱신한다. 다만 file input에는 브라우저 보안 규칙상 사용자 값을 property로 쓸 수 없으므로 attribute만 제거하고 property에는 쓰지 않는다.
+
+file input 여부는 이번 props가 own `type` key를 가지면 그 값을, 아니면 현재 DOM의 `type`을 사용해 판정한다. tag와 type을 문자열로 바꾸어 소문자로 비교하므로 `file`, `FILE`, `File`은 모두 같은 결과다. 이 판정을 `value` 처리 전에 한 번 계산하므로 `{ value, type: 'file' }`의 key 순서와도 무관하다.
+
+```javascript
+const tag = String(domNode.tagName).toLowerCase();
+const type = Object.prototype.hasOwnProperty.call(props, 'type')
+  ? props.type
+  : domNode.type;
+const isFileInput = tag === 'input' && String(type).toLowerCase() === 'file';
+```
+
+text input이 file input으로 바뀌는 경우에도 이전 `value` attribute를 제거한다. children을 처리한 뒤 controlled property를 다시 맞추는 경로에서도 같은 대소문자 무관 판정을 사용하며, file input의 `value` property에는 값을 쓰지 않는다.
+
+---
+
+### ARIA attribute 처리
+
+`aria-*`는 일반 HTML boolean property가 아니라 문자열 attribute다.
+
+```javascript
+if (key.startsWith('aria-')) {
+  if (newValue === undefined || newValue === null) {
+    domNode.removeAttribute(key);
+  } else if (typeof newValue === 'boolean') {
+    domNode.setAttribute(key, String(newValue));
+  } else {
+    domNode.setAttribute(key, newValue);
+  }
+}
+```
+
+따라서 `aria-hidden={true}`는 `aria-hidden="true"`, `aria-hidden={false}`는 `aria-hidden="false"`가 된다. null이나 undefined일 때만 attribute를 제거한다. 이 branch에서는 `domNode[key]`에 값을 쓰지 않으므로 같은 이름의 임의 property를 만들지 않는다.
+
+---
+
+### HTML boolean 속성 처리
 
 ```javascript
 if (typeof newValue === 'boolean') {
@@ -224,7 +265,7 @@ if (typeof newValue === 'boolean') {
 }
 ```
 
-`disabled`, `checked`, `readOnly` 같은 boolean 속성은 **프로퍼티와 attribute 양쪽에 모두 반영**해야 올바르게 동작한다.
+`aria-*`가 아닌 `disabled`, `checked`, `readOnly` 같은 boolean 속성은 **프로퍼티와 attribute 양쪽에 모두 반영**해야 올바르게 동작한다.
 
 - `domNode[key] = true`: JavaScript에서 `input.disabled`으로 접근할 때 올바른 값을 반환하도록 함
 - `setAttribute(key, '')`: HTML에서 `<input disabled>`로 렌더링되도록 함 (빈 문자열이 HTML boolean attribute의 표준)
@@ -253,13 +294,13 @@ if (newValue === undefined || newValue === null) {
 domNode.setAttribute(key, newValue);
 ```
 
-`id`, `href`, `src`, `data-*`, `aria-*` 등 일반 문자열/숫자 속성은 `setAttribute`로 DOM에 반영한다.
+`id`, `href`, `src`, `data-*` 등 일반 문자열/숫자 속성은 `setAttribute`로 DOM에 반영한다. `aria-*`는 앞의 전용 branch가 먼저 처리한다.
 
 ---
 
 ## `updateProps(target, newProps)`
 
-Babel 플러그인이 변환한 렌더 함수 내부에서 호출되는 유틸리티로, 컴포넌트의 **반응형 props 객체(`__props`)를 업데이트**한다.
+Babel 플러그인이 변환한 렌더 함수 내부에서 호출되는 유틸리티로, **컴파일러가 만든 props 저장 객체의 내용을 업데이트**한다.
 
 ### 코드
 
@@ -272,17 +313,23 @@ updateProps(target, newProps) {
 
 ### 왜 delete 후 assign인가
 
-컴포넌트의 setup에서 생성된 `__props` 객체는 클로저에 의해 참조가 유지된다. 새 객체를 만들면 클로저의 참조가 끊어지므로, **같은 객체를 유지하면서 내용만 교체**해야 한다.
+컴포넌트 setup에서 컴파일러가 만든 props 저장 객체는 클로저에 의해 참조가 유지된다. 새 객체를 만들면 클로저의 참조가 끊어지므로, **같은 객체를 유지하면서 내용만 교체**해야 한다.
+
+아래의 `_props`는 설명을 위한 이름이다. 실제 변환 결과에서는 컴파일러가 현재 스코프와 충돌하지 않는 식별자를 만들며, 그 이름은 공개 API가 아니다.
 
 ```javascript
 // Babel이 변환한 코드 (개념적 이해를 위한 단순화)
 function Counter(_initialProps) {
-  const __props = { ..._initialProps };  // ← 이 객체의 참조가 클로저에 유지됨
+  const _props = { ..._initialProps };  // ← 이 객체의 참조가 클로저에 유지됨
 
-  return (_newProps) => {
-    AEUI.updateProps(__props, _newProps);  // __props의 내용을 교체 (참조는 유지)
-    // ... __props.name을 사용하여 렌더링 ...
-  };
+  return (_newProps) => AEUI.__runtime.runRenderPhase(
+    _newProps,
+    _props,
+    () => {
+      // runRenderPhase가 _props의 내용을 교체한 뒤 이 함수를 실행한다.
+      // ... _props에서 최신 값을 읽어 렌더링 ...
+    }
+  );
 }
 ```
 
