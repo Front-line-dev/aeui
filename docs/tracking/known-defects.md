@@ -8,18 +8,18 @@
 
 | ID | 영역 | 위반한 스펙 |
 |---|---|---|
-| `AEUI-DATA-FIX-001` | 깊은 비교의 대칭성·타입·참조 그래프 | [02 §7 `_deepEqual`](../spec/02-vnode-and-deep-data.md#7-_deepequal) |
-| `AEUI-DATA-FIX-002` | `__proto__` own property 안전 복제 | [02 §8 `_deepClone`](../spec/02-vnode-and-deep-data.md#8-_deepclone) |
-| `AEUI-DOM-FIX-001` | boolean `aria-*` 의미 | [04 §11.3 boolean과 일반 attribute](../spec/04-reconciliation-and-dom.md#113-boolean과-일반-attribute) |
-| `AEUI-DOM-FIX-002` | file input type 대소문자 판정 | [04 §13 value와 checked](../spec/04-reconciliation-and-dom.md#13-value와-checked) |
-| `AEUI-COMPILER-IMPORT-FIX-001` | default·namespace import 보존 | [06 §3.3 import 생성과 충돌 처리](../spec/06-babel-compiler.md#33-import-생성과-충돌-처리) |
-| `AEUI-COMPILER-FIX-001` | 일반 callback의 컴포넌트 오판 | [06 §5.3 컴포넌트 근거와 판정](../spec/06-babel-compiler.md#53-컴포넌트-근거와-판정) |
-| `AEUI-COMPILER-FIX-002` | compiler 생성 이름 충돌 | [06 §7.1 공통 target](../spec/06-babel-compiler.md#71-공통-target) |
-| `AEUI-COMPILER-FIX-003` | named dependency getter 오변환 | [06 §8.4 dependency getter 분류](../spec/06-babel-compiler.md#84-dependency-getter-분류) |
-| `AEUI-COMPILER-FIX-004` | hook import alias 오판 | [06 §8.1 hook call 판별](../spec/06-babel-compiler.md#81-hook-call-판별) |
-| `AEUI-COMPILER-FIX-005` | 사용자 render parameter를 wrapper로 오인 | [06 §9.2 wrapper idempotence](../spec/06-babel-compiler.md#92-wrapper-idempotence) |
-| `AEUI-ROUTER-FIX-001` | route/source 확장자 집합 불일치 | [07 §2.3 router mode 선택](../spec/07-directory-router.md#23-router-mode-선택), [08 §2 공식 확장자](../spec/08-vite-plugin-and-build.md#2-vite-플러그인-상수와-공식-확장자) |
-| `AEUI-VITE-FIX-001` | public/internal virtual entry 중복 주입 | [07 §2.2 HTML entry 주입](../spec/07-directory-router.md#22-html-entry-주입), [08 §5.2 주입 규칙](../spec/08-vite-plugin-and-build.md#52-주입-규칙) |
+| `AEUI-DATA-FIX-001` | 깊은 비교의 대칭성·타입·참조 그래프 | [02 §7 `_deepEqual`](../spec/02-vnode-and-deep-data.md#7-_deepequal--깊은-비교) |
+| `AEUI-DATA-FIX-002` | `__proto__` own property 안전 복제 | [02 §8 `_deepClone`](../spec/02-vnode-and-deep-data.md#8-_deepclone--깊은-복사) |
+| `AEUI-DOM-FIX-001` | boolean `aria-*` 의미 | [04 §10.2 props 적용 규칙](../spec/04-reconciliation-and-dom.md#props-적용-규칙) |
+| `AEUI-DOM-FIX-002` | file input type 대소문자 판정 | [04 §12 controlled input: value와 checked](../spec/04-reconciliation-and-dom.md#12-controlled-input-value와-checked) |
+| `AEUI-COMPILER-IMPORT-FIX-001` | default·namespace import 보존 | [06 §3.3 충돌 처리](../spec/06-babel-compiler.md#33-충돌-처리) |
+| `AEUI-COMPILER-FIX-001` | 일반 callback의 컴포넌트 오판 | [06 §4.2 컴포넌트 판별 기준](../spec/06-babel-compiler.md#42-컴포넌트-판별-기준) |
+| `AEUI-COMPILER-FIX-002` | compiler 생성 이름 충돌 | [06 §6.2 identifier props](../spec/06-babel-compiler.md#62-identifier-props) |
+| `AEUI-COMPILER-FIX-003` | named dependency getter 오변환 | [06 §7.4 deps getter 분류](../spec/06-babel-compiler.md#74-deps-getter-분류) |
+| `AEUI-COMPILER-FIX-004` | hook import alias 오판 | [06 §7.1 hook 판별 — binding 기반](../spec/06-babel-compiler.md#71-hook-판별--binding-기반) |
+| `AEUI-COMPILER-FIX-005` | 사용자 render parameter를 wrapper로 오인 | [06 §8 render phase wrapper 생성](../spec/06-babel-compiler.md#8-render-phase-wrapper-생성) |
+| `AEUI-ROUTER-FIX-001` | route/source 확장자 집합 불일치 | [07 §2 Vite 자동 부트스트랩](../spec/07-directory-router.md#2-vite-자동-부트스트랩), [08 §5.1 대상 판별](../spec/08-vite-plugin-and-build.md#대상-판별) |
+| `AEUI-VITE-FIX-001` | public/internal virtual entry 중복 주입 | [07 §2 Vite 자동 부트스트랩](../spec/07-directory-router.md#2-vite-자동-부트스트랩), [08 §3 HTML entry 자동 주입](../spec/08-vite-plugin-and-build.md#3-html-entry-자동-주입) |
 
 ## 데이터 연산
 
@@ -45,9 +45,9 @@
 
 ### `AEUI-DOM-FIX-002`: file input type
 
-- 현재 잘못된 결과: controlled sync 경로가 `type="FILE"`과 `type="File"`을 일반 input으로 오인해 금지된 non-empty value 쓰기를 시도할 수 있다.
-- 영향 코드: `packages/core/src/dom-host.js`, `packages/core/src/component-lifecycle.js`
-- 회귀 검증 범위: `file`, `FILE`, `File`과 모든 controlled DOM 갱신 경로.
+- 현재 잘못된 결과: `updateDomProps`의 file input 판정은 `String(type).toLowerCase() === 'file'`로 대소문자를 올바르게 무시하나, `syncHostControlledProps`의 controlled sync 경로가 `type !== 'file'`로 정확한 문자열만 비교해 `type="FILE"`과 `type="File"`을 일반 input으로 오인하고 금지된 non-empty value 쓰기를 시도할 수 있다.
+- 영향 코드: `packages/core/src/dom-host.js`
+- 회귀 검증 범위: `file`, `FILE`, `File`과 `updateDomProps`·`syncHostControlledProps` 두 경로 모두의 controlled DOM 갱신.
 
 ## Babel 컴파일러
 
@@ -65,7 +65,7 @@
 
 ### `AEUI-COMPILER-FIX-002`: 생성 identifier
 
-- 현재 잘못된 결과: 고정된 `__props` identifier가 사용자 binding과 충돌한다.
+- 현재 잘못된 결과: 고정된 `__props` identifier가 사용자 binding과 충돌한다. 스펙 §6.2는 컴파일러가 생성하는 identifier가 사용자 binding과 충돌하지 않고 scope-safe한 고유 이름을 생성해야 한다고 규정한다.
 - 영향 코드: `packages/core/src/babel-plugin.js`
 - 회귀 검증 범위: 생성 identifier와 같은 이름 또는 비슷한 이름을 쓰는 사용자 binding.
 
@@ -97,6 +97,6 @@
 
 ### `AEUI-VITE-FIX-001`: virtual entry 중복
 
-- 현재 잘못된 결과: HTML에 public `/@aeui-entry`가 있어도 internal `virtual:aeui-entry`만 검사해 script를 중복 주입할 수 있다.
+- 현재 잘못된 결과: HTML에 public `/@aeui-entry`가 있어도 internal `virtual:aeui-entry`만 검사해 script를 중복 주입할 수 있다. 스펙 §3은 `virtual:aeui-entry` 또는 `/@aeui-entry` 둘 다 검사해야 하며, 수동 main 감지 시 실제 `<script>` 태그의 `type="module"` attribute만 대상으로 하고 `data-src`, HTML 주석, 일반 문자열 내의 경로는 module script로 판정하지 않아야 한다고 규정한다.
 - 영향 코드: `packages/core/src/vite-plugin.js`
 - 회귀 검증 범위: internal/public ID, 실제 module script, `data-src`, 주석과 일반 문자열.

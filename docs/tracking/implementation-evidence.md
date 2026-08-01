@@ -113,6 +113,8 @@
 - deep compare의 대칭성, cross-type, graph와 `__proto__` property tests
 - compiler의 callback negative, UID, named getter, imported-name과 idempotence fixtures
 - 생성 tarball을 설치한 실제 ESM/CJS 소비 smoke
+- file input의 `syncHostControlledProps` 대소문자 무시 경로 테스트
+- virtual entry public path(`/@aeui-entry`) 검사 경로 테스트
 
 ## 오류 및 경고 prefix 관찰값
 
@@ -132,6 +134,7 @@
 - Deep Compare Test의 진단 UI에는 trigger count 0과 1을 각각 PASS로 표시하는 역사적 문구가 있었다. 스펙의 기대값은 연결된 데이터·watch 계약에서 결정한다.
 - Deep Compare Test의 세 interval과 DOM Prop Test timeout은 page lifetime 동안 cleanup하지 않는 fixture다. 이 현황은 integration contract가 아니다.
 - visual text, shadow와 spacing은 프레임워크 적합성 조건이 아니다.
+- commerce-admin의 localStorage는 key `"aeui-commerce-admin:v1"`을 `localStorage.getItem`/`setItem`에 전달하고, 값은 `{ version, savedAt, data }` JSON 객체다.
 
 ## 소스 파일 목록에서 확인한 내용
 
@@ -174,10 +177,17 @@ Set 구현은 `remainingB`, SameValueZero 직접 삭제, 후보 signature와 tri
 
 이 테스트들은 attribute branch, event proxy, controlled property, mount 실패 정리, scheduler backoff, watcher/cleanup ordering과 오류 격리를 조사하는 참고 자료다.
 
+### Reconciliation과 mount 실패 정리
+
+host mount 실패 시 `mountHostNode`의 `try` 안에서 children reconcile이나 controlled sync가 throw하면, DOM 요소를 직접 제거하고 node를 정리한다. 단, `cloneHostPropsSnapshot`은 `try` 밖에서 실행되므로 이 단계에서 실패하면 직접 `reconcile` 경로에서는 DOM이 남을 수 있다. root 경로(`reconcileRoot`)에서는 `removeUncommittedDom`이 미커밋 DOM을 별도 정리한다.
+
+fragment mount 실패 시 `mountFragmentNode`는 mount 전 sibling 위치를 기억해두고, 실패 시 그 이후에 새로 삽입된 DOM을 `removeInsertedSiblings`로 제거한다.
+
 ### Babel 컴파일러
 
 - `ensureAeuiImport`는 분리 시점에 처음 찾은 `aeui` import declaration을 직접 수정했다. default·namespace import를 구분하지 않는 문제는 [`AEUI-COMPILER-IMPORT-FIX-001`](known-defects.md)에서 추적한다.
 - component 판별은 익명 default export의 renderable 반환, JSX 또는 임의 call의 첫 argument 사용, 대문자 이름과 renderable 반환을 조합했다. 임의 callback을 component로 오인하는 문제는 [`AEUI-COMPILER-FIX-001`](known-defects.md)에서 추적한다.
+- compiler가 생성하는 identifier(`_initialProps`, `_props`, `_resolveProps` 등)는 고정 이름을 사용하며 사용자 binding과 충돌할 수 있다. 스펙 06 §6.2는 scope-safe한 고유 이름을 생성해야 한다고 규정하며, 이 문제는 [`AEUI-COMPILER-FIX-002`](known-defects.md)에서 추적한다.
 - `clean` 변환은 callee만 바꾸고 argument 수와 타입을 검사하지 않았다.
 - `watch` 변환은 callback-first 두 argument 호출만 처리하고, 첫 argument가 배열이거나 argument가 1개 또는 3개 이상이면 그대로 두었다.
 - hook 순회는 component path 아래의 call expression을 검사하며 call을 소유한 함수가 원 component인지 별도로 제한하지 않았다.
@@ -195,11 +205,17 @@ Set 구현은 `remainingB`, SameValueZero 직접 삭제, 후보 signature와 tri
 - 분리 시점 `package.json`은 실제 package 이름 `a-easy-ui`, version `0.0.1`, ESM module type과 앱에서 쓰는 별칭 `aeui`를 사용했다.
 - 기존 Vite 테스트는 manual main 보존, `data-*` 오인 방지, 기본·사용자 alias, 여섯 확장자 eager glob과 JSX·TS·TSX 변환을 조사했다. public virtual entry 중복과 detector/parser 확장자 불일치 경로는 포함하지 않았다.
 - `type-tests/public-api.ts`는 세 package 진입점, component/VNode/renderable 타입과 alias option을 smoke test했다.
-- dry-run package에는 whitelist된 dist artifact 12개, 전체 `src`, 선언 파일 3개와 `package.json`이 포함됐고 목록 밖 `dist/aeui.js`는 제외됐다.
+- dry-run package에는 whitelist된 dist artifact 12개(6 JS + 6 sourcemap), 전체 `src`, 선언 파일 3개와 `package.json`이 포함됐고 목록 밖 `dist/aeui.js`는 제외됐다.
+- Rollup 세 빌드 모두 `sourcemap: true`를 설정하며, tarball의 `files` 목록은 12개 dist 파일(6 JS + 6 `.map`)을 포함한다.
+- 루트 workspace의 `build:examples` script는 `vite-demo`, `deep-compare-test`, `commerce-admin` 세 예제를 순서대로 빌드한다.
 
 ### `create-aeui-app` CLI
 
-- template은 root의 `gitignore`, `index.html`, `jsconfig.json`, `package.json`, `vite.config.js`와 route page 3개로 구성됐다.
+- template은 root의 `gitignore`, `index.html`, `jsconfig.json`, `package.json`, `vite.config.js`와 `src/pages` 아래 route page 3개(`index.jsx`, `about.jsx`, `products/[id].jsx`)로 구성됐다.
 - copy 함수는 depth와 무관하게 이름이 정확히 `gitignore`인 entry를 `.gitignore`로 바꿨지만, 분리 시점 template에서는 root 파일 하나만 이 규칙에 해당했다.
-- CLI dry-run package는 `index.js`, `package.json`, template root 파일 5개와 page 파일 3개로 총 10개 entry를 포함했다.
+- CLI는 프로젝트 이름을 필수로 요구하며, 이름 생략 시 도움말을 출력하고 `process.exit(1)`. 기본 이름 `aeui-app`은 없다.
+- 이미 존재하는 디렉토리에 대해 오류를 출력하고 `process.exit(1)`. 기존 내용 유지나 덮어쓰기를 하지 않는다.
+- CLI는 `npm install`을 자동으로 실행하지 않는다. `--no-install` 옵션도 없다. 사용법 안내에 `npm install` 명령을 출력할 뿐이다.
+- template `package.json`의 의존성은 `aeui: "npm:a-easy-ui@^0.0.1"`과 `vite: "^8.0.0"`, `engines`에 Node `^20.19.0 || >=22.12.0`을 포함한다.
+- CLI dry-run package는 `index.js`, `package.json`, template root 파일 5개와 page 파일 3개(하위 디렉토리 포함)로 총 10개 entry를 포함했다.
 - `packages/create-aeui-app`에는 전용 test file과 package test script가 없었고, root에도 CLI 전용 suite를 실행하는 script가 없었다.

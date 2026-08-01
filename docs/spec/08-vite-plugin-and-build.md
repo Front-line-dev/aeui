@@ -63,7 +63,7 @@ export default defineConfig({
 - `virtual:aeui-entry` 또는 `/@aeui-entry`가 이미 HTML에 있음
 - `src/main.*` 형태의 수동 module script가 있음
 
-수동 main 감지는 `src` attribute에서 query/hash를 제거한 후 `src/main.<확장자>` 패턴과 대소문자 무시로 비교한다.
+수동 main 감지는 실제 `<script>` 태그의 `type="module"` attribute를 가진 것만 대상으로 하며, `src` attribute에서 query/hash를 제거한 후 `src/main.<확장자>` 패턴과 대소문자 무시로 비교한다. `data-src`, HTML 주석, 일반 문자열 내의 경로는 module script로 판정하지 않는다.
 
 ### virtual module 해석
 
@@ -207,8 +207,8 @@ export default function aeui(options?: AeuiViteOptions): unknown;
 ```
 input: src/index.js
 outputs:
-  dist/aeui.cjs      (format: cjs, exports: named)
-  dist/aeui.esm.js    (format: es)
+  dist/aeui.cjs      (format: cjs, exports: named, sourcemap: true)
+  dist/aeui.esm.js    (format: es, sourcemap: true)
 ```
 
 CJS의 top-level export: `AEUI`, `watch`, `clean`
@@ -218,8 +218,8 @@ CJS의 top-level export: `AEUI`, `watch`, `clean`
 ```
 input: src/babel-plugin.js
 outputs:
-  dist/babel-plugin.cjs   (format: cjs, exports: default)
-  dist/babel-plugin.js     (format: es)
+  dist/babel-plugin.cjs   (format: cjs, exports: default, sourcemap: true)
+  dist/babel-plugin.js     (format: es, sourcemap: true)
 ```
 
 CJS `exports: 'default'` → `require('aeui/babel-plugin')` 결과가 **함수 자체**.
@@ -230,8 +230,8 @@ CJS `exports: 'default'` → `require('aeui/babel-plugin')` 결과가 **함수 �
 input: src/vite-plugin.js
 external: @babel/core, @babel/plugin-transform-react-jsx
 outputs:
-  dist/vite-plugin.cjs   (format: cjs, exports: default)
-  dist/vite-plugin.js     (format: es)
+  dist/vite-plugin.cjs   (format: cjs, exports: default, sourcemap: true)
+  dist/vite-plugin.js     (format: es, sourcemap: true)
 ```
 
 두 Babel 패키지는 external로 남으며 `dependencies`에 선언.
@@ -270,6 +270,7 @@ outputs:
     "test": "npm --prefix example/test test",
     "build": "npm run build:core && npm run build:examples",
     "build:core": "npm --workspace a-easy-ui run build",
+    "build:examples": "npm --prefix example/vite-demo run build && npm --prefix example/deep-compare-test run build && npm --prefix example/commerce-admin run build",
     "typecheck": "npm --workspace a-easy-ui run typecheck",
     "pack:core": "npm pack --dry-run --workspace a-easy-ui --cache .npm"
   }

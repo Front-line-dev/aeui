@@ -12,12 +12,15 @@
 - fragment reorder, nested destructuring props와 render parameter 조합, cleanup/watch ordering을 독립 시나리오로 검증한다.
 - source 직접 import와 빌드된 package entry를 분리하고 ESM/CJS package-consumer smoke를 자동화한다.
 - `create-aeui-app` CLI를 별도 임시 디렉터리에서 검증하는 공식 suite를 추가한다.
+- 12장(소스 파일 배치)의 파일 경계와 private 심볼 배치는 source import를 통해 검증한다 (10장의 예외 조항).
 
 ## 중간 우선순위
 
 ### `AEUI-LIFECYCLE-PLAN-001`: 부분 mount 실패 cleanup
 
 최초 mount 도중 뒤쪽 sibling이 실패해도 앞에서 setup을 끝낸 provisional component의 cleanup을 정확히 한 번 실행하는 계약을 설계한다. 전체 render의 완전한 transaction rollback이나 error boundary와는 별개로 관리한다.
+
+> 참고: 현재 host mount 실패 정리는 `mountHostNode` 내부의 `try/catch`에서 수행하며, `cloneHostPropsSnapshot`은 `try` 밖에서 실행되므로 이 단계에서 실패하면 직접 `reconcile` 경로에서는 DOM이 남을 수 있다. root 경로에서만 `removeUncommittedDom`이 별도 정리한다.
 
 ### `AEUI-DOM-PLAN-002`: file input polling 변화 감지
 
@@ -112,6 +115,7 @@ compiler runtime bridge를 계측 또는 error boundary의 삽입 지점으로 �
 
 - AEUI version 동적 삽입
 - router-first 기본 구조를 유지하는 추가 template 정책
+- template 의존성 버전(`vite: ^8.0.0`, `aeui: npm:a-easy-ui@^0.0.1`)의 자동 갱신 방안
 
 ### monorepo tooling
 

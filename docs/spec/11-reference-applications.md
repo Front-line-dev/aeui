@@ -158,16 +158,19 @@ App setup 자원:
 
 localStorage 형식:
 
+key: `"aeui-commerce-admin:v1"` (별도 상수)
+
+value (JSON 문자열):
+
 ```json
 {
-  "key": "aeui-commerce-admin:v1",
-  "payload": {
-    "version": 1,
-    "savedAt": "<timestamp>",
-    "data": { "products": [], "cart": {}, "orders": [], "activity": [] }
-  }
+  "version": 1,
+  "savedAt": 1234567890123,
+  "data": { "products": [], "cart": {}, "orders": [], "activity": [] }
 }
 ```
+
+key는 `localStorage.getItem`/`setItem`에 전달하는 문자열이고, value는 `version`, `savedAt`, `data`를 담은 JSON 객체다.
 
 parse 오류, key 부재, version 불일치는 null 처리. 초기 데이터는 각 배열이 실제 배열일 때만 사용, 나머지는 seed 대체.
 

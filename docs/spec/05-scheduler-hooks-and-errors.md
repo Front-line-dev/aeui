@@ -41,7 +41,7 @@ frameDelay = didMutate
 버튼 클릭 같은 DOM 이벤트가 발생하면, polling을 기다리지 않고 **다음 animation frame에 바로** 화면을 갱신한다:
 
 ```
-사용자 클릭 → event handler 실행 → count++ 
+사용자 클릭 → event handler 실행 → count++
   → requestRender() → 다음 프레임에서 tick() → 화면 갱신
 ```
 

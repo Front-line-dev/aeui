@@ -275,7 +275,7 @@ domNode._aeuiProxyListeners[eventName] // addEventListener에 등록된 고정 p
 
 ### `updateDomProps`의 value 처리
 
-input type이 `file`이면(대소문자 무시):
+input type이 `file`이면(**대소문자 무시** — `String(type).toLowerCase() === 'file'`):
 - `value` **attribute만** 제거, property에는 쓰지 않음 (보안)
 
 그 외:
@@ -288,6 +288,8 @@ input type이 `file`이면(대소문자 무시):
 input/textarea/select의 value → props의 값으로 복구
 input의 checked → props의 값으로 복구
 ```
+
+value 복구에서 input type이 `file`이면(**대소문자 무시** — `props.type !== 'file'` 비교가 아니라 대소문자 무시 비교) controlled sync를 건너뛴다.
 
 **왜 children 뒤에?** `<select>`의 value는 `<option>` children이 mount된 후에야 올바르게 설정할 수 있기 때문이다.
 
@@ -306,4 +308,5 @@ input의 checked → props의 값으로 복구
 - event handler 교체는 proxy 유지, 제거는 listener 해제
 - select value는 option 뒤에 동기화
 - file input에 value를 강제로 쓰지 않음
-- 실패한 mount의 DOM은 local 정리로 제거
+- file input의 type 판정은 `updateDomProps`와 `syncHostControlledProps` 두 경로 모두 대소문자를 무시
+- 실패한 host mount의 DOM은 host 요소를 직접 제거. 실패한 fragment mount는 mount 전 sibling 이후에 삽입된 DOM을 제거. 직접 `reconcile` 경로에서 host props snapshot(`cloneHostPropsSnapshot`)은 `try` 밖에서 실행되므로 이 단계에서 실패하면 DOM이 남을 수 있고, root 경로(`reconcileRoot`)에서는 별도 정리가 미커밋 DOM을 제거한다

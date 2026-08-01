@@ -224,6 +224,8 @@ function Card(_initialProps) {
 
 `_props` 객체의 **identity가 유지**되면서 runtime이 매 render마다 key를 교체한다. `props` alias도 자동으로 최신 값을 본다.
 
+> **충돌 방지:** 컴파일러가 생성하는 identifier(`_initialProps`, `_props`, `_resolveProps`, `_resolvedProps`, `_newProps`, `_renderProps` 등)는 사용자 binding과 충돌하지 않아야 한다. 같은 이름의 사용자 binding이 이미 존재하면 컴파일러는 scope-safe한 고유 이름을 생성해야 한다.
+
 ### 6.3 object destructuring
 
 ```js
