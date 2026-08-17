@@ -113,4 +113,3 @@ Object.defineProperty(cloned, key, {
 ## 관련 문서
 
 - watcher 실행 흐름: [04. 스케줄러와 Dirty Checking](04-scheduler-and-dirty-checking.md)
-- 원본 명세: [spec 02 §7-8](../spec/02-vnode-and-deep-data.md)

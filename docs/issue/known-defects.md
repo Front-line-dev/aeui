@@ -1,6 +1,6 @@
 # 알려진 구현 결함
 
-이 문서는 현재 코드가 [`docs/spec`](../spec/README.md)을 위반하는 지점을 추적한다. 올바른 결과는 각 항목에 연결된 스펙 조항만 정의한다. 아래의 회귀 검증 범위는 결함이 다시 생기지 않는지 확인할 사례이며 별도 계약이 아니다.
+이 문서는 현재 코드의 알려진 결함을 추적한다. 올바른 결과는 각 항목에 연결된 스펙 조항만 정의한다. 아래의 회귀 검증 범위는 결함이 다시 생기지 않는지 확인할 사례이며 별도 계약이 아니다.
 
 모든 항목의 초기 상태는 **open**, 우선순위는 **high**다.
 
@@ -8,18 +8,18 @@
 
 | ID | 영역 | 위반한 스펙 |
 |---|---|---|
-| `AEUI-DATA-FIX-001` | 깊은 비교의 대칭성·타입·참조 그래프 | [02 §7 `_deepEqual`](../spec/02-vnode-and-deep-data.md#7-_deepequal--깊은-비교) |
-| `AEUI-DATA-FIX-002` | `__proto__` own property 안전 복제 | [02 §8 `_deepClone`](../spec/02-vnode-and-deep-data.md#8-_deepclone--깊은-복사) |
-| `AEUI-DOM-FIX-001` | boolean `aria-*` 의미 | [04 §10.2 props 적용 규칙](../spec/04-reconciliation-and-dom.md#props-적용-규칙) |
-| `AEUI-DOM-FIX-002` | file input type 대소문자 판정 | [04 §12 controlled input: value와 checked](../spec/04-reconciliation-and-dom.md#12-controlled-input-value와-checked) |
-| `AEUI-COMPILER-IMPORT-FIX-001` | default·namespace import 보존 | [06 §3.3 충돌 처리](../spec/06-babel-compiler.md#33-충돌-처리) |
-| `AEUI-COMPILER-FIX-001` | 일반 callback의 컴포넌트 오판 | [06 §4.2 컴포넌트 판별 기준](../spec/06-babel-compiler.md#42-컴포넌트-판별-기준) |
-| `AEUI-COMPILER-FIX-002` | compiler 생성 이름 충돌 | [06 §6.2 identifier props](../spec/06-babel-compiler.md#62-identifier-props) |
-| `AEUI-COMPILER-FIX-003` | named dependency getter 오변환 | [06 §7.4 deps getter 분류](../spec/06-babel-compiler.md#74-deps-getter-분류) |
-| `AEUI-COMPILER-FIX-004` | hook import alias 오판 | [06 §7.1 hook 판별 — binding 기반](../spec/06-babel-compiler.md#71-hook-판별--binding-기반) |
-| `AEUI-COMPILER-FIX-005` | 사용자 render parameter를 wrapper로 오인 | [06 §8 render phase wrapper 생성](../spec/06-babel-compiler.md#8-render-phase-wrapper-생성) |
-| `AEUI-ROUTER-FIX-001` | route/source 확장자 집합 불일치 | [07 §2 Vite 자동 부트스트랩](../spec/07-directory-router.md#2-vite-자동-부트스트랩), [08 §5.1 대상 판별](../spec/08-vite-plugin-and-build.md#대상-판별) |
-| `AEUI-VITE-FIX-001` | public/internal virtual entry 중복 주입 | [07 §2 Vite 자동 부트스트랩](../spec/07-directory-router.md#2-vite-자동-부트스트랩), [08 §3 HTML entry 자동 주입](../spec/08-vite-plugin-and-build.md#3-html-entry-자동-주입) |
+| `AEUI-DATA-FIX-001` | 깊은 비교의 대칭성·타입·참조 그래프 | 02 §7 `_deepEqual` |
+| `AEUI-DATA-FIX-002` | `__proto__` own property 안전 복제 | 02 §8 `_deepClone` |
+| `AEUI-DOM-FIX-001` | boolean `aria-*` 의미 | 04 §10.2 props 적용 규칙 |
+| `AEUI-DOM-FIX-002` | file input type 대소문자 판정 | 04 §12 controlled input: value와 checked |
+| `AEUI-COMPILER-IMPORT-FIX-001` | default·namespace import 보존 | 06 §3.3 충돌 처리 |
+| `AEUI-COMPILER-FIX-001` | 일반 callback의 컴포넌트 오판 | 06 §4.2 컴포넌트 판별 기준 |
+| `AEUI-COMPILER-FIX-002` | compiler 생성 이름 충돌 | 06 §6.2 identifier props |
+| `AEUI-COMPILER-FIX-003` | named dependency getter 오변환 | 06 §7.4 deps getter 분류 |
+| `AEUI-COMPILER-FIX-004` | hook import alias 오판 | 06 §7.1 hook 판별 — binding 기반 |
+| `AEUI-COMPILER-FIX-005` | 사용자 render parameter를 wrapper로 오인 | 06 §8 render phase wrapper 생성 |
+| `AEUI-ROUTER-FIX-001` | route/source 확장자 집합 불일치 | 07 §2 Vite 자동 부트스트랩, 08 §5.1 대상 판별 |
+| `AEUI-VITE-FIX-001` | public/internal virtual entry 중복 주입 | 07 §2 Vite 자동 부트스트랩, 08 §3 HTML entry 자동 주입 |
 
 ## 데이터 연산
 

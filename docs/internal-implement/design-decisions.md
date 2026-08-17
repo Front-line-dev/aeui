@@ -193,8 +193,8 @@ watch(() => { ... }, [count]);            // 깔끔한 API
 
 ## 관련 문서
 
-- Polling 반응성: `docs/internals/core/scheduler.md`
-- Babel 변환: `docs/internals/babel-plugin/babel-plugin.md`
-- Props 반응화: `docs/internals/core/dom.md` (`updateProps` 섹션)
-- Watcher 실행: `docs/internals/core/watcher.md`
-- Reconciliation: `docs/internals/core/reconciler.md`
+- Polling 반응성: `core/scheduler.md`
+- Babel 변환: `babel-plugin/babel-plugin.md`
+- Props 반응화: `core/dom.md` (`updateProps` 섹션)
+- Watcher 실행: `core/watcher.md`
+- Reconciliation: `core/reconciler.md`

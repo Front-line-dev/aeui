@@ -129,4 +129,3 @@ file input은 controlled sync를 건너뛴다.
 ## 관련 문서
 
 - Reconciliation 전체 흐름: [02. VDOM과 Diffing](02-vdom-and-diffing.md)
-- 원본 명세: [spec 04 §10-12](../spec/04-reconciliation-and-dom.md)

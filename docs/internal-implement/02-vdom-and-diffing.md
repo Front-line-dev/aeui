@@ -179,6 +179,4 @@ mount 전 sibling 위치를 기억해두고, 실패 시 새로 삽입된 DOM을 
 
 ## 관련 문서
 
-- VNode 헬퍼 상세: [spec 02](../spec/02-vnode-and-deep-data.md)
 - DOM props 적용: [06. DOM 연산](06-dom-operations.md)
-- 원본 명세: [spec 04](../spec/04-reconciliation-and-dom.md)

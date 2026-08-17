@@ -178,4 +178,3 @@ router teardown 호출 후 mutable 필드를 초기값으로 되돌린다. 단:
 ## 관련 문서
 
 - 깊은 비교 상세: [05. 깊은 비교](05-deep-compare.md)
-- 원본 명세: [spec 05](../spec/05-scheduler-hooks-and-errors.md)

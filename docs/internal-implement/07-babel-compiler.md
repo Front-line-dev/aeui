@@ -251,5 +251,4 @@ class method, object method는 대상 아님.
 
 ## 관련 문서
 
-- 원본 명세: [spec 06](../spec/06-babel-compiler.md)
 - 컴파일러 ABI 사용처: [03. 컴포넌트 내부](03-component-internals.md)

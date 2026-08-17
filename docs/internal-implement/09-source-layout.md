@@ -40,8 +40,8 @@ src/
 
 | 파일 | export | 상세 |
 |---|---|---|
-| `index.js` | `core.js` + `hooks.js` 전체 re-export | [spec 01 §1](../spec/01-public-api-and-architecture.md) |
-| `core.js` | `AEUI` | [spec 01 §3](../spec/01-public-api-and-architecture.md) |
+| `index.js` | `core.js` + `hooks.js` 전체 re-export | |
+| `core.js` | `AEUI` | |
 | `app-runtime.js` | `createAppRuntime` | package root에서 re-export 안 함 |
 
 ### VNode과 값 연산
@@ -151,4 +151,3 @@ template/                 → 생성 프로젝트 파일
 ## 관련 문서
 
 - 전체 아키텍처: [01. 아키텍처](01-architecture.md)
-- 원본 명세: [spec 12](../spec/12-source-layout.md)

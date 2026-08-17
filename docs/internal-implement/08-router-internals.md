@@ -171,5 +171,4 @@ state.routerTeardown = () => {
 
 ## 관련 문서
 
-- 사용자 관점: [guide 05. 라우팅](../guide/05-routing.md)
-- 원본 명세: [spec 07](../spec/07-directory-router.md)
+- 사용자 관점: [user-scenario 05. 라우팅](../user-scenario/05-routing.md)

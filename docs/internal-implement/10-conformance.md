@@ -114,5 +114,3 @@ RAF, polling, DOM event, timer는 테스트가 명시적으로 제어. 각 테�
 ---
 
 ## 관련 문서
-
-- 원본 명세: [spec 10](../spec/10-conformance.md), [spec 11](../spec/11-reference-applications.md)

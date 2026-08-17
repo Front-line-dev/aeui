@@ -194,4 +194,3 @@ cleanupComponentNode(state, node, options)
 ## 관련 문서
 
 - Watcher 실행 상세: [04. 스케줄러와 Dirty Checking](04-scheduler-and-dirty-checking.md)
-- 원본 명세: [spec 03](../spec/03-component-runtime.md)
