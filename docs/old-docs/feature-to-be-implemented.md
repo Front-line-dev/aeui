@@ -1,5 +1,0 @@
-- watch 에서 deps에 props가 있을 경우 반영이 안 되는 문제
-- props, watch deps 딥 비교
-- local babel
-- test environment
-- export package
