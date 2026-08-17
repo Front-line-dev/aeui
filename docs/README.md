@@ -29,17 +29,17 @@
 
 | 문서 | 독자 | 역할 |
 |---|---|---|
-| [`spec/`](spec/README.md) | 구현자·리뷰어 | 코드가 따라야 하는 상세 계약과 적합성 기준 |
-| [`guide/`](guide/level-1.md) | AEUI 사용자 | 설치, 사용법과 사용자 mental model |
-| [`guide/router.md`](guide/router.md) | AEUI 사용자 | core 디렉터리 라우터 사용법 |
-| [`internals/`](internals/design-decisions.md) | 기여자 | 현재 구현의 구조, 배경과 설계 근거 |
+| [`guide/`](guide/README.md) | **AEUI 사용자** | 설치, 사용법, 튜토리얼 — "AEUI를 어떻게 쓰는가?" |
+| [`dev/`](dev/README.md) | **기여자·구현자** | 내부 구현 상세 — "어떻게 구현되었는가?" |
+| [`spec/`](spec/README.md) | 구현자·리뷰어 | 코드가 따라야 하는 상세 계약과 적합성 기준 (규범 문서) |
+| [`internals/`](internals/design-decisions.md) | 기여자 | 현재 구현의 배경과 설계 근거 |
 | [`tracking/`](tracking/README.md) | 기여자 | 알려진 결함, 계획 기능과 현재 구현 근거 |
 | [`old-docs/`](old-docs/README.md) | 유지보수자 | 현재 문서 체계 이전의 보관 자료 |
 | [`contributing.md`](contributing.md) | 기여자 | 개발 환경, 검증 명령과 문서 변경 규칙 |
 
 ## 권장 읽기 순서
 
-- 처음 사용하는 경우: Level 1 → router guide → Level 2
-- 프레임워크를 수정하는 경우: 이 인덱스 → `spec/README.md` → 관련 세부 명세 → 적합성 문서 → internals
-- 결함을 수정하는 경우: `tracking/known-defects.md` → 연결된 스펙 → 테스트 → 코드
-- 기능을 추가하는 경우: `tracking/planned-features.md` → 확정된 스펙 → 테스트 → 코드
+- **처음 사용하는 경우:** [`guide/01-getting-started.md`](guide/01-getting-started.md) → 순서대로 읽기
+- **프레임워크를 수정하는 경우:** 이 인덱스 → [`dev/01-architecture.md`](dev/01-architecture.md) → 관련 dev 문서 → `spec/` 원본 명세
+- **결함을 수정하는 경우:** `tracking/known-defects.md` → 연결된 스펙 → 테스트 → 코드
+- **기능을 추가하는 경우:** `tracking/planned-features.md` → 확정된 스펙 → 테스트 → 코드
