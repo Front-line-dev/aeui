@@ -208,5 +208,5 @@ vite-plugin
 
 ## 관련 문서
 
-- 상세 모듈 목록: [09. 소스 배치](09-source-layout.md)
+- 상세 모듈 목록: [17. 소스 배치](17-source-layout.md)
 - 설계 결정 배경: [설계 결정 문서](design-decisions.md)

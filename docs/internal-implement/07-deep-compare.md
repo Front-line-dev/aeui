@@ -1,4 +1,4 @@
-# Deep Compare — `_deepEqual`, `_deepClone`
+# 07. Deep Compare — `_deepEqual`, `_deepClone`
 
 ## 개요
 
@@ -425,3 +425,8 @@ Object.getPrototypeOf(cloned) === Object.prototype; // true
 - 구현: `packages/core/src/deep-compare.js`
 - VNode marker: `packages/core/src/vnode-marker.js`
 - 규범적 계약: `docs/spec/02-vnode-and-deep-data.md` §7~8
+
+## 관련 문서
+
+- watcher 실행 흐름: [06. 스케줄러](06-scheduler.md)
+- Watcher 엔진: [15. Watcher 실행](15-watcher.md)

@@ -1,4 +1,4 @@
-# VNode 생성 — `createVNode`, `createElement`, `Fragment`
+# 02. VNode 생성 — `createVNode`, `createElement`, `Fragment`
 
 ## 개요
 
@@ -30,7 +30,7 @@ AEUI는 **VNode**과 **RuntimeNode**를 명확히 분리한다.
 | 생명주기 | 매 render마다 새로 생성 | old/new 비교 과정에서 재사용 |
 | 소유하는 것 | tag, props, children | DOM 참조, lifecycle state, 자식 관계 |
 
-VNode은 `createVNode`이 매번 새로 만드는 가벼운 객체이고, RuntimeNode는 `reconcile`이 VNode을 기반으로 생성하고 유지하는 실행 중 객체이다. RuntimeNode의 상세 구조는 `instance.md`를 참조한다.
+VNode은 `createVNode`이 매번 새로 만드는 가벼운 객체이고, RuntimeNode는 `reconcile`이 VNode을 기반으로 생성하고 유지하는 실행 중 객체이다. RuntimeNode의 상세 구조는 [04. RuntimeNode 관리](04-instance.md)를 참조한다.
 
 ---
 
@@ -70,6 +70,14 @@ VNode은 `createVNode`이 매번 새로 만드는 가벼운 객체이고, Runtim
 ### `key`의 위치
 
 `key`는 `props` 안에 그대로 남아 있으며, 컴포넌트에서는 `props.key`로 읽을 수 있다. 다만 `updateDomProps`에서 `key`를 건너뛰므로 DOM attribute로는 렌더되지 않는다. reconcile 중 형제 노드 매칭에 사용된다.
+
+### VNODE_MARKER
+
+```js
+export const VNODE_MARKER = Symbol.for('aeui.vnode');
+```
+
+`Object.defineProperty`로 `enumerable: false`로 설정되어 `Object.keys()`에 나타나지 않는다. VNode 판별은 `{ tag, props, children }` 구조가 아니라 **이 마커의 존재 여부**로만 수행한다.
 
 ---
 
@@ -291,3 +299,8 @@ Fragment는 함수이지만, Babel 플러그인이 이를 일반 컴포넌트로
 - `createElement` alias: `packages/core/src/core.js`
 - `Fragment`: `packages/core/src/core.js`
 - `isFragmentVNode`: `packages/core/src/vnode-helpers.js`
+
+## 관련 문서
+
+- RuntimeNode 구조: [04. RuntimeNode 관리](04-instance.md)
+- Reconciliation: [03. Reconciliation](03-reconciler.md)

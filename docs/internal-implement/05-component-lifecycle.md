@@ -1,53 +1,6 @@
-# 03. 컴포넌트 내부
+# 05. 컴포넌트 생명주기
 
-이 문서는 AEUI 컴포넌트의 내부 실행 흐름 — RuntimeNode 구조, setup/render 과정, context 스택, commit과 cleanup을 설명한다.
-
----
-
-## RuntimeNode 구조
-
-VNode은 매 렌더의 **설계도**(입력)이고, RuntimeNode는 렌더 사이에 **유지되는** 실행 상태이다.
-
-### 공통 필드
-
-```js
-{
-  kind: null,          // 'text', 'host', 'fragment', 'component', 'root'
-  key: null,           // sibling 매칭용
-  vnode,               // 현재 렌더의 VNode
-  parent: parentNode,  // 논리적 부모
-  parentDom,           // DOM 부모
-  children: [],
-  firstDom: null,
-  lastDom: null,
-  isMounted: true,
-}
-```
-
-### kind별 추가 필드
-
-```js
-// text
-{ kind: 'text', value: String(vnode), dom: null }
-
-// host
-{ kind: 'host', tag: vnode.tag, dom: null, props: vnode.props || {} }
-
-// fragment
-{ kind: 'fragment' }
-
-// component — 핵심
-{
-  kind: 'component',
-  component: vnode.tag,        // 컴포넌트 함수
-  props: vnode.props || {},
-  watchStates: [],             // 등록된 watcher 목록
-  cleanups: [],                // 등록된 cleanup 함수 목록
-  renderedNode: null,          // 렌더 결과 RuntimeNode
-  renderFactory: null,         // setup이 반환한 렌더 함수
-  render: null,                // renderFactory alias
-}
-```
+이 문서는 AEUI 컴포넌트의 내부 실행 흐름 — setup/render 과정, context 스택, commit과 cleanup을 설명한다.
 
 ---
 
@@ -191,6 +144,15 @@ cleanupComponentNode(state, node, options)
 
 ---
 
+## 관련 코드 위치
+
+- `packages/core/src/component-lifecycle.js`
+- `packages/core/src/runtime-context.js`
+- `packages/core/src/compiler-runtime.js`
+
 ## 관련 문서
 
-- Watcher 실행 상세: [04. 스케줄러와 Dirty Checking](04-scheduler-and-dirty-checking.md)
+- RuntimeNode 구조: [04. RuntimeNode 관리](04-instance.md)
+- Watcher 실행 상세: [15. Watcher 실행](15-watcher.md)
+- 스케줄러: [06. 스케줄러](06-scheduler.md)
+- 런타임 컨텍스트 상세: [13. 런타임 컨텍스트](13-runtime-context.md)

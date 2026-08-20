@@ -1,4 +1,4 @@
-# Unmount — `unmountNode`
+# 09. Unmount — `unmountNode`
 
 ## 개요
 
@@ -156,15 +156,6 @@ function removeDomRange(parentDom, node) {
 
 ### `watchStates`, `cleanups` 배열 비우기, `renderedNode` 해제
 
-```javascript
-if (node.kind === 'component') {
-  cleanupComponentNode(state, node, {
-    preserveChildren: true,
-    preserveDomRange: true,
-  });
-}
-```
-
 `cleanupComponentNode()`가 배열을 빈 배열로 교체하여, watcher의 `callback`, `getDeps` 함수와 cleanup 함수에 대한 **참조를 해제**한다. 이 함수들이 클로저로 참조하는 변수들이 가비지 컬렉션되어 메모리가 회수될 수 있게 한다.
 
 `renderedNode = null`과 `renderFactory = null`로 설정하여 이전 렌더 결과의 subtree 참조도 해제한다.
@@ -195,3 +186,8 @@ if (node.kind === 'component') {
 - `removeDomRange`: `packages/core/src/reconciler.js`
 - `getDomNodesInRange`: `packages/core/src/reconciler.js`
 - `clean` 훅 (cleanup 등록): `packages/core/src/hook-registry.js`
+
+## 관련 문서
+
+- 컴포넌트 생명주기: [05. 컴포넌트 생명주기](05-component-lifecycle.md)
+- 훅 레지스트리: [14. 훅 레지스트리](14-hook-registry.md)

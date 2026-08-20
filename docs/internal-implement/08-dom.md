@@ -1,10 +1,22 @@
-# DOM 조작 — `createDomNode`, `updateDomProps`, `updateProps`
+# 08. DOM 조작 — `createDomNode`, `updateDomProps`, `updateProps`
 
 ## 개요
 
 이 함수들은 AEUI에서 **실제 브라우저 DOM을 조작**하는 역할을 담당한다.
 
 `reconcile`이 "무엇을 변경할지" (어떤 노드를 추가/수정/삭제할지) 결정하면, 이 함수들이 "실제 DOM에 어떻게 적용할지"를 처리한다. AEUI 내부에서 `document.createElement`, `setAttribute`, `addEventListener` 등 브라우저 API를 직접 호출하는 곳은 여기뿐이다.
+
+---
+
+## 함수 목록
+
+| 함수 | 역할 |
+|------|------|
+| `createDomNode(state, vnode)` | VNode으로부터 DOM 요소 생성 |
+| `updateDomProps(state, domNode, props, oldProps)` | DOM 속성 diff 및 적용 |
+| `updateProps(target, newProps)` | 컴포넌트 props 객체 내용 교체 |
+| `cloneHostPropsSnapshot(state, props)` | host node의 props 스냅샷 생성 |
+| `syncHostControlledProps(state, node)` | `value`/`checked` controlled prop 동기화 |
 
 ---
 
@@ -33,7 +45,17 @@ export function createDomNode(state, vnode) {
 
 ---
 
-## `updateDomProps(domNode, props, oldProps)`
+## `cloneHostPropsSnapshot(state, props)`
+
+host node의 props를 deepClone으로 독립적 스냅샷을 만든다. `children`, `key`, `ref`는 DOM 속성이 아니므로 스냅샷에 포함하지 않는다.
+
+JSX transform이 개발용 metadata로 주입하는 `__self`, `__source`도 스냅샷에서 제외한다. 특히 `__self`는 컴포넌트 인스턴스 노드 전체를 가리킬 수 있으므로 deepClone 대상에 포함되면 인스턴스 트리와 DOM 참조를 따라가며 메모리 폭증을 일으킬 수 있다.
+
+이전 props를 `deepClone`으로 저장해두므로, **같은 style 객체를 직접 수정해도** 다음 렌더에서 변경이 감지된다.
+
+---
+
+## `updateDomProps(state, domNode, props, oldProps)`
 
 DOM 요소의 **속성(attribute, property)을 업데이트**한다. 새 props와 이전 props를 비교하여 **실제로 변경된 부분만** 적용한다.
 
@@ -52,9 +74,9 @@ DOM 요소의 **속성(attribute, property)을 업데이트**한다. 새 props�
    → 이전과 현재의 모든 key를 수집 (사라진 속성도 감지하기 위함)
 
 2. 각 key에 대해 순서대로:
-   ├── key가 children, key, ref → 건너뜀 (DOM 속성이 아님)
+   ├── key가 children, key, ref, __self, __source → 건너뜀
    ├── file-input value 특례인지 계산
-   ├── 새 값과 이전 값이 같고 file-input value 특례가 아니면 (`deepEqual`) → 건너뜀
+   ├── 새 값과 이전 값이 같고 file-input value 특례가 아니면 (deepEqual) → 건너뜀
    ├── key가 on으로 시작 + 함수값 → 이벤트 핸들러 처리
    ├── key === "className" → className 처리
    ├── key === "style" + 객체값 → style 객체 처리
@@ -96,6 +118,8 @@ if (key === 'children' || key === 'key' || key === 'ref') continue;
 | `children` | `createVNode`이 children을 props에도 저장하지만, 이것은 DOM 속성이 아니다. 자식 요소 처리는 `reconcile`이 담당한다 |
 | `key` | reconciliation에서 형제 노드를 식별하는 내부 힌트다. DOM 속성으로 설정하면 안 된다 |
 | `ref` | AEUI 내부용으로 예약한 값이므로 DOM 속성으로 설정하지 않는다 |
+
+`__self`, `__source`도 JSX transform이 개발용으로 넣는 metadata이므로 DOM 속성으로 내려보내지 않는다.
 
 ### 변경 감지 (불필요한 DOM 조작 방지)
 
@@ -170,7 +194,9 @@ if (key.startsWith("on")) {
 ```
 
 인라인 화살표 함수(`() => count++`)는 렌더 함수가 실행될 때마다 **새 함수 객체**가 생성된다. `deepEqual`은 함수를 참조 비교(`Object.is`)하므로 매번 "다름"으로 판단된다.  
-이 구현은 DOM 리스너를 매번 재등록하지 않고, 저장된 핸들러 참조만 갱신하므로 불필요한 `removeEventListener`/`addEventListener` 호출을 줄인다. 동시에 이벤트가 끝날 때 전체 루트 렌더를 앞당길 수 있으므로, 클릭과 입력 같은 상호작용은 polling 주기를 기다리지 않고 다음 프레임에 반영된다.
+이 구현은 DOM 리스너를 매번 재등록하지 않고, 저장된 핸들러 참조만 갱신하므로 불필요한 `removeEventListener`/`addEventListener` 호출을 줄인다.
+
+> **이벤트 핸들러 변경은 `didMutate`를 true로 만들지 않는다.** DOM write가 아니므로 polling backoff에 영향을 주지 않는다.
 
 ---
 
@@ -184,7 +210,7 @@ if (key === 'className') {
 
 JSX에서는 HTML의 `class` 대신 `className`을 사용한다 (JavaScript의 `class` 예약어와의 충돌 방지). DOM의 `.className` 프로퍼티에 직접 할당하면 HTML `class` 속성으로 올바르게 반영된다.
 
-`newValue`가 `null`이나 `undefined`면 빈 문자열로 설정하여 이전 class를 제거한다. (`??`는 nullish coalescing 연산자로, 왼쪽이 `null` 또는 `undefined`일 때 오른쪽 값을 반환한다)
+`newValue`가 `null`이나 `undefined`면 빈 문자열로 설정하여 이전 class를 제거한다.
 
 ---
 
@@ -231,7 +257,7 @@ const type = Object.prototype.hasOwnProperty.call(props, 'type')
 const isFileInput = tag === 'input' && String(type).toLowerCase() === 'file';
 ```
 
-text input이 file input으로 바뀌는 경우에도 이전 `value` attribute를 제거한다. children을 처리한 뒤 controlled property를 다시 맞추는 경로에서도 같은 대소문자 무관 판정을 사용하며, file input의 `value` property에는 값을 쓰지 않는다.
+text input이 file input으로 바뀌는 경우에도 이전 `value` attribute를 제거한다.
 
 ---
 
@@ -251,7 +277,7 @@ if (key.startsWith('aria-')) {
 }
 ```
 
-따라서 `aria-hidden={true}`는 `aria-hidden="true"`, `aria-hidden={false}`는 `aria-hidden="false"`가 된다. null이나 undefined일 때만 attribute를 제거한다. 이 branch에서는 `domNode[key]`에 값을 쓰지 않으므로 같은 이름의 임의 property를 만들지 않는다.
+따라서 `aria-hidden={true}`는 `aria-hidden="true"`, `aria-hidden={false}`는 `aria-hidden="false"`가 된다. null이나 undefined일 때만 attribute를 제거한다.
 
 ---
 
@@ -267,10 +293,6 @@ if (typeof newValue === 'boolean') {
 
 `aria-*`가 아닌 `disabled`, `checked`, `readOnly` 같은 boolean 속성은 **프로퍼티와 attribute 양쪽에 모두 반영**해야 올바르게 동작한다.
 
-- `domNode[key] = true`: JavaScript에서 `input.disabled`으로 접근할 때 올바른 값을 반환하도록 함
-- `setAttribute(key, '')`: HTML에서 `<input disabled>`로 렌더링되도록 함 (빈 문자열이 HTML boolean attribute의 표준)
-- `false`일 때 `removeAttribute`: `<input>` (disabled 없음)으로 렌더링
-
 ---
 
 ### attribute 제거
@@ -284,17 +306,48 @@ if (newValue === undefined || newValue === null) {
 }
 ```
 
-새 props에 해당 key가 없거나 값이 `null`이면, DOM에서 해당 attribute를 제거한다.
+새 props에 해당 key가 없거나 값이 `null`이면, DOM에서 해당 attribute를 제거한다. 기존 값이 boolean prop이었다면 DOM property도 `false`로 되돌려야 브라우저 내부 상태가 남지 않는다.
 
-이때 기존 값이 boolean prop(`checked`, `disabled`, `readOnly` 등)이었다면 attribute만 지우면 부족하다. DOM property도 `false`로 되돌려야 브라우저 내부 상태가 남지 않는다.
+---
 
-### 일반 attribute 설정
+## `syncHostControlledProps(state, node)`
 
-```javascript
-domNode.setAttribute(key, newValue);
+`<input>`, `<select>`, `<textarea>`의 `value`/`checked`를 DOM property와 동기화한다.
+
+이 함수가 필요한 이유:
+
+1. `<select>`는 `<option>` children이 모두 렌더된 뒤에야 `value`를 설정할 수 있다.
+2. `<input type="file">`의 `value`는 보안상 DOM property에 직접 쓸 수 없다.
+
+`updateDomProps()`도 같은 규칙을 따른다. children을 처리한 뒤 controlled property를 다시 맞추는 경로에서도 같은 대소문자 무관 판정을 사용하며, file input의 `value` property에는 값을 쓰지 않는다.
+
+사용자가 input 값을 직접 바꿔도 같은 props로 다음 reconcile하면 **controlled 값으로 복구**된다.
+
+---
+
+## Host Node의 Mount/Update 순서
+
+### Mount
+
+```
+1. createDomNode(vnode)        → DOM 요소 생성
+2. parentDom에 삽입
+3. props snapshot 저장
+4. children reconcile
+5. controlled props 동기화
 ```
 
-`id`, `href`, `src`, `data-*` 등 일반 문자열/숫자 속성은 `setAttribute`로 DOM에 반영한다. `aria-*`는 앞의 전용 branch가 먼저 처리한다.
+### Update
+
+```
+1. updateDomProps()            ← props diff (children보다 먼저)
+2. vnode/key/tag 갱신
+3. props snapshot 저장
+4. children reconcile
+5. controlled props 동기화     ← children 뒤에
+```
+
+**순서가 중요:** props diff가 children보다 먼저지만, controlled value의 최종 동기화는 option children mount 후에.
 
 ---
 
@@ -315,29 +368,17 @@ updateProps(target, newProps) {
 
 컴포넌트 setup에서 컴파일러가 만든 props 저장 객체는 클로저에 의해 참조가 유지된다. 새 객체를 만들면 클로저의 참조가 끊어지므로, **같은 객체를 유지하면서 내용만 교체**해야 한다.
 
-아래의 `_props`는 설명을 위한 이름이다. 실제 변환 결과에서는 컴파일러가 현재 스코프와 충돌하지 않는 식별자를 만들며, 그 이름은 공개 API가 아니다.
-
-```javascript
-// Babel이 변환한 코드 (개념적 이해를 위한 단순화)
-function Counter(_initialProps) {
-  const _props = { ..._initialProps };  // ← 이 객체의 참조가 클로저에 유지됨
-
-  return (_newProps) => AEUI.__runtime.runRenderPhase(
-    _newProps,
-    _props,
-    () => {
-      // runRenderPhase가 _props의 내용을 교체한 뒤 이 함수를 실행한다.
-      // ... _props에서 최신 값을 읽어 렌더링 ...
-    }
-  );
-}
-```
-
 delete-then-assign 방식은 `Object.keys` 비교 등 더 정교한 방법보다 단순하다. 초기 코드 복잡성을 피하기 위한 설계이다.
 
-### 이전에 있던 prop이 사라지는 경우 처리
+---
 
-delete로 모든 key를 먼저 삭제하므로, 이전에 `{ name: "A", count: 1 }`이었고 이번에 `{ name: "B" }`만 전달되면 `count`는 자연스럽게 사라진다.
+## 이전 모듈과의 분리
+
+이전에는 이 함수들이 `reconciler.js`에 직접 포함되어 있었다. 분리 후:
+
+- reconciler는 "무엇을 바꾸는가"만 결정한다.
+- dom-host는 "DOM에 어떻게 쓰는가"를 담당한다.
+- controlled props 동기화 로직이 한곳에 모여 있다.
 
 ---
 
@@ -348,3 +389,7 @@ delete로 모든 key를 먼저 삭제하므로, 이전에 `{ name: "A", count: 1
 - `updateProps`: `packages/core/src/dom-host.js`
 - `cloneHostPropsSnapshot`: `packages/core/src/dom-host.js`
 - `syncHostControlledProps`: `packages/core/src/dom-host.js`
+
+## 관련 문서
+
+- Reconciliation 전체 흐름: [03. Reconciliation](03-reconciler.md)

@@ -1,4 +1,4 @@
-# RuntimeNode 관리 — `node-factory`, `runtime-context`, `component-lifecycle`
+# 04. RuntimeNode 관리 — `node-factory`, `runtime-context`, `component-lifecycle`
 
 ## 개요
 
@@ -147,68 +147,6 @@ component의 경우 `createComponentNode()`가 `watchStates`, `cleanups`, `rende
 
 ---
 
-## 컴포넌트 컨텍스트와 phase
-
-`runtime-context.js`는 현재 실행 중인 컴포넌트와 phase를 관리한다. 구현은 단일 글로벌 포인터가 아니라 active runtime stack이다.
-
-```javascript
-withComponentContext(state, node, 'setup', () => {
-  // watch/clean 등록 가능
-});
-
-withComponentContext(state, node, 'render', () => {
-  // render 실행
-});
-```
-
-관리되는 값은 다음 세 가지다.
-
-| 필드 | 의미 |
-|------|------|
-| `currentComponentNode` | 현재 실행 중인 component node |
-| `currentComponentPhase` | `setup` 또는 `render` |
-
-### 왜 phase가 필요한가
-
-과거에는 "현재 component가 있는가"만으로 hook 등록 여부를 판단했다. 이제는 phase까지 함께 검사한다.
-
-- `watch()`와 `clean()`은 `setup` phase에서만 등록된다.
-- render 중에 호출된 `watch()`는 무시된다.
-- 예외가 발생해도 `finally`에서 컨텍스트가 복구된다.
-- 중첩된 component setup/render가 생겨도 바깥 runtime 컨텍스트가 stack으로 복원된다.
-
----
-
-## component lifecycle
-
-component node는 `component-lifecycle.js`가 관리한다.
-
-### setup
-
-```javascript
-setupComponentNode(state, node)
-```
-
-- `renderFactory`가 없을 때만 setup을 실행한다.
-- setup은 `withComponentContext(..., 'setup')` 안에서 실행된다.
-- 결과로 받은 render 함수를 `renderFactory`에 저장한다.
-
-### render
-
-```javascript
-renderComponentNode(state, parentDom, node, nextProps, beforeDom)
-```
-
-이 함수가 component mount/update 공통 진입점이다.
-
-1. props 동기화
-2. 필요하면 setup 실행
-3. render factory 호출
-4. render 결과 VNode를 `state.reconcile()`로 subtree diff
-5. `renderedNode`, `children`, `firstDom`, `lastDom` 갱신
-
----
-
 ## DOM ownership — `firstDom` / `lastDom`
 
 `fragment`와 `component`는 자체 DOM이 없을 수 있으므로, AEUI는 단일 `dom` 대신 DOM range를 관리한다.
@@ -248,3 +186,9 @@ renderComponentNode(state, parentDom, node, nextProps, beforeDom)
 - `packages/core/src/runtime-context.js`
 - `packages/core/src/component-lifecycle.js`
 - `packages/core/src/runtime-state.js`
+
+## 관련 문서
+
+- 컴포넌트 생명주기: [05. 컴포넌트 생명주기](05-component-lifecycle.md)
+- Reconciliation: [03. Reconciliation](03-reconciler.md)
+- 런타임 컨텍스트 상세: [13. 런타임 컨텍스트](13-runtime-context.md)
