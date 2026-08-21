@@ -1,18 +1,18 @@
 # 계획 기능
 
-이 문서는 아직 현재 AEUI 스펙에 포함하지 않은 기능과 개선 작업을 관리한다. 여기 적힌 내용은 지금 반드시 구현해야 하는 동작이나 테스트 기대값이 아니다.
+이 문서는 아직 `user-scenario`에서 약속하지 않은 기능과 개선 작업을 관리한다. 여기 적힌 내용은 지금 반드시 구현해야 하는 동작이나 테스트 기대값이 아니다. 현재 계약을 구현하지 못한 항목은 여기가 아니라 [`known-defects.md`](known-defects.md)에서 추적한다.
 
 ## 높은 우선순위
 
 ### 공식 적합성 suite 구축
 
-- 모든 테스트가 검증하는 스펙 조항을 직접 가리키게 한다.
-- 기존 `example/test` assertion을 계약으로 복사하지 않고 기대값을 스펙에서 도출한다.
+- 모든 테스트가 검증하는 `user-scenario` 문장을 직접 가리키게 한다.
+- 기존 `example/test` assertion을 계약으로 복사하지 않고 기대값을 `user-scenario`에서 도출한다.
 - 값/VNode, compiler, runtime/DOM, router/Vite, package 소비와 reference app 계층을 분리한다.
 - fragment reorder, nested destructuring props와 render parameter 조합, cleanup/watch ordering을 독립 시나리오로 검증한다.
 - source 직접 import와 빌드된 package entry를 분리하고 ESM/CJS package-consumer smoke를 자동화한다.
 - `create-aeui-app` CLI를 별도 임시 디렉터리에서 검증하는 공식 suite를 추가한다.
-- 12장(소스 파일 배치)의 파일 경계와 private 심볼 배치는 source import를 통해 검증한다 (10장의 예외 조항).
+- [17. 소스 배치](../internal-implement/17-source-layout.md)의 파일 경계와 private 심볼 배치는 source import를 통해 검증한다 ([18. 적합성 검증](../internal-implement/18-conformance.md)의 예외 조항).
 
 ## 중간 우선순위
 
@@ -82,10 +82,8 @@ JSX 변환 단계가 필요한 Fragment를 자동 삽입해 사용자가 직접 
 
 ### 문서 보강
 
-- Level 1: AEUI의 역할과 간결한 사용자 경험
-- Level 2: 일반 변수 반응성과 compiler 기반 문법의 개념
-- Level 3: 앱 작성에 필요한 내부 모델
-- internals: AEUI 기여자를 위한 모듈 경계와 구현 근거
+- `user-scenario`: AEUI의 역할과 간결한 사용자 경험, 일반 변수 반응성과 compiler 기반 문법의 개념
+- `internal-implement`: 앱 작성에 필요한 내부 모델, 기여자를 위한 모듈 경계와 구현 근거
 
 ## 장기 계획
 

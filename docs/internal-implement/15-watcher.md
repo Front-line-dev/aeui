@@ -4,6 +4,11 @@
 
 watcher는 `watch()` 훅으로 등록된 의존성 감시 엔트리다. 실제 실행 엔진은 `component-watchers.js`와 `component-lifecycle.js`가 맡고, 등록은 Babel 플러그인이 만든 compiled helper 경로로 들어온다.
 
+watcher는 두 모드로 동작한다.
+
+- **deps 기반** (`watch(cb, deps)`): deps가 변경된 때만 callback 실행. 처음 등록 시에는 실행하지 않는다.
+- **항상 실행** (`watch(cb)`): 매 render마다 render 직전에 callback 실행. **첫 번째 render에서도 실행된다.**
+
 책임 분리는 다음과 같다.
 
 - `app-runtime.js` / `AEUI.__runtime.watch`: compiled path watcher 등록
@@ -30,6 +35,13 @@ runComponentWatchers(state, node)
 
 ```javascript
 node.watchStates.forEach((watcher) => {
+  if (!watcher.getDeps) {
+    // 항상 실행 모드: deps 비교 없이 매 render에서 callback 실행
+    watcher.callback();
+    return;
+  }
+
+  // deps 기반 모드
   const newDeps = watcher.getDeps();
   const hasChanged = !watcher.oldDeps || !state.deepEqual(newDeps, watcher.oldDeps);
 
@@ -80,6 +92,16 @@ return <p>{label}</p>;
 ```
 
 watcher를 render 전에 실행해야 `label` 변경이 같은 render 결과에 바로 반영된다.
+
+### 첫 번째 render에서의 실행
+
+항상 실행 모드(`watch(cb)`)는 첫 번째 render에서도 render 직전에 callback을 실행한다. 사용자 시나리오의 "매 렌더마다" 정의를 그대로 따른다.
+
+deps 기반 모드(`watch(cb, deps)`)는 첫 번째 render에서는 실행하지 않는다. 등록 시점에 `oldDeps`를 초기화하므로, 첫 render에서는 항상 이전 deps와 같다.
+
+### 실행 순서
+
+등록된 순서대로 실행된다. 항상 실행 watcher와 deps 기반 watcher가 섞여 있어도 등록 순서를 유지한다.
 
 ---
 

@@ -5,11 +5,23 @@ React와 유사한 VDOM 기반의 프레임워크이나, Dirty Checking 반응�
 
 ## 1. 프로젝트 구조 (Monorepo)
 - **`packages/core`**: 프레임워크의 핵심 런타임 및 컴파일러 플러그인이 위치합니다.
-  - `src/core.js`: VDOM 생성, Diffing, Reconciliation, 인스턴스 트리 관리, Polling(`tick`) 기반 반응성 루프.
-  - `src/hooks.js`: `watch`, `clean` 등의 훅 정의.
-  - `src/babel-plugin.js`: AEUI 전용 Babel 플러그인. JSX 변환, 컴포넌트 래핑(`() => JSX`), 의존성 주입 등 필수적인 트랜스파일링 담당.
+  - `src/core.js`: VDOM 생성, 앱 초기화, 런타임 bridge.
+  - `src/reconciler.js`: Diffing, Reconciliation, DOM 갱신.
+  - `src/scheduler.js`: Polling(`tick`) 기반 반응성 루프.
+  - `src/component-lifecycle.js`: setup/render 실행 흐름.
+  - `src/component-watchers.js`: watch 실행 엔진.
+  - `src/hook-registry.js`: watch/clean 등록 로직.
+  - `src/hooks.js`: `watch`, `clean` public API.
+  - `src/deep-compare.js`: `_deepEqual`, `_deepClone`.
+  - `src/dom-host.js`: DOM props 적용, 이벤트 프록시, controlled input.
+  - `src/babel-plugin.js`: AEUI 전용 Babel 플러그인.
+  - `src/compiler-runtime.js`: Babel output ↔ runtime 연결.
+  - `src/app-runtime.js`: `createAppRuntime`, state 격리.
+  - `src/runtime-context.js`: active runtime stack, phase 관리.
+  - `src/router.js`: 디렉터리 라우터.
+  - `src/vite-plugin.js`: Vite 플러그인.
 - **`packages/create-aeui-app`**: CLI 도구.
-- **`docs/`**: 디자인 문서 및 사용자 가이드 (주로 한글 작성).
+- **`docs/`**: 사용자 시나리오(`user-scenario/`), 내부 구현(`internal-implement/`), 이슈(`issue/`). 주로 한글 작성.
 - **`example/`**: 테스트 및 데모용 애플리케이션 (`vite-demo`, `shoppingCart` 등).
 
 ## 2. 핵심 아키텍처 및 철학
@@ -26,8 +38,8 @@ React와 유사한 VDOM 기반의 프레임워크이나, Dirty Checking 반응�
   - DOM 조작은 `core.js`의 `_reconcile` 함수에서 수행됩니다.
 
 ## 3. 개발 규칙 (Rules)
-- **문서화**: 새로운 기능 추가나 변경 시 `docs/` 내의 문서(특히 `spec.md`)를 최신화해야 합니다. 문서는 주로 **한국어**로 작성합니다.
+- **문서화**: 새로운 기능 추가나 변경 시 `docs/user-scenario/`를 먼저 확인하고, 불일치가 있으면 `docs/issue/known-defects.md` 또는 `docs/issue/planned-features.md`에 기록합니다. 문서는 주로 **한국어**로 작성합니다.
 - **Babel 의존성 주의**: 컴포넌트 코드를 작성하거나 분석할 때, 항상 **Babel 플러그인에 의해 변환될 결과**를 염두에 두어야 합니다. (예: `watch`의 의존성 배열 `[a, b]`는 `() => [a, b]`로 변환됨).
 - **파일 시스템**:
   - 프레임워크 코어 수정은 오직 `packages/core` 내에서만 이루어져야 합니다.
-  - 테스트는 `example/` 디렉토리의 프로젝트를 활용합니다.
+  - 테스트는 `example/` 디렉터리의 프로젝트를 활용합니다.

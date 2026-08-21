@@ -13,7 +13,12 @@
 
 ## watch 훅
 
-`watch`는 특정 값의 변경을 감시하고, 값이 바뀌면 콜백을 실행하는 훅이다.
+`watch`는 특정 값의 변경을 감시하거나, 매 render마다 콜백을 실행하는 훅이다. 두 가지 모드가 있다.
+
+| 모드 | 호출 | 실행 시점 |
+|---|---|---|
+| **항상 실행** | `watch(cb)` | 매 render마다 렌더 직전에 callback 실행 |
+| **deps 기반** | `watch(cb, deps)` | 처음 등록 시는 실행하지 않고, 이후 deps 변경 시만 실행 |
 
 - React `useEffect`처럼 보이지만, 실행 타이밍은 AEUI의 render phase와 dirty checking 루프에 맞춰져 있다.
 - deps 비교는 참조 비교가 아니라 `deepEqual` 기반 값 비교다.
@@ -30,13 +35,14 @@ watch(() => {
 ### 함수 시그니처
 
 ```javascript
-watch(callback, deps)
+watch(callback)         // 항상 실행 모드
+watch(callback, deps)   // deps 기반 모드
 ```
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
-| `callback` | `Function` | 변경 시 실행할 함수 |
-| `deps` | `Array` 또는 `() => Array` | 감시할 값 배열 또는 배열을 반환하는 함수 |
+| `callback` | `Function` | 변경 시(또는 매 render시) 실행할 함수 |
+| `deps` | `Array` 또는 `() => Array` (선택) | 감시할 값 배열 또는 배열을 반환하는 함수. 생략하면 매 render마다 실행 |
 
 Babel 플러그인은 `watch(callback, [count])`의 deps 배열을 getter 형태로 바꾸고, 호출 지점도 `AEUI.__runtime.watch(...)` helper로 옮긴다.
 
@@ -65,12 +71,14 @@ compiled main path에서는 `AEUI.__runtime.watch(...)`가 현재 runtime state�
 1. getSetupComponentNode(runtime) → setup phase의 component node
 2. node가 없으면 리턴 (render phase이거나 컴포넌트 밖)
 3. callback이 함수가 아니면 TypeError
-4. deps가 없거나 배열/배열 getter가 아니면 TypeError
-5. getDeps: deps getter를 매번 호출해 현재 deps 배열을 읽는 함수 생성
-6. node.watchStates에 watcher 객체 push
+4-a. deps가 없으면 → 항상 실행 모드 watcher 등록 (getDeps: null)
+4-b. deps가 있으면 배열/배열 getter 검증 후 deps 기반 watcher 등록
+5. node.watchStates에 watcher 객체 push
 ```
 
 등록되는 watcher 객체:
+
+**deps 기반 모드:**
 
 ```javascript
 {
@@ -80,7 +88,19 @@ compiled main path에서는 `AEUI.__runtime.watch(...)`가 현재 runtime state�
 }
 ```
 
-`deepClone`을 쓰는 이유는 배열/객체 deps의 mutation도 감지하기 위해서다.
+**항상 실행 모드 (deps 없음):**
+
+```javascript
+{
+  callback,
+  getDeps: null,
+  oldDeps: null,
+}
+```
+
+`getDeps`가 `null`이면 deps 비교를 건너뛰고 매 render에서 callback을 실행한다.
+
+deps 기반 모드에서 `deepClone`을 쓰는 이유는 배열/객체 deps의 mutation도 감지하기 위해서다.
 
 #### 실행 경로
 

@@ -47,27 +47,9 @@ my-app/
 
 ---
 
-## AEUI 앱의 기본 구조
+## 첫 페이지 작성
 
-### import
-
-AEUI에서 사용하는 것은 **세 가지**뿐입니다:
-
-```js
-import { AEUI, watch, clean } from 'aeui';
-```
-
-| 이름 | 역할 |
-|---|---|
-| `AEUI` | 앱 초기화, VNode 생성, 화면 갱신 |
-| `watch` | 특정 값이 바뀌었을 때 실행할 콜백 등록 |
-| `clean` | 컴포넌트가 제거될 때 실행할 정리 작업 등록 |
-
-> **팁:** JSX를 사용하면 `AEUI`는 자동으로 import됩니다. `watch`와 `clean`은 필요할 때만 가져오세요.
-
-### 컴포넌트 작성
-
-AEUI의 컴포넌트는 JSX를 반환하는 함수입니다:
+`src/pages/index.jsx`를 열어 내용을 바꿔 보세요:
 
 ```jsx
 export default function HomePage() {
@@ -80,13 +62,27 @@ export default function HomePage() {
 }
 ```
 
-React와 비슷하게 보이지만, 동작 원리는 다릅니다. 자세한 내용은 [02. 컴포넌트](02-components.md)에서 설명합니다.
+저장하면 브라우저가 즉시 갱신됩니다. AEUI 컴포넌트는 JSX를 반환하는 함수입니다. React와 비슷하게 보이지만 동작 원리가 다릅니다 — 자세한 내용은 [02. 컴포넌트](02-components.md)에서 설명합니다.
 
-### 앱 초기화
+---
 
-`src/pages/` 디렉토리를 사용하면 앱 초기화는 **자동**입니다. Vite 플러그인이 알아서 처리합니다.
+## 컴포넌트는 어떻게 화면에 나타나나?
 
-만약 라우터 없이 단일 앱을 만들고 싶다면, `src/App.jsx`를 만들고 수동으로 초기화할 수 있습니다:
+작성한 컴포넌트가 브라우저에 표시되려면, 누군가가 그 컴포넌트를 HTML 페이지의 실제 DOM 요소에 연결해야 합니다. `create-aeui-app`으로 만든 프로젝트에서는 이 과정이 **자동**입니다.
+
+### `src/pages/`가 있을 때 (기본)
+
+Vite 플러그인이 다음을 자동으로 수행합니다:
+
+1. `index.html`의 `<div id="root">`를 찾고
+2. `src/pages/` 안의 파일들을 URL과 연결한 라우터를 만들고
+3. 라우터를 `<div id="root">`에 연결합니다
+
+따라서 별도의 코드를 작성할 필요가 없습니다.
+
+### `src/pages/`가 없을 때
+
+라우터 없이 단일 컴포넌트로 앱을 구성하고 싶다면, `src/App.jsx`를 만드세요:
 
 ```jsx
 // src/App.jsx
@@ -95,30 +91,9 @@ export default function App() {
 }
 ```
 
-이 경우 `src/pages/` 디렉토리가 없으면 Vite 플러그인이 자동으로 `App.jsx`를 진입점으로 사용합니다.
+Vite 플러그인이 `App.jsx`를 진입점으로 삼아 `<div id="root">`에 연결합니다.
 
----
-
-## vite.config.js
-
-생성된 프로젝트의 Vite 설정은 간단합니다:
-
-```js
-import { defineConfig } from 'vite';
-import aeui from 'aeui/vite';
-
-export default defineConfig({
-  plugins: [aeui()]
-});
-```
-
-`aeui()` 플러그인이 다음을 자동으로 처리합니다:
-- AEUI Babel 변환과 JSX 변환
-- 앱 부트스트랩 코드 생성
-- 디렉터리 라우팅 설정
-- `@` 경로 별칭 (`@ → src/`)
-
-설정 옵션에 대한 자세한 내용은 [07. 프로젝트 설정](07-project-config.md)을 참고하세요.
+> **참고:** Vite 플러그인 옵션이나 빌드 설정에 대해서는 [07. 프로젝트 설정](07-project-config.md)을 참고하세요.
 
 ---
 

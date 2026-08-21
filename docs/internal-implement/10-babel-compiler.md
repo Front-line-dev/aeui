@@ -13,7 +13,7 @@ AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은
 | **Runtime import 주입** | JSX 또는 compiled helper 사용 | `import { AEUI } from 'aeui'` 자동 추가 | 사용자가 JSX 때문에 `AEUI` import를 직접 쓰지 않도록 함 |
 | **Return 래핑** | `return <div />` | `return () => <div />` | setup 1회 실행 + render 반복 실행 구조 생성 |
 | **Props 반응화** | `function Comp(props)` | 초기 props 파라미터 + 내부 props 저장 객체 | props 변경 시 클로저 참조를 최신 상태로 유지 |
-| **Hook 연결** | `watch(cb, [count])`, `clean(cb)` | `AEUI.__runtime.watch(...)`, `AEUI.__runtime.clean(...)` | 활성 앱 런타임에 hook 등록을 위임 |
+| **Hook 연결** | `watch(cb, [count])`, `watch(cb)`, `clean(cb)` | `AEUI.__runtime.watch(...)`, `AEUI.__runtime.clean(...)` | 활성 앱 런타임에 hook 등록을 위임 |
 
 플러그인은 JSX 또는 compiled helper가 `AEUI` 식별자를 필요로 하는 파일에 named import를 자동으로 넣는다. 기존 `import { watch } from 'aeui'`가 있으면 같은 import 선언에 `AEUI` specifier를 추가하고, import가 없으면 새 import 선언을 만든다. runtime binding이 필요한 파일에 다른 local `AEUI` binding이 있으면 JSX runtime helper를 안전하게 가리킬 수 없으므로 compile error를 낸다.
 
@@ -257,7 +257,12 @@ function UserCard(_initialProps) {
 - binding이 없는 bare `watch(...)`와 `clean(...)`은 호환 규칙에 따라 같은 이름의 hook으로 처리한다.
 - local binding, 다른 패키지에서 가져온 binding, namespace/member 호출은 AEUI hook으로 추측하지 않는다.
 
-`clean`은 인자 개수와 타입을 바꾸지 않고 callee만 `AEUI.__runtime.clean`으로 교체한다. `watch`는 인자가 정확히 두 개이고 첫 인자가 배열이 아닐 때만 `AEUI.__runtime.watch`로 교체한다.
+`clean`은 인자 개수와 타입을 바꾸지 않고 callee만 `AEUI.__runtime.clean`으로 교체한다. `watch`는 다음 두 형태를 변환한다.
+
+- **2인자**: `watch(cb, deps)` — 첫 인자가 배열이 아닐 때 `AEUI.__runtime.watch(cb, depsGetter)`로 교체
+- **1인자**: `watch(cb)` — deps 없이 매 render마다 실행하는 형태로 `AEUI.__runtime.watch(cb)`로 교체
+
+> **미지원 (현재):** 1인자 `watch(cb)` 변환은 아직 구현되지 않았다. 현재 Babel 플러그인은 인자가 정확히 2개일 때만 변환을 수행한다. 이 문제는 [`AEUI-WATCH-FIX-001`](../issue/known-defects.md)에서 추적한다.
 
 hook call 순회는 컴포넌트 아래의 중첩 함수 안까지 확인한다. 다만 구조 분해된 props 참조를 최신값으로 바꾸는 대상은 inline watch callback과 최종 dependency getter이며, identifier로 전달한 named callback의 함수 본문은 이 단계에서 다시 쓰지 않는다.
 

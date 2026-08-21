@@ -1,55 +1,56 @@
 # AEUI 문서 인덱스
 
-이 문서는 AEUI 문서의 역할과 읽기 순서를 정의하는 루트 인덱스다.
+이 문서는 AEUI 문서의 **역할, 권위 순서, 읽기 순서**를 정의하는 루트 인덱스다.
 
-## 문서 구조
+## 문서 권위
 
-| 위치 | 독자 | 역할 |
+문서 간 내용이 충돌하면 다음 우선순위를 따른다.
+
+| 우선순위 | 위치 | 설명 |
 |---|---|---|
-| [`user-scenario/`](user-scenario/01-getting-started.md) | **AEUI 사용자** | AEUI를 사용하는 유저 입장에서 서술한 문서. 이 문서들을 **최우선 룰**로 취급한다. |
-| [`internal-implement/`](internal-implement/01-architecture.md) | **기여자·구현자** | `user-scenario`에서 기술한 AEUI 기능들을 어떻게 코드로 구현했는지 서술한 문서. |
-| [`issue/`](issue/known-defects.md) | 기여자 | 현재 문제점과 향후 계획. |
+| **1 (최우선)** | [`user-scenario/`](user-scenario/) | 사용자에게 약속한 동작. 이 문서의 내용이 최종 계약이다. |
+| **2** | [`internal-implement/`](internal-implement/) | user-scenario의 동작을 코드로 구현하는 방법을 서술한다. |
+| **3** | 현재 코드 | 위 문서에 기술되지 않은 세부 동작은 코드가 사실상의 명세다. |
 
-## user-scenario — 사용자 시나리오
+구현이 `user-scenario`와 일치하지 않는 항목은 [`issue/known-defects.md`](issue/known-defects.md)에서 추적한다.
 
-AEUI를 사용하는 유저 관점에서 작성된 문서. 처음 사용한다면 **01 → 07** 순서로 읽는다.
+## user-scenario
 
-| 문서 | 한 줄 요약 |
-|---|---|
-| [01. 시작하기](user-scenario/01-getting-started.md) | 프로젝트 생성부터 첫 화면 띄우기까지 |
-| [02. 컴포넌트](user-scenario/02-components.md) | 함수형 컴포넌트 작성법, setup과 render의 분리, props |
-| [03. 반응성](user-scenario/03-reactivity.md) | `let` 변수로 상태 관리, `watch`로 변화 감지, `clean`으로 정리 |
-| [04. JSX와 렌더링](user-scenario/04-jsx-and-rendering.md) | JSX 문법, Fragment, 조건부 렌더링, 리스트와 key |
-| [05. 라우팅](user-scenario/05-routing.md) | 파일 기반 라우팅, 동적 경로, 레이아웃, 404 페이지 |
-| [06. 이벤트와 입력](user-scenario/06-event-handling.md) | 이벤트 핸들링, controlled input, 폼 처리 |
-| [07. 프로젝트 설정](user-scenario/07-project-config.md) | Vite 플러그인 옵션, 빌드 설정, npm 패키지 구조 |
+| # | 문서 | 한 줄 요약 |
+|---|---|---|
+| 01 | [시작하기](user-scenario/01-getting-started.md) | 프로젝트 생성부터 첫 화면 띄우기까지 |
+| 02 | [컴포넌트](user-scenario/02-components.md) | 함수형 컴포넌트, setup/render 분리, props |
+| 03 | [반응성](user-scenario/03-reactivity.md) | `let` 변수 상태, `watch`, `clean` |
+| 04 | [JSX와 렌더링](user-scenario/04-jsx-and-rendering.md) | JSX 문법, Fragment, 조건부 렌더링, 리스트와 key |
+| 05 | [라우팅](user-scenario/05-routing.md) | 파일 기반 라우팅, 동적 경로, 레이아웃 |
+| 06 | [이벤트와 입력](user-scenario/06-event-handling.md) | 이벤트 핸들링, controlled input, 폼 처리 |
+| 07 | [프로젝트 설정](user-scenario/07-project-config.md) | Vite 플러그인 옵션, 빌드 설정, npm 패키지 구조 |
 
-## internal-implement — 내부 구현
+## internal-implement
 
-`user-scenario`의 기능들이 코드 수준에서 어떻게 구현되었는지 설명한다.
+| # | 문서 | 한 줄 요약 |
+|---|---|---|
+| 01 | [아키텍처](internal-implement/01-architecture.md) | 전체 구조, 모듈 의존 관계 |
+| 02 | [VDOM](internal-implement/02-vdom.md) | VNode 구조, child 정규화 |
+| 03 | [Reconciler](internal-implement/03-reconciler.md) | Diffing, DOM 갱신 알고리즘 |
+| 04 | [인스턴스](internal-implement/04-instance.md) | RuntimeNode, 인스턴스 트리 |
+| 05 | [컴포넌트 생명주기](internal-implement/05-component-lifecycle.md) | setup/render 실행 흐름, context |
+| 06 | [스케줄러](internal-implement/06-scheduler.md) | Polling 루프, backoff, DOM 이벤트 dispatch |
+| 07 | [깊은 비교](internal-implement/07-deep-compare.md) | `_deepEqual`, `_deepClone` |
+| 08 | [DOM 연산](internal-implement/08-dom.md) | DOM props, 이벤트 프록시, controlled input |
+| 09 | [Unmount](internal-implement/09-unmount.md) | 해제 흐름, cleanup 실행 |
+| 10 | [Babel 컴파일러](internal-implement/10-babel-compiler.md) | 컴포넌트 판별, props/hook 변환, render wrapper |
+| 11 | [앱 런타임](internal-implement/11-app-runtime.md) | `createAppRuntime`, state 격리 |
+| 12 | [컴파일러-런타임 브리지](internal-implement/12-compiler-runtime.md) | Babel output ↔ runtime 연결 |
+| 13 | [런타임 컨텍스트](internal-implement/13-runtime-context.md) | active runtime stack, phase 관리 |
+| 14 | [훅 레지스트리](internal-implement/14-hook-registry.md) | watch/clean 등록 로직 |
+| 15 | [Watcher 실행](internal-implement/15-watcher.md) | deps 비교, callback 실행 엔진 |
+| 16 | [라우터](internal-implement/16-router.md) | route table, segment 매칭 |
+| 17 | [소스 배치](internal-implement/17-source-layout.md) | 파일 경계, 모듈별 심볼 |
+| 18 | [적합성 검증](internal-implement/18-conformance.md) | 테스트 설계 원칙, 검증 범위 |
+| — | [설계 결정](internal-implement/design-decisions.md) | 주요 설계 선택과 근거 |
 
-| 문서 | 한 줄 요약 |
-|---|---|
-| [01. 아키텍처](internal-implement/01-architecture.md) | 전체 구조, `createAppRuntime`, state 격리, 모듈 의존 관계 |
-| [02. VDOM과 Diffing](internal-implement/02-vdom-and-diffing.md) | VNode 구조, Reconciliation 알고리즘 |
-| [03. 컴포넌트 내부](internal-implement/03-component-internals.md) | RuntimeNode, setup/render 실행 흐름, context 스택 |
-| [04. 스케줄러와 Dirty Checking](internal-implement/04-scheduler-and-dirty-checking.md) | Polling 루프, backoff, DOM 이벤트 dispatch |
-| [05. 깊은 비교](internal-implement/05-deep-compare.md) | `_deepEqual` 알고리즘, `_deepClone` |
-| [06. DOM 연산](internal-implement/06-dom-operations.md) | DOM props 적용, 이벤트 프록시 패턴, controlled input |
-| [07. Babel 컴파일러](internal-implement/07-babel-compiler.md) | 컴포넌트 판별, props/hook 변환, render wrapper |
-| [08. 라우터 내부](internal-implement/08-router-internals.md) | route table 생성, segment 매칭, anchor click 가로채기 |
-| [09. 소스 배치](internal-implement/09-source-layout.md) | 파일 경계, 모듈별 심볼 목록, 의존 관계 |
-| [10. 적합성 검증](internal-implement/10-conformance.md) | 테스트 설계 원칙, 검증 범위, 예제 앱 규칙 |
-| [설계 결정](internal-implement/design-decisions.md) | 주요 설계 선택과 그 이유 |
-
-상세 모듈 문서:
-
-- [`babel-plugin/`](internal-implement/babel-plugin/) — Babel 플러그인 상세
-- [`core/`](internal-implement/core/) — 코어 런타임 모듈별 상세
-- [`hooks/`](internal-implement/hooks/) — watch, clean 훅 상세
-- [`router/`](internal-implement/router/) — 디렉터리 라우터 상세
-
-## issue — 문제점과 계획
+## issue
 
 | 문서 | 한 줄 요약 |
 |---|---|
@@ -58,7 +59,7 @@ AEUI를 사용하는 유저 관점에서 작성된 문서. 처음 사용한다�
 
 ## 권장 읽기 순서
 
-- **처음 사용하는 경우:** [`user-scenario/01-getting-started.md`](user-scenario/01-getting-started.md) → 순서대로 읽기
-- **프레임워크를 수정하는 경우:** 이 인덱스 → [`internal-implement/01-architecture.md`](internal-implement/01-architecture.md) → 관련 문서
-- **결함을 수정하는 경우:** [`issue/known-defects.md`](issue/known-defects.md) → 관련 내부 문서 → 코드
-- **기능을 추가하는 경우:** [`issue/planned-features.md`](issue/planned-features.md) → 관련 내부 문서 → 코드
+- **처음 사용:** `user-scenario/01` → 순서대로 읽기
+- **프레임워크 수정:** 이 인덱스 → `internal-implement/01` → 관련 문서
+- **결함 수정:** `issue/known-defects.md` → 관련 내부 문서 → 코드
+- **기능 추가:** `issue/planned-features.md` → 관련 내부 문서 → 코드

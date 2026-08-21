@@ -35,7 +35,7 @@ export default defineConfig({
 ```js
 export default defineConfig({
   plugins: [aeui({
-    alias: '~',           // ~ 대신 @ 사용
+    alias: '~',           // @ 대신 ~ 사용
     aliasDir: 'src',
     rootId: 'app',        // <div id="app"> 사용
     styles: 'src/main.css', // 스타일 파일 경로 변경
@@ -206,4 +206,4 @@ npm run preview   # 빌드 결과 미리보기
 ## 관련 문서
 
 - 라우팅 규칙 자세히: [05. 라우팅](05-routing.md)
-- 내부 빌드 구조: [개발 문서 — Babel 컴파일러](../internal-implement/07-babel-compiler.md)
+- 내부 빌드 구조: [개발 문서 — Babel 컴파일러](../internal-implement/10-babel-compiler.md)

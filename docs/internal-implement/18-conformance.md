@@ -1,19 +1,19 @@
 # 18. 적합성 검증
 
-이 문서는 AEUI의 스펙 충족 여부를 검증하는 원칙과 범위를 설명한다.
+이 문서는 AEUI의 계약 충족 여부를 검증하는 원칙과 범위를 설명한다.
 
 ---
 
-## 테스트와 스펙의 연결
+## 테스트와 계약의 연결
 
-모든 검증은 `docs/spec`의 문장을 근거로 한다. 소스 코드의 현재 동작이나 기존 테스트의 기대값은 스펙을 대체하지 않는다.
+공개 동작 테스트는 `user-scenario`의 문장과 heading을 직접 근거로 삼는다. 내부 구조 검증은 `internal-implement`를 참고하되, 충돌 시 `user-scenario`가 우선한다. 소스 코드의 현재 동작이나 기존 테스트의 기대값은 계약을 대체하지 않는다.
 
 | 규칙 | 설명 |
 |---|---|
-| 근거 명시 | 테스트마다 근거 문서·절·문장을 적음 |
+| 근거 명시 | 테스트마다 `user-scenario`의 문서·절·문장을 적음 |
 | 고유 ID | 자동화 가능한 규칙은 test ID에 연결 |
 | 수동 검증 | 자동화 불가 규칙은 review ID에 사유와 절차 명시 |
-| 근거 없는 기대값 금지 | 스펙에 없는 결과를 통과 조건으로 넣지 않음 |
+| 근거 없는 기대값 금지 | `user-scenario`에 없는 결과를 통과 조건으로 넣지 않음 |
 
 ---
 
@@ -104,14 +104,19 @@ RAF, polling, DOM event, timer는 테스트가 명시적으로 제어. 각 테�
 
 모든 다음 조건을 만족할 때 충족:
 
-1. 모든 스펙 조항이 test/review ID에 연결
+1. 모든 `user-scenario` 동작이 test/review ID에 연결
 2. 기능별 묶음이 독립 통과
 3. package/CLI가 실제 소비 경로에서 통과
 4. 예제 앱 통합 시나리오 통과
 5. 패키지/저장소 검사 통과
-6. 기대값과 스펙 사이 불일치 없음
+6. 기대값과 `user-scenario` 사이 불일치 없음
 
 ---
 
 ## 관련 문서
+
+- 공개 동작 계약: [`user-scenario/`](../user-scenario/01-getting-started.md)
+- 내부 구현 참고: [`internal-implement/`](01-architecture.md)
+- 알려진 결함: [`issue/known-defects.md`](../issue/known-defects.md)
+- 계획 기능: [`issue/planned-features.md`](../issue/planned-features.md)
 

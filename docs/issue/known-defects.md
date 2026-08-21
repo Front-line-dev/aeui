@@ -1,25 +1,44 @@
 # 알려진 구현 결함
 
-이 문서는 현재 코드의 알려진 결함을 추적한다. 올바른 결과는 각 항목에 연결된 스펙 조항만 정의한다. 아래의 회귀 검증 범위는 결함이 다시 생기지 않는지 확인할 사례이며 별도 계약이 아니다.
+이 문서는 현재 코드의 알려진 결함을 추적한다. 올바른 동작은 각 항목에 연결된 `user-scenario` 문서가 정의한다. 아래의 회귀 검증 범위는 결함이 다시 생기지 않는지 확인할 사례이며 별도 계약이 아니다.
 
 모든 항목의 초기 상태는 **open**, 우선순위는 **high**다.
 
 ## 목록
 
-| ID | 영역 | 위반한 스펙 |
+| ID | 영역 | 근거 |
 |---|---|---|
-| `AEUI-DATA-FIX-001` | 깊은 비교의 대칭성·타입·참조 그래프 | 02 §7 `_deepEqual` |
-| `AEUI-DATA-FIX-002` | `__proto__` own property 안전 복제 | 02 §8 `_deepClone` |
-| `AEUI-DOM-FIX-001` | boolean `aria-*` 의미 | 04 §10.2 props 적용 규칙 |
-| `AEUI-DOM-FIX-002` | file input type 대소문자 판정 | 04 §12 controlled input: value와 checked |
-| `AEUI-COMPILER-IMPORT-FIX-001` | default·namespace import 보존 | 06 §3.3 충돌 처리 |
-| `AEUI-COMPILER-FIX-001` | 일반 callback의 컴포넌트 오판 | 06 §4.2 컴포넌트 판별 기준 |
-| `AEUI-COMPILER-FIX-002` | compiler 생성 이름 충돌 | 06 §6.2 identifier props |
-| `AEUI-COMPILER-FIX-003` | named dependency getter 오변환 | 06 §7.4 deps getter 분류 |
-| `AEUI-COMPILER-FIX-004` | hook import alias 오판 | 06 §7.1 hook 판별 — binding 기반 |
-| `AEUI-COMPILER-FIX-005` | 사용자 render parameter를 wrapper로 오인 | 06 §8 render phase wrapper 생성 |
-| `AEUI-ROUTER-FIX-001` | route/source 확장자 집합 불일치 | 07 §2 Vite 자동 부트스트랩, 08 §5.1 대상 판별 |
-| `AEUI-VITE-FIX-001` | public/internal virtual entry 중복 주입 | 07 §2 Vite 자동 부트스트랩, 08 §3 HTML entry 자동 주입 |
+| `AEUI-WATCH-FIX-001` | `watch(cb)` 1인자 호출 미지원 | [user-scenario/03 § watch — 기본 사용법](../user-scenario/03-reactivity.md#기본-사용법--deps-없이) |
+| `AEUI-DATA-FIX-001` | 깊은 비교의 대칭성·타입·참조 그래프 | [internal-implement/07 § _deepEqual](../internal-implement/07-deep-compare.md) |
+| `AEUI-DATA-FIX-002` | `__proto__` own property 안전 복제 | [internal-implement/07 § _deepClone](../internal-implement/07-deep-compare.md) |
+| `AEUI-DOM-FIX-001` | boolean `aria-*` 의미 | [internal-implement/08 § props 적용](../internal-implement/08-dom.md) |
+| `AEUI-DOM-FIX-002` | file input type 대소문자 판정 | [internal-implement/08 § controlled input](../internal-implement/08-dom.md) |
+| `AEUI-COMPILER-IMPORT-FIX-001` | default·namespace import 보존 | [internal-implement/10 § runtime import 주입](../internal-implement/10-babel-compiler.md) |
+| `AEUI-COMPILER-FIX-001` | 일반 callback의 컴포넌트 오판 | [internal-implement/10 § 컴포넌트 판별](../internal-implement/10-babel-compiler.md#1단계-shouldtransformcomponent--컴포넌트-판별) |
+| `AEUI-COMPILER-FIX-002` | compiler 생성 이름 충돌 | [internal-implement/10 § props 반응화](../internal-implement/10-babel-compiler.md#3단계-injectreactiveprops--props-반응화) |
+| `AEUI-COMPILER-FIX-003` | named dependency getter 오변환 | [internal-implement/10 § deps getter](../internal-implement/10-babel-compiler.md#3-3-watch-dependency-getter-처리) |
+| `AEUI-COMPILER-FIX-004` | hook import alias 오판 | [internal-implement/10 § hook binding 판별](../internal-implement/10-babel-compiler.md#3-2-hook-binding-판별) |
+| `AEUI-COMPILER-FIX-005` | 사용자 render parameter를 wrapper로 오인 | [internal-implement/10 § render wrapper 중복 방지](../internal-implement/10-babel-compiler.md#render-wrapper-중복-방지) |
+| `AEUI-ROUTER-FIX-001` | route/source 확장자 집합 불일치 | [internal-implement/16 § route table](../internal-implement/16-router.md) |
+| `AEUI-VITE-FIX-001` | public/internal virtual entry 중복 주입 | [user-scenario/07 § HTML 진입점](../user-scenario/07-project-config.md#html-진입점) |
+
+## watch(cb) 미지원
+
+### `AEUI-WATCH-FIX-001`: `watch(cb)` 1인자 호출 미지원
+
+[user-scenario/03 § 기본 사용법 — deps 없이](../user-scenario/03-reactivity.md#기본-사용법--deps-없이)는 `watch(콜백)`만 호출하면 매 렌더마다 콜백이 항상 실행된다고 정의한다.
+
+현재 두 가지 문제로 이 동작이 지원되지 않는다.
+
+1. **Babel 플러그인**: `watch` 호출의 인자가 정확히 2개일 때만 `AEUI.__runtime.watch(...)` 변환을 수행한다. 1인자 호출은 변환 대상에서 빠진다.
+2. **Runtime (`hook-registry.js`)**: `registerWatch`가 deps를 필수로 요구하여, deps 없이 호출하면 TypeError를 발생시킨다.
+
+수정 범위:
+- `packages/core/src/babel-plugin.js`: 1인자 `watch(cb)` → `AEUI.__runtime.watch(cb)` 변환 추가
+- `packages/core/src/hook-registry.js`: deps가 없는 watcher를 "항상 실행" 모드로 등록
+- `packages/core/src/component-watchers.js`: deps가 없는 watcher는 deps 비교를 건너뛰고 매 render에서 callback 실행
+
+---
 
 ## 데이터 연산
 

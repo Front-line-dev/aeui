@@ -6,58 +6,65 @@ AEUI의 컴포넌트는 **함수**입니다. React와 비슷하게 보이지만,
 
 ## React와의 핵심 차이
 
-| | React | AEUI |
-|---|---|---|
-| **함수 실행** | 매 렌더마다 전체 함수 재실행 | 함수 본문은 **최초 1회만** 실행 |
-| **상태** | `useState` 훅 사용 | 일반 `let` 변수 사용 |
-| **갱신** | 명시적 `setState` 호출 | 자동 변경 감지 (Dirty Checking) |
+같은 카운터를 React와 AEUI로 비교해 보세요:
 
----
-
-## 기본 컴포넌트 작성
-
-```jsx
-function Greeting() {
-  // 이 줄들은 컴포넌트가 처음 화면에 나타날 때 한 번만 실행됩니다.
-  console.log('안녕, 나는 한 번만 출력돼요!');
-  
-  // ↓ 이 부분만 화면이 갱신될 때마다 다시 실행됩니다.
-  return <h1>안녕하세요!</h1>;
-}
-```
-
-AEUI의 Babel 컴파일러가 자동으로 함수를 두 부분으로 나눕니다:
-
-1. **setup** (함수 본문) — 마운트 시 한 번만 실행
-2. **render** (`return` 이후) — 화면 갱신 시마다 실행
-
-이 분리는 **자동**으로 이루어지므로, 특별한 문법을 배울 필요가 없습니다.
-
----
-
-## `let` 변수를 상태로 사용하기
-
-AEUI에서는 `useState` 같은 훅이 필요 없습니다. 그냥 `let`을 쓰세요:
+**React** — 버튼을 누를 때마다 함수 전체가 다시 실행됩니다:
 
 ```jsx
 function Counter() {
-  // setup: 한 번만 실행
-  let count = 0;
-  
-  // render: 매번 실행 — 항상 최신 count를 표시
-  return (
-    <button onClick={() => count++}>
-      클릭 횟수: {count}
-    </button>
-  );
+  // ← 매 렌더마다 이 줄부터 전부 재실행
+  const [count, setCount] = useState(0);
+  console.log('렌더!');  // 클릭할 때마다 출력
+
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
 }
 ```
 
-`count++`가 실행되면, AEUI가 자동으로 값의 변경을 감지하고 화면을 갱신합니다.
+**AEUI** — 함수 본문은 처음 한 번만 실행되고, `return` 부분만 반복됩니다:
 
-### 왜 이게 가능할까?
+```jsx
+function Counter() {
+  // ← 처음 화면에 나타날 때 한 번만 실행
+  let count = 0;              // 일반 let 변수가 곧 상태
+  console.log('마운트!');      // 딱 한 번만 출력
 
-함수 본문(setup)은 한 번만 실행되므로, `let count = 0`은 **최초 마운트 시 한 번만** 실행됩니다. 이후 `count++`로 값을 바꿔도 `count`가 0으로 초기화되지 않습니다. `return` 뒤의 JSX만 반복 실행되면서 **현재 count 값**을 읽어갑니다.
+  return <button onClick={() => count++}>{count}</button>;
+  //                           ↑ setter 함수 없이 직접 변경
+  //     ↑ 이 부분만 화면 갱신 시마다 다시 실행
+}
+```
+
+핵심 차이를 정리하면:
+
+- **함수 실행**: React는 매 렌더마다 전체 재실행 / AEUI는 최초 1회만 실행
+- **상태**: React는 `useState` 훅 / AEUI는 일반 `let` 변수
+- **갱신**: React는 `setState` 호출 / AEUI는 자동 변경 감지
+
+---
+
+## 왜 이게 가능할까? — Babel 컴파일러
+
+AEUI의 Babel 컴파일러가 빌드 시점에 `return`을 함수로 감쌉니다:
+
+```jsx
+// 여러분이 작성한 코드
+function Counter() {
+  let count = 0;
+  return <button onClick={() => count++}>{count}</button>;
+}
+```
+
+```jsx
+// Babel 컴파일러가 변환한 코드
+function Counter() {
+  let count = 0;
+  return () => <button onClick={() => count++}>{count}</button>;
+}
+```
+
+`return` 뒤에 `() =>`가 붙으면서 함수 본문(**setup** — 한 번)과 반환된 함수(**render** — 매번)로 나뉩니다. 이 변환은 자동이므로 신경 쓸 필요 없습니다.
+
+> **참고:** 위 카운터 예제에서 `let count = 0`으로 상태를 선언하고 `count++`로 직접 변경했습니다. AEUI가 이 변경을 어떻게 감지하는지는 [03. 반응성](03-reactivity.md)에서 설명합니다.
 
 ---
 
@@ -103,14 +110,30 @@ function Button({ label, ...rest }) {
 
 ### props는 항상 최신
 
-AEUI는 부모가 새 props를 전달하면, 컴포넌트가 항상 **최신 값**을 볼 수 있도록 보장합니다. setup에서 구조 분해한 변수도 render 시점에는 최신 값으로 업데이트됩니다.
+setup은 한 번만 실행되는데, 구조 분해한 props는 어떻게 최신 값을 유지할까요?
 
 ```jsx
+// 여러분이 작성한 코드
 function Display({ message }) {
-  // message는 항상 부모가 전달한 최신 값입니다.
   return <p>{message}</p>;
 }
 ```
+
+```jsx
+// Babel 컴파일러가 변환한 코드 (개념)
+function Display(_initialProps) {
+  const _props = { ..._initialProps };      // props 저장 객체
+  let { message } = _initialProps;
+
+  return (_newProps) => {
+    Object.assign(_props, _newProps);        // 매 render마다 최신 props로 갱신
+    ({ message } = _props);
+    return <p>{message}</p>;
+  };
+}
+```
+
+컴파일러가 props 저장 객체를 만들고, 매 render마다 최신 값을 다시 읽습니다. 자동이므로 신경 쓸 필요 없습니다.
 
 ---
 
