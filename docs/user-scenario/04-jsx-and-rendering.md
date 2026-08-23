@@ -82,23 +82,19 @@ function LoginButton({ isLoggedIn }) {
 }
 ```
 
-### 변수 활용
+### 함수 활용
 
-더 복잡한 조건은 변수에 JSX를 담아서 사용합니다:
+더 복잡한 조건은 함수로 분리하여 JSX 안에서 호출합니다:
 
 ```jsx
 function StatusMessage({ status }) {
-  let message;
-  
-  if (status === 'loading') {
-    message = <p>로딩 중...</p>;
-  } else if (status === 'error') {
-    message = <p className="error">오류 발생</p>;
-  } else {
-    message = <p>완료!</p>;
+  function renderMessage() {
+    if (status === 'loading') return <p>로딩 중...</p>;
+    if (status === 'error') return <p className="error">오류 발생</p>;
+    return <p>완료!</p>;
   }
 
-  return <div>{message}</div>;
+  return <div>{renderMessage()}</div>;
 }
 ```
 
@@ -205,22 +201,3 @@ JSX에서 다음 값들은 화면에 아무것도 표시하지 않습니다:
 {showDetails && <Details />}   // showDetails가 false이면 아무것도 안 보임
 {null}                          // 아무것도 안 보임
 ```
-
----
-
-## 핵심 정리
-
-| 패턴 | 사용법 |
-|---|---|
-| **JSX 표현식** | `{변수}`, `{함수()}` |
-| **Fragment** | `<>...</>` |
-| **조건부 렌더링** | `{조건 && <Element />}`, `{조건 ? A : B}` |
-| **리스트** | `{배열.map(item => <Element key={id} />)}` |
-| **className** | `className="클래스"` |
-| **인라인 style** | `style="문자열"` 또는 `style={{ 객체 }}` |
-
----
-
-## 다음 단계
-
-→ [05. 라우팅](05-routing.md)에서 파일 기반 라우팅으로 여러 페이지를 구성하는 방법을 배워보세요.

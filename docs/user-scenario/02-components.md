@@ -200,7 +200,7 @@ export default function () { ... } // ✅ export default는 이름 없어도 인
 
 ---
 
-## 생명주기 정리
+## 생명주기
 
 | 단계 | 시점 | 실행 횟수 |
 |---|---|---|
@@ -209,9 +209,3 @@ export default function () { ... } // ✅ export default는 이름 없어도 인
 | **cleanup** | 컴포넌트가 화면에서 제거될 때 | 1회 |
 
 cleanup에 대해서는 [03. 반응성](03-reactivity.md)에서 `clean`과 함께 설명합니다.
-
----
-
-## 다음 단계
-
-→ [03. 반응성](03-reactivity.md)에서 `watch`와 `clean`으로 더 정교한 상태 관리를 배워보세요.

@@ -212,23 +212,3 @@ export default function NotFound({ route }) {
 다음 6가지 확장자가 라우트 파일로 인식됩니다:
 
 `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`
-
----
-
-## 핵심 정리
-
-| 기능 | 사용법 |
-|---|---|
-| **정적 라우트** | `about.jsx` → `/about` |
-| **동적 라우트** | `[id].jsx` → `/products/:id` |
-| **catch-all** | `[...slug].jsx` → `/docs/*` |
-| **링크** | 일반 `<a href>` 사용 |
-| **레이아웃** | `_layout.jsx` (root만) |
-| **404** | `404.jsx` (root만) |
-| **private 파일** | `_` 접두사 파일 → 무시 |
-
----
-
-## 다음 단계
-
-→ [06. 이벤트와 입력](06-event-handling.md)에서 이벤트 핸들링과 폼 입력 처리를 배워보세요.

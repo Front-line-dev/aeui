@@ -43,39 +43,8 @@ npm run dev
 
 ## 문서
 
-문서의 역할, 권위와 읽기 순서는 [문서 인덱스](docs/README.md)에서 먼저 확인한다.
-
-### 구현 명세
-
-| 문서 | 설명 |
-|------|------|
-| [AEUI 구현 명세](docs/spec/README.md) | 현재 코드가 따라야 하는 규범적 계약 |
-| [스펙 충족 여부 검증](docs/spec/10-conformance.md) | 스펙에서 테스트 기대값을 가져오고 연결하는 원칙 |
-
-### 사용자 가이드
-
-| 문서 | 설명 |
-|------|------|
-| [Level 1 — 기본 사용법](docs/guide/level-1.md) | 컴포넌트, 상태, props, watch, clean |
-| [디렉터리 라우터](docs/guide/router.md) | core 파일 기반 라우팅과 페이지 규칙 |
-| [Level 2 — 핵심 원리](docs/guide/level-2.md) | Babel 변환, VDOM, Tick 루프 |
-| [Level 3 — 내부 구조](docs/guide/level-3.md) | 아키텍처, 코드 구조, 내부 문서 인덱스 |
-
-### 내부 구현 상세
-
-| 문서 | 설명 |
-|------|------|
-| [설계 결정](docs/internals/design-decisions.md) | 주요 설계 선택과 그 이유 |
-| [Core 런타임](docs/internals/core/) | VNode, 인스턴스, Reconciler, DOM, 스케줄러, Watcher 등 |
-| [Hooks](docs/internals/hooks/) | watch, clean 훅 상세 |
-| [Babel 플러그인](docs/internals/babel-plugin/babel-plugin.md) | 코드 변환 로직 전체 |
-
-### 기타
-
-| 문서 | 설명 |
-|------|------|
-| [작업 추적](docs/tracking/README.md) | 알려진 결함, 계획 기능과 구현 근거 |
-| [기여 가이드](docs/contributing.md) | 개발 환경 설정, 빌드, 테스트 |
+- `docs/user-scenario/` — 사용자에게 약속한 동작을 정의하는 문서
+- `docs/internal-implement/` — 약속한 동작을 코드로 구현하는 방법을 설명하는 문서
 
 ---
 

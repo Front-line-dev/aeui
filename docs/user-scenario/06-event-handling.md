@@ -236,21 +236,3 @@ function ContactForm() {
 DOM 이벤트(클릭, 입력 등) 안에서 상태를 변경하면, AEUI가 자동으로 **다음 프레임에 화면을 갱신**합니다. `AEUI.render()`를 직접 호출할 필요가 없습니다.
 
 여러 이벤트가 빠르게 연속으로 발생해도, AEUI는 **하나의 렌더링으로 합쳐서** 처리합니다.
-
----
-
-## 핵심 정리
-
-| 패턴 | 사용법 |
-|---|---|
-| **이벤트 핸들러** | `onClick={() => ...}` |
-| **텍스트 입력** | `value={v} onInput={(e) => v = e.target.value}` |
-| **체크박스** | `checked={v} onChange={() => v = !v}` |
-| **셀렉트** | `value={v} onChange={(e) => v = e.target.value}` |
-| **폼 제출** | `onSubmit={(e) => { e.preventDefault(); ... }}` |
-
----
-
-## 다음 단계
-
-→ [07. 프로젝트 설정](07-project-config.md)에서 Vite 플러그인 옵션과 빌드 설정을 알아보세요.

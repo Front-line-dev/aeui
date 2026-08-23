@@ -104,9 +104,3 @@ Vite 플러그인이 `App.jsx`를 진입점으로 삼아 `<div id="root">`에 �
 | `npm run dev` | 개발 서버 시작 (HMR 지원) |
 | `npm run build` | 프로덕션 빌드 |
 | `npm run preview` | 빌드 결과 미리보기 |
-
----
-
-## 다음 단계
-
-→ [02. 컴포넌트](02-components.md)에서 AEUI 컴포넌트의 작성법을 배워보세요.

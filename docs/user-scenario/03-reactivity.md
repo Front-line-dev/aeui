@@ -268,21 +268,3 @@ function AutoSaver({ data }) {
   return <p>자동 저장이 활성화되어 있습니다.</p>;
 }
 ```
-
----
-
-## 핵심 정리
-
-| API | 용도 | 호출 위치 | 실행 시점 |
-|---|---|---|---|
-| `let` 변수 | 상태 선언 | setup | 마운트 시 1회 |
-| `watch(cb)` | 매 렌더 실행 | setup | 렌더 시마다 |
-| `watch(cb, deps)` | 값 변화 감지 | setup | deps 변경 시만 (최초 제외) |
-| `clean(cb)` | 정리 작업 | setup | 컴포넌트 제거 시 |
-| `AEUI.render()` | 수동 갱신 | 어디서든 | 호출 즉시 |
-
----
-
-## 다음 단계
-
-→ [04. JSX와 렌더링](04-jsx-and-rendering.md)에서 조건부 렌더링, 리스트, key 등 화면을 구성하는 패턴을 배워보세요.
