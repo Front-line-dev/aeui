@@ -20,11 +20,16 @@ export function registerWatch(runtime, callback, deps) {
   if (!node) return;
 
   if (typeof callback !== 'function') {
-    throw new TypeError('[AEUI] watch(callback, deps) requires callback to be a function.');
+    throw new TypeError('[AEUI] watch(callback[, deps]) requires callback to be a function.');
   }
 
   if (deps === undefined) {
-    throw new TypeError('[AEUI] watch(callback, deps) requires deps.');
+    node.watchStates.push({
+      callback,
+      getDeps: null,
+      oldDeps: null,
+    });
+    return;
   }
 
   const getDeps = () => readDeps(deps);

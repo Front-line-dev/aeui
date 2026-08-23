@@ -262,8 +262,6 @@ function UserCard(_initialProps) {
 - **2인자**: `watch(cb, deps)` — 첫 인자가 배열이 아닐 때 `AEUI.__runtime.watch(cb, depsGetter)`로 교체
 - **1인자**: `watch(cb)` — deps 없이 매 render마다 실행하는 형태로 `AEUI.__runtime.watch(cb)`로 교체
 
-> **미지원 (현재):** 1인자 `watch(cb)` 변환은 아직 구현되지 않았다. 현재 Babel 플러그인은 인자가 정확히 2개일 때만 변환을 수행한다. 이 문제는 [`AEUI-WATCH-FIX-001`](../issue/known-defects.md)에서 추적한다.
-
 hook call 순회는 컴포넌트 아래의 중첩 함수 안까지 확인한다. 다만 구조 분해된 props 참조를 최신값으로 바꾸는 대상은 inline watch callback과 최종 dependency getter이며, identifier로 전달한 named callback의 함수 본문은 이 단계에서 다시 쓰지 않는다.
 
 ### 3-3. Watch dependency getter 처리

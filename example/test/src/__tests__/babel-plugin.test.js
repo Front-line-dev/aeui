@@ -193,7 +193,7 @@ describe('AEUI Babel Plugin', () => {
     expect(code).toMatch(/AEUI\.__runtime\.watch\(\(\) => \[count\], \(\) => \[count\]\)/);
   });
 
-  it('deps 생략과 options 인자는 watch helper로 변환하지 않는다', () => {
+  it('watch(callback)은 deps 없이 runtime helper로 변환한다', () => {
     const withoutDeps = transform(`
       import { AEUI, watch } from 'aeui';
       function App() {
@@ -202,6 +202,11 @@ describe('AEUI Babel Plugin', () => {
       }
     `);
 
+    expect(withoutDeps).toMatch(/AEUI\.__runtime\.watch\(\(\) => \{\}\)/);
+    expect(withoutDeps).not.toMatch(/\n\s*watch\(/);
+  });
+
+  it('options 인자가 있는 watch 호출은 runtime helper로 변환하지 않는다', () => {
     const withOptions = transform(`
       import { AEUI, watch } from 'aeui';
       function App() {
@@ -211,7 +216,20 @@ describe('AEUI Babel Plugin', () => {
       }
     `);
 
-    expect(withoutDeps).not.toMatch(/AEUI\.__runtime\.watch\(/);
     expect(withOptions).not.toMatch(/AEUI\.__runtime\.watch\(/);
+  });
+
+  it('watch(callback)의 구조분해 props 참조를 최신값 조회로 변환한다', () => {
+    const code = transform(`
+      import { AEUI, watch } from 'aeui';
+      function App({ value }) {
+        watch(() => console.log(value));
+        return <div>{value}</div>;
+      }
+    `);
+
+    expect(code).toMatch(/AEUI\.__runtime\.watch\(\(\) => \{/);
+    expect(code).toMatch(/const _resolvedProps\d* = _resolveProps\d*\(\)/);
+    expect(code).toMatch(/console\.log\(_resolvedProps\d*\.value\)/);
   });
 });

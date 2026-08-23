@@ -8,7 +8,6 @@
 
 | ID | 영역 | 근거 |
 |---|---|---|
-| `AEUI-WATCH-FIX-001` | `watch(cb)` 1인자 호출 미지원 | [user-scenario/03 § watch — 기본 사용법](../user-scenario/03-reactivity.md#기본-사용법--deps-없이) |
 | `AEUI-DATA-FIX-001` | 깊은 비교의 대칭성·타입·참조 그래프 | [internal-implement/07 § _deepEqual](../internal-implement/07-deep-compare.md) |
 | `AEUI-DATA-FIX-002` | `__proto__` own property 안전 복제 | [internal-implement/07 § _deepClone](../internal-implement/07-deep-compare.md) |
 | `AEUI-DOM-FIX-001` | boolean `aria-*` 의미 | [internal-implement/08 § props 적용](../internal-implement/08-dom.md) |
@@ -21,24 +20,6 @@
 | `AEUI-COMPILER-FIX-005` | 사용자 render parameter를 wrapper로 오인 | [internal-implement/10 § render wrapper 중복 방지](../internal-implement/10-babel-compiler.md#render-wrapper-중복-방지) |
 | `AEUI-ROUTER-FIX-001` | route/source 확장자 집합 불일치 | [internal-implement/16 § route table](../internal-implement/16-router.md) |
 | `AEUI-VITE-FIX-001` | public/internal virtual entry 중복 주입 | [user-scenario/07 § HTML 진입점](../user-scenario/07-project-config.md#html-진입점) |
-
-## watch(cb) 미지원
-
-### `AEUI-WATCH-FIX-001`: `watch(cb)` 1인자 호출 미지원
-
-[user-scenario/03 § 기본 사용법 — deps 없이](../user-scenario/03-reactivity.md#기본-사용법--deps-없이)는 `watch(콜백)`만 호출하면 매 렌더마다 콜백이 항상 실행된다고 정의한다.
-
-현재 두 가지 문제로 이 동작이 지원되지 않는다.
-
-1. **Babel 플러그인**: `watch` 호출의 인자가 정확히 2개일 때만 `AEUI.__runtime.watch(...)` 변환을 수행한다. 1인자 호출은 변환 대상에서 빠진다.
-2. **Runtime (`hook-registry.js`)**: `registerWatch`가 deps를 필수로 요구하여, deps 없이 호출하면 TypeError를 발생시킨다.
-
-수정 범위:
-- `packages/core/src/babel-plugin.js`: 1인자 `watch(cb)` → `AEUI.__runtime.watch(cb)` 변환 추가
-- `packages/core/src/hook-registry.js`: deps가 없는 watcher를 "항상 실행" 모드로 등록
-- `packages/core/src/component-watchers.js`: deps가 없는 watcher는 deps 비교를 건너뛰고 매 render에서 callback 실행
-
----
 
 ## 데이터 연산
 

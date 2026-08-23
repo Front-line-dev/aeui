@@ -3,6 +3,11 @@ export function runComponentWatchers(state, node) {
 
   node.watchStates.forEach((watcher) => {
     try {
+      if (!watcher.getDeps) {
+        watcher.callback();
+        return;
+      }
+
       const newDeps = watcher.getDeps();
       const hasChanged =
         !watcher.oldDeps ||

@@ -333,6 +333,29 @@ describe('watch 훅', () => {
     watchLog = [];
   });
 
+  it('deps가 없으면 첫 render를 포함해 매 render 직전에 callback이 실행된다', () => {
+    function AlwaysWatch() {
+      let count = 0;
+
+      watch(() => {
+        count += 1;
+        watchLog.push(count);
+      });
+
+      return <span id="always-watch-count">{count}</span>;
+    }
+
+    AEUI.init(AlwaysWatch, container);
+
+    expect(watchLog).toEqual([1]);
+    expect(container.querySelector('#always-watch-count').textContent).toBe('1');
+
+    AEUI.render();
+
+    expect(watchLog).toEqual([1, 2]);
+    expect(container.querySelector('#always-watch-count').textContent).toBe('2');
+  });
+
   it('props 변경 시 watch callback이 실행됨', () => {
     AEUI.init(WatchApp, container);
 

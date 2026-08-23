@@ -565,33 +565,38 @@ export default function aeuiTransform({ types: t }) {
         if (!isAeuiHookCall(callPath, 'watch')) return;
 
         const args = callPath.node.arguments;
-        if (args.length !== 2) return;
+        if (args.length !== 1 && args.length !== 2) return;
 
         const [callbackArg, secondArg] = args;
         if (t.isArrayExpression(callbackArg)) {
           return;
         }
 
-        let depsArg = secondArg;
-        if (!isFunctionLike(depsArg)) {
-          depsArg = t.arrowFunctionExpression([], t.cloneNode(depsArg, true));
+        if (args.length === 2) {
+          let depsArg = secondArg;
+          if (!isFunctionLike(depsArg)) {
+            depsArg = t.arrowFunctionExpression([], t.cloneNode(depsArg, true));
+          }
+
+          callPath.node.arguments = [callbackArg, depsArg];
         }
 
-        callPath.node.arguments = [callbackArg, depsArg];
         callPath.node.callee = createAeuiRuntimeMember('watch');
 
         if (destructuredNames.size > 0 && propsId) {
           const callbackPath = callPath.get('arguments.0');
-          const depsPath = callPath.get('arguments.1');
 
           const preparedCallback = prepareResolvedProps(callbackPath);
           if (preparedCallback) {
             ensureBlockBody(callbackPath).unshiftContainer('body', preparedCallback.declaration);
           }
 
-          const preparedDeps = prepareResolvedProps(depsPath);
-          if (preparedDeps) {
-            ensureBlockBody(depsPath).unshiftContainer('body', preparedDeps.declaration);
+          if (args.length === 2) {
+            const depsPath = callPath.get('arguments.1');
+            const preparedDeps = prepareResolvedProps(depsPath);
+            if (preparedDeps) {
+              ensureBlockBody(depsPath).unshiftContainer('body', preparedDeps.declaration);
+            }
           }
         }
       },

@@ -840,4 +840,22 @@ describe('에러 처리', () => {
 
     expect(instance.watchStates[0].oldDeps).toEqual([1]);
   });
+
+  it('deps가 없는 watcher는 실행할 때마다 callback을 호출함', () => {
+    const callback = vi.fn();
+    const instance = {
+      watchStates: [
+        {
+          callback,
+          getDeps: null,
+          oldDeps: null,
+        },
+      ],
+    };
+
+    runtime.runComponentWatchers(instance);
+    runtime.runComponentWatchers(instance);
+
+    expect(callback).toHaveBeenCalledTimes(2);
+  });
 });

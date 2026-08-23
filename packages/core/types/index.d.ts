@@ -27,7 +27,7 @@ export interface VNode<P = Record<string, unknown>> {
 }
 
 export interface AeuiRuntimeInternals {
-  watch(callback: () => void, deps: readonly unknown[] | (() => readonly unknown[])): void;
+  watch(callback: () => void, deps?: readonly unknown[] | (() => readonly unknown[])): void;
   clean(callback: () => void): void;
   runRenderPhase(...args: unknown[]): Renderable;
   [key: string]: unknown;
@@ -54,7 +54,7 @@ export declare const AEUI: AeuiApp;
 
 export declare function watch(
   callback: () => void,
-  deps: readonly unknown[] | (() => readonly unknown[])
+  deps?: readonly unknown[] | (() => readonly unknown[])
 ): void;
 
 export declare function clean(callback: () => void): void;

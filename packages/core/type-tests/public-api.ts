@@ -18,6 +18,10 @@ const Counter: Component<{ title: string }> = ({ title }) => {
     console.log(title, count);
   }, [title, count]);
 
+  watch(() => {
+    console.log('render', count);
+  });
+
   clean(() => {
     count = 0;
   });
