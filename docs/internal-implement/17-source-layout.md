@@ -50,7 +50,7 @@ src/
 |---|---|---|
 | `vnode-marker.js` | `VNODE_MARKER` | — |
 | `vnode-helpers.js` | `getVNodeKey`, `isFragmentVNode`, `getFragmentChildren` | `resolveFragmentComponent` |
-| `deep-compare.js` | `_deepEqual`, `_deepClone` | `isVNode`, `canDeepMatchSetValue`, `primitiveSignature` 등 |
+| `deep-compare.js` | `_deepEqual`, `_deepClone` | `isVNode`, `createPairs`, `clonePairs`, `replacePairs`, `classify`, `compareSet` |
 
 ### RuntimeNode와 컴포넌트
 

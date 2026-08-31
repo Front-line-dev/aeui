@@ -40,6 +40,42 @@ describe('deepEqual', () => {
     expect(_deepEqual(a, b)).toBe(false);
   });
 
+  it('공유 참조와 분리 참조의 차이를 양방향으로 구분', () => {
+    const shared = {};
+    const sharedGraph = { left: shared, right: shared };
+    const splitGraph = { left: {}, right: {} };
+
+    expect(_deepEqual(sharedGraph, splitGraph)).toBe(false);
+    expect(_deepEqual(splitGraph, sharedGraph)).toBe(false);
+  });
+
+  it('동일 참조도 기존 객체 대응과 충돌하면 같지 않게 취급', () => {
+    const shared = {};
+    const a = { first: {}, second: shared };
+    const b = { first: shared, second: shared };
+
+    expect(_deepEqual(a, b)).toBe(false);
+    expect(_deepEqual(b, a)).toBe(false);
+  });
+
+  it('서로 다른 내장 타입은 빈 enumerable key가 같아도 구분', () => {
+    const values = [
+      {},
+      [],
+      new Date(0),
+      /x/,
+      new Map(),
+      new Set(),
+    ];
+
+    for (let i = 0; i < values.length; i += 1) {
+      for (let j = i + 1; j < values.length; j += 1) {
+        expect(_deepEqual(values[i], values[j])).toBe(false);
+        expect(_deepEqual(values[j], values[i])).toBe(false);
+      }
+    }
+  });
+
   it('Date 비교', () => {
     const d1 = new Date('2024-01-01');
     const d2 = new Date('2024-01-01');
@@ -82,6 +118,43 @@ describe('deepEqual', () => {
     const s2 = new Set([{ nested: { ok: true } }, { id: 1 }, shared, 'a', 1]);
 
     expect(_deepEqual(s1, s2)).toBe(true);
+  });
+
+  it('Set 후보 비교 실패가 다음 후보의 객체 대응에 영향을 주지 않음', () => {
+    const s1 = new Set([
+      { common: { value: 1 }, kind: 'first' },
+      { common: { value: 1 }, kind: 'second' },
+    ]);
+    const s2 = new Set([
+      { common: { value: 1 }, kind: 'second' },
+      { common: { value: 1 }, kind: 'first' },
+    ]);
+
+    expect(_deepEqual(s1, s2)).toBe(true);
+  });
+
+  it('Set에서 accessor와 같은 값을 가진 data property를 동일하게 비교', () => {
+    const accessorValue = {};
+    Object.defineProperty(accessorValue, 'value', {
+      enumerable: true,
+      get() {
+        return 1;
+      },
+    });
+
+    const s1 = new Set([accessorValue, { kind: 'other' }]);
+    const s2 = new Set([{ kind: 'other' }, { value: 1 }]);
+
+    expect(_deepEqual(s1, s2)).toBe(true);
+  });
+
+  it('Set의 동일 참조 값도 바깥 객체 대응과 충돌하면 같지 않게 취급', () => {
+    const shared = {};
+    const a = { outside: {}, values: new Set([shared]) };
+    const b = { outside: shared, values: new Set([shared]) };
+
+    expect(_deepEqual(a, b)).toBe(false);
+    expect(_deepEqual(b, a)).toBe(false);
   });
 
   it('Set 내부 VNode는 같은 참조일 때만 동일하게 취급', () => {
@@ -129,6 +202,7 @@ describe('deepEqual', () => {
     b.y.next = b.y;
 
     expect(_deepEqual(a, b)).toBe(false);
+    expect(_deepEqual(b, a)).toBe(false);
   });
 
   it('순환 참조 Set 비교 시 크래시 없이 동작', () => {
@@ -183,6 +257,62 @@ describe('deepClone', () => {
     expect(cloned).toEqual(original);
     cloned.b.c = 99;
     expect(original.b.c).toBe(2); // 원본 변경 안 됨
+  });
+
+  it('객체의 공유 참조 관계를 복제본 안에서 보존', () => {
+    const shared = { value: 1 };
+    const original = { left: shared, right: shared };
+    const cloned = _deepClone(original);
+
+    expect(cloned.left).not.toBe(shared);
+    expect(cloned.left).toBe(cloned.right);
+  });
+
+  it('own __proto__를 prototype 변경 없이 독립적인 data property로 복제', () => {
+    const pollutionKey = '__aeuiDeepClonePolluted__';
+    const beforeDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, pollutionKey);
+    const protoValue = { [pollutionKey]: true };
+    const original = {};
+    Object.defineProperty(original, '__proto__', {
+      value: protoValue,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+
+    const cloned = _deepClone(original);
+    const descriptor = Object.getOwnPropertyDescriptor(cloned, '__proto__');
+
+    expect(Object.hasOwn(cloned, '__proto__')).toBe(true);
+    expect(Object.getPrototypeOf(cloned)).toBe(Object.prototype);
+    expect(descriptor).toEqual({
+      value: expect.any(Object),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    expect(descriptor.value).not.toBe(protoValue);
+    expect(descriptor.value).toEqual(protoValue);
+    expect(Object.getOwnPropertyDescriptor(Object.prototype, pollutionKey)).toEqual(beforeDescriptor);
+  });
+
+  it('자기 자신을 가리키는 own __proto__를 순환 구조로 복제', () => {
+    const original = {};
+    Object.defineProperty(original, '__proto__', {
+      value: original,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+
+    const cloned = _deepClone(original);
+    const descriptor = Object.getOwnPropertyDescriptor(cloned, '__proto__');
+
+    expect(Object.getPrototypeOf(cloned)).toBe(Object.prototype);
+    expect(descriptor.value).toBe(cloned);
+    expect(descriptor.enumerable).toBe(true);
+    expect(descriptor.writable).toBe(true);
+    expect(descriptor.configurable).toBe(true);
   });
 
   it('Date 복제', () => {

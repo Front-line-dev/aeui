@@ -8,8 +8,6 @@
 
 | ID | 영역 | 근거 |
 |---|---|---|
-| `AEUI-DATA-FIX-001` | 깊은 비교의 대칭성·타입·참조 그래프 | [internal-implement/07 § _deepEqual](../internal-implement/07-deep-compare.md) |
-| `AEUI-DATA-FIX-002` | `__proto__` own property 안전 복제 | [internal-implement/07 § _deepClone](../internal-implement/07-deep-compare.md) |
 | `AEUI-DOM-FIX-001` | boolean `aria-*` 의미 | [internal-implement/08 § props 적용](../internal-implement/08-dom.md) |
 | `AEUI-DOM-FIX-002` | file input type 대소문자 판정 | [internal-implement/08 § controlled input](../internal-implement/08-dom.md) |
 | `AEUI-COMPILER-IMPORT-FIX-001` | default·namespace import 보존 | [internal-implement/10 § runtime import 주입](../internal-implement/10-babel-compiler.md) |
@@ -20,20 +18,6 @@
 | `AEUI-COMPILER-FIX-005` | 사용자 render parameter를 wrapper로 오인 | [internal-implement/10 § render wrapper 중복 방지](../internal-implement/10-babel-compiler.md#render-wrapper-중복-방지) |
 | `AEUI-ROUTER-FIX-001` | route/source 확장자 집합 불일치 | [internal-implement/16 § route table](../internal-implement/16-router.md) |
 | `AEUI-VITE-FIX-001` | public/internal virtual entry 중복 주입 | [user-scenario/07 § HTML 진입점](../user-scenario/07-project-config.md#html-진입점) |
-
-## 데이터 연산
-
-### `AEUI-DATA-FIX-001`: `_deepEqual`
-
-- 현재 잘못된 결과: 단방향 `a -> b` 대응만 기록해 인자 순서에 따라 결과가 달라질 수 있고, 서로 다른 내장 타입이나 공유 참조 구조를 같은 값으로 판단할 수 있다.
-- 영향 코드: `packages/core/src/deep-compare.js`
-- 회귀 검증 범위: 인자 순서 대칭성, 내장 타입 일치, 순환·공유 참조의 일대일 대응과 Set 후보별 격리 상태.
-
-### `AEUI-DATA-FIX-002`: `_deepClone`
-
-- 현재 잘못된 결과: enumerable own `__proto__`를 일반 대입해 property를 잃고 clone의 prototype을 바꿀 수 있다.
-- 영향 코드: `packages/core/src/deep-compare.js`
-- 회귀 검증 범위: `__proto__` own data property, clone의 prototype과 전역 prototype 불변성.
 
 ## DOM
 
