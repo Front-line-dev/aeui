@@ -1,6 +1,7 @@
 import { Layout, Home, Product, NotFound } from '../fixtures/router-pages.jsx';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AEUI, watch, clean } from 'aeui';
+import { watch as observe, clean as dispose } from 'aeui';
 import { resetRuntimeState } from '../../../../packages/core/src/runtime-state.js';
 
 /**
@@ -19,6 +20,7 @@ beforeEach(() => {
 
 afterEach(() => {
   runtime.stopScheduler();
+  for (const child of runtime.state.rootNode?.children || []) runtime.unmountNode(child);
   resetRuntimeState(runtime.state);
   container.remove();
 });
@@ -139,7 +141,7 @@ describe('상태 변경 (let 변수)', () => {
 });
 
 describe('DOM 이벤트 자동 렌더', () => {
-  it('클릭 이벤트 뒤 다음 프레임에 자동으로 다시 렌더된다', async () => {
+  it('오래 유휴 상태여도 클릭 이벤트는 다음 프레임에 자동 반영', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('requestAnimationFrame', (callback) => setTimeout(() => callback(0), 16));
     vi.stubGlobal('cancelAnimationFrame', (id) => clearTimeout(id));
@@ -158,6 +160,8 @@ describe('DOM 이벤트 자동 렌더', () => {
 
       AEUI.init(AutoRenderApp, container);
       expect(container.querySelector('#auto-count').textContent).toBe('0');
+
+      await vi.advanceTimersByTimeAsync(4000);
 
       container.querySelector('#auto-btn').click();
 
@@ -178,11 +182,12 @@ describe('DOM 이벤트 자동 렌더', () => {
     vi.stubGlobal('requestAnimationFrame', (callback) => setTimeout(() => callback(0), 16));
     vi.stubGlobal('cancelAnimationFrame', (id) => clearTimeout(id));
 
-    const tickSpy = vi.spyOn(runtime, 'tick');
+    const renders = vi.fn();
 
     try {
       function CoalescedAutoRenderApp() {
         let count = 0;
+        watch(renders);
 
         return (
           <div>
@@ -193,7 +198,7 @@ describe('DOM 이벤트 자동 렌더', () => {
       }
 
       AEUI.init(CoalescedAutoRenderApp, container);
-      expect(tickSpy).toHaveBeenCalledTimes(1);
+      expect(renders).toHaveBeenCalledTimes(1);
 
       const button = container.querySelector('#coalesced-btn');
       button.click();
@@ -204,9 +209,31 @@ describe('DOM 이벤트 자동 렌더', () => {
       await vi.advanceTimersByTimeAsync(16);
 
       expect(container.querySelector('#coalesced-count').textContent).toBe('2');
-      expect(tickSpy).toHaveBeenCalledTimes(2);
+      expect(renders).toHaveBeenCalledTimes(2);
     } finally {
-      tickSpy.mockRestore();
+      runtime.stopScheduler();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('외부 타이머의 let 변경을 유휴 상태에서도 1초 이내 자동 반영', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', (callback) => setTimeout(callback, 16));
+    vi.stubGlobal('cancelAnimationFrame', clearTimeout);
+    try {
+      function TimerApp() {
+        let message = 'waiting';
+        const timer = setTimeout(() => { message = 'complete'; }, 4000);
+        clean(() => clearTimeout(timer));
+        return <p>{message}</p>;
+      }
+      AEUI.init(TimerApp, container);
+      await vi.advanceTimersByTimeAsync(3999);
+      expect(container.textContent).toBe('waiting');
+      await vi.advanceTimersByTimeAsync(1001);
+      expect(container.textContent).toBe('complete');
+    } finally {
       runtime.stopScheduler();
       vi.useRealTimers();
       vi.unstubAllGlobals();
@@ -1036,26 +1063,24 @@ describe('key 기반 reconciliation', () => {
 
 // ─── Fragment ───
 
-// Fragment는 babel 플러그인이 PascalCase 함수를 컴포넌트로 변환하므로,
-// JSX <></> 구문 대신 createVNode으로 직접 테스트
 describe('Fragment', () => {
-  it('Fragment children이 부모 DOM에 직접 렌더됨', () => {
-    // Fragment를 사용하는 컴포넌트를 createVNode으로 구성
+  it('JSX Fragment의 children이 부모 DOM에 직접 렌더되고 갱신됨', () => {
+    let first = 'First';
     function FragmentUser() {
       return (
         <div id="frag-wrap">
-          {AEUI.createVNode(AEUI.Fragment, null,
-            AEUI.createVNode('p', { id: 'frag1' }, 'First'),
-            AEUI.createVNode('p', { id: 'frag2' }, 'Second')
-          )}
+          <><p id="frag1">{first}</p><p id="frag2">Second</p></>
         </div>
       );
     }
 
     AEUI.init(FragmentUser, container);
 
-    expect(container.querySelector('#frag1').textContent).toBe('First');
-    expect(container.querySelector('#frag2').textContent).toBe('Second');
+    const wrapper = container.querySelector('#frag-wrap');
+    expect(Array.from(wrapper.childNodes).map(node => node.textContent)).toEqual(['First', 'Second']);
+    first = 'Updated';
+    AEUI.render();
+    expect(Array.from(wrapper.childNodes).map(node => node.textContent)).toEqual(['Updated', 'Second']);
   });
 
   it('Fragment를 반환하는 중첩 컴포넌트 다음 형제 컴포넌트가 정상 업데이트됨', () => {
@@ -1275,5 +1300,178 @@ describe('DOM 타입 교체 시 내부 컴포넌트 cleanup 실행', () => {
     AEUI.render();
 
     expect(cButton().textContent).toBe('C:1');
+  });
+});
+
+describe('훅의 실행과 정리', () => {
+  it('watch에 함수가 아닌 callback을 전달하면 TypeError로 거부', () => {
+    let failure;
+    const observed = vi.fn();
+    function App() {
+      try {
+        watch(null);
+      } catch (error) {
+        failure = error;
+      }
+      watch(observed);
+      return <p>ready</p>;
+    }
+    AEUI.init(App, container);
+    expect(failure).toBeInstanceOf(TypeError);
+    expect(failure.message).toContain('requires callback to be a function');
+    expect(container.textContent).toBe('ready');
+    expect(observed).toHaveBeenCalledTimes(1);
+  });
+
+  it('watch에 배열이 아닌 deps를 전달하면 등록을 거부하고 callback을 실행하지 않음', () => {
+    let failure;
+    const rejected = vi.fn();
+    function App() {
+      try {
+        watch(rejected, { count: 0 });
+      } catch (error) {
+        failure = error;
+      }
+      return <p>ready</p>;
+    }
+    AEUI.init(App, container);
+    AEUI.render();
+    expect(failure).toBeInstanceOf(TypeError);
+    expect(failure.message).toContain('requires deps to be an array');
+    expect(rejected).not.toHaveBeenCalled();
+    expect(container.textContent).toBe('ready');
+  });
+
+  it('dependency getter가 잘못된 값을 반환하면 오류를 기록하고 정상 배열로 복구되면 다시 관찰', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const observed = vi.fn();
+    const otherWatcher = vi.fn();
+    let deps = [0];
+    try {
+      function App() {
+        watch(observed, () => deps);
+        watch(otherWatcher);
+        return <p>{Array.isArray(deps) ? 'valid' : 'invalid'}</p>;
+      }
+      AEUI.init(App, container);
+      deps = null;
+      AEUI.render();
+      expect(errors).toHaveBeenCalledWith('[AEUI] Watcher error:', expect.any(TypeError));
+      expect(errors.mock.calls[0][1].message).toContain('requires deps to be an array');
+      expect(observed).not.toHaveBeenCalled();
+      expect(otherWatcher).toHaveBeenCalledTimes(2);
+      expect(container.textContent).toBe('invalid');
+
+      deps = [1];
+      AEUI.render();
+      AEUI.render();
+      expect(observed).toHaveBeenCalledTimes(1);
+      expect(container.textContent).toBe('valid');
+      expect(errors).toHaveBeenCalledTimes(1);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it('같은 객체의 중첩 값을 직접 변이해도 watch가 변경을 감지하고 중복 실행하지 않음', () => {
+    const values = [];
+    function App() {
+      const state = { profile: { count: 0 } };
+      watch(() => { values.push(state.profile.count); }, [state]);
+      return <button onClick={() => state.profile.count++}>{state.profile.count}</button>;
+    }
+    AEUI.init(App, container);
+    expect(values).toEqual([]);
+    const button = container.querySelector('button');
+    button.click();
+    AEUI.render();
+    AEUI.render();
+    expect(values).toEqual([1]);
+    button.click();
+    AEUI.render();
+    expect(values).toEqual([1, 2]);
+    expect(container.textContent).toBe('2');
+  });
+
+  it('import 별칭과 이름 있는 dependency getter도 최신 상태를 관찰하고 한 번 정리', () => {
+    const values = [];
+    const inlineValues = [];
+    const disposed = vi.fn();
+    function App() {
+      let count = 0;
+      const deps = () => [count];
+      observe(() => { values.push(count); return [count]; }, deps);
+      observe(() => { inlineValues.push(count); }, [count]);
+      dispose(disposed);
+      return <button onClick={() => count++}>{count}</button>;
+    }
+    AEUI.init(App, container);
+    expect(values).toEqual([]);
+    expect(inlineValues).toEqual([]);
+    container.querySelector('button').click();
+    AEUI.render();
+    AEUI.render();
+    expect(container.textContent).toBe('1');
+    expect(values).toEqual([1]);
+    expect(inlineValues).toEqual([1]);
+    AEUI.init(SimpleApp, container);
+    AEUI.render();
+    expect(disposed).toHaveBeenCalledTimes(1);
+    expect(values).toEqual([1]);
+  });
+
+  it('watch 오류가 뒤의 watcher나 화면 갱신을 막지 않음', () => {
+    const failure = new Error('watch failed');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const values = [];
+    try {
+      function App() {
+        let count = 0;
+        watch(() => { throw failure; }, [count]);
+        watch(() => { values.push(count); }, [count]);
+        return <button onClick={() => count++}>{count}</button>;
+      }
+      AEUI.init(App, container);
+      const button = container.querySelector('button');
+      button.click();
+      AEUI.render();
+      button.click();
+      AEUI.render();
+      expect(container.textContent).toBe('2');
+      expect(values).toEqual([1, 2]);
+      expect(errors).toHaveBeenCalledWith(expect.any(String), failure);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it('cleanup 오류 뒤에도 등록 순서대로 한 번씩 정리하고 제거된 watcher는 실행하지 않음', () => {
+    const failure = new Error('cleanup failed');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const calls = [];
+    const observed = vi.fn();
+    try {
+      function Child() {
+        watch(observed);
+        clean(() => { calls.push('first'); throw failure; });
+        clean(() => { calls.push('second'); });
+        return <span>child</span>;
+      }
+      function App() {
+        let visible = true;
+        return <div>{visible && <Child />}<button onClick={() => { visible = false; }}>remove</button></div>;
+      }
+      AEUI.init(App, container);
+      expect(observed).toHaveBeenCalledTimes(1);
+      container.querySelector('button').click();
+      AEUI.render();
+      AEUI.render();
+      expect(container.querySelector('span')).toBeNull();
+      expect(observed).toHaveBeenCalledTimes(1);
+      expect(calls).toEqual(['first', 'second']);
+      expect(errors).toHaveBeenCalledWith(expect.any(String), failure);
+    } finally {
+      errors.mockRestore();
+    }
   });
 });

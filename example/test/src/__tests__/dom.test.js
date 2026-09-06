@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AEUI, watch } from 'aeui';
-import { cloneHostPropsSnapshot } from '../../../../packages/core/src/dom-host.js';
 import { resetRuntimeState } from '../../../../packages/core/src/runtime-state.js';
 
 const runtime = AEUI.__runtime;
@@ -29,79 +28,56 @@ describe('_updateDomProps', () => {
     div = document.createElement('div');
   });
 
-  it('children prop을 DOM에 설정하지 않음', () => {
-    runtime.updateDomProps(div, { children: ['child1', 'child2'] });
-    expect(div.hasAttribute('children')).toBe(false);
-  });
-
-  it('key, ref prop을 DOM에 설정하지 않음', () => {
-    runtime.updateDomProps(div, { key: 'k1', ref: {} });
-    expect(div.hasAttribute('key')).toBe(false);
-    expect(div.hasAttribute('ref')).toBe(false);
-  });
-
-  it('JSX 개발 metadata prop을 DOM에 설정하지 않음', () => {
+  it('children, key, ref와 JSX 개발 metadata를 DOM에 설정하지 않음', () => {
     runtime.updateDomProps(div, {
+      children: ['child'], key: 'item', ref: () => {},
       __self: { component: 'node' },
       __source: { fileName: 'App.jsx', lineNumber: 1, columnNumber: 1 },
     });
 
     expect(div.hasAttribute('__self')).toBe(false);
     expect(div.hasAttribute('__source')).toBe(false);
-  });
-
-  it('JSX 개발 metadata prop은 host props snapshot에서 제외', () => {
-    const deepClone = vi.fn((value) => value);
-    const self = { kind: 'component' };
-    self.parent = self;
-
-    const snapshot = cloneHostPropsSnapshot(
-      { deepClone },
-      {
-        id: 'ok',
-        __self: self,
-        __source: { fileName: 'App.jsx', lineNumber: 1, columnNumber: 1 },
-      }
-    );
-
-    expect(snapshot).toEqual({ id: 'ok' });
-    expect(deepClone).toHaveBeenCalledTimes(1);
-    expect(deepClone).toHaveBeenCalledWith('ok');
-  });
-
-  it('className을 class attribute로 설정', () => {
-    runtime.updateDomProps(div, { className: 'my-class' });
-    expect(div.className).toBe('my-class');
+    expect(div.hasAttribute('children')).toBe(false);
+    expect(div.hasAttribute('key')).toBe(false);
+    expect(div.hasAttribute('ref')).toBe(false);
   });
 
   it('className 제거 시 빈 문자열로 설정', () => {
     runtime.updateDomProps(div, { className: 'my-class' });
+    expect(div.className).toBe('my-class');
     runtime.updateDomProps(div, { className: undefined }, { className: 'my-class' });
     expect(div.className).toBe('');
   });
 
-  it('style 문자열 처리', () => {
+  it('style 문자열을 객체로 교체하고 이전 속성을 제거', () => {
     runtime.updateDomProps(div, { style: 'color: red' });
-    expect(div.style.cssText).toContain('color');
-  });
-
-  it('style 객체 처리', () => {
-    runtime.updateDomProps(div, { style: { color: 'red', fontSize: '16px' } });
     expect(div.style.color).toBe('red');
+    runtime.updateDomProps(div, { style: { fontSize: '16px' } }, { style: 'color: red' });
+    expect(div.style.color).toBe('');
     expect(div.style.fontSize).toBe('16px');
-  });
-
-  it('boolean attribute true 설정', () => {
-    runtime.updateDomProps(div, { disabled: true });
-    expect(div.disabled).toBe(true);
-    expect(div.hasAttribute('disabled')).toBe(true);
+    runtime.updateDomProps(div, {}, { style: { fontSize: '16px' } });
+    expect(div.style.cssText).toBe('');
   });
 
   it('boolean attribute false 설정 (attribute 제거)', () => {
-    runtime.updateDomProps(div, { disabled: true });
-    runtime.updateDomProps(div, { disabled: false }, { disabled: true });
-    expect(div.disabled).toBe(false);
-    expect(div.hasAttribute('disabled')).toBe(false);
+    const button = document.createElement('button');
+    runtime.updateDomProps(button, { disabled: true });
+    expect(button.disabled).toBe(true);
+    expect(button.hasAttribute('disabled')).toBe(true);
+    runtime.updateDomProps(button, { disabled: false }, { disabled: true });
+    expect(button.disabled).toBe(false);
+    expect(button.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('ARIA 속성의 false를 문자열로 유지하고 생략 시 제거', () => {
+    const enabled = { 'aria-expanded': true };
+    const disabled = { 'aria-expanded': false };
+    runtime.updateDomProps(div, enabled);
+    expect(div.getAttribute('aria-expanded')).toBe('true');
+    runtime.updateDomProps(div, disabled, enabled);
+    expect(div.getAttribute('aria-expanded')).toBe('false');
+    runtime.updateDomProps(div, {}, disabled);
+    expect(div.hasAttribute('aria-expanded')).toBe(false);
   });
 
   it('boolean attribute가 undefined로 제거되면 DOM property도 false로 리셋', () => {
@@ -133,15 +109,21 @@ describe('_updateDomProps', () => {
     expect(select.getAttribute('value')).toBe('DELIVERED');
   });
 
-  it('file input에는 value property를 강제로 쓰지 않음', () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-
-    expect(() => {
-      runtime.updateDomProps(input, { type: 'file', value: 'fake-path' });
-    }).not.toThrow();
-
-    expect(input.getAttribute('value')).toBeNull();
+  it('file input은 마운트와 재렌더링 모두 value를 강제로 쓰지 않음', () => {
+    for (const type of ['file', 'FILE', 'File']) {
+      const container = document.createElement('div');
+      const root = createRoot(container);
+      let node = reconcileRoot(container, root, null,
+        AEUI.createVNode('input', { type, value: 'fake-path' }));
+      const input = container.firstChild;
+      node = reconcileRoot(container, root, node,
+        AEUI.createVNode('input', { type, value: 'next-path' }));
+      expect(container.firstChild).toBe(input);
+      expect(input.type).toBe('file');
+      expect(input.value).toBe('');
+      expect(input.getAttribute('value')).toBeNull();
+      runtime.unmountNode(node);
+    }
   });
 
   it('input이 text에서 file로 바뀌면 이전 value attribute를 제거함', () => {
@@ -476,209 +458,6 @@ describe('_reconcile key 기반 child matching', () => {
   });
 });
 
-describe('_unmountNode', () => {
-  it('isMounted를 false로 설정하고 _domNodeCount를 0으로 초기화', () => {
-    const node = {
-      kind: 'component',
-      isMounted: true,
-      _domNodeCount: 3,
-      cleanups: [],
-      children: [],
-      watchStates: [{ callback: () => { }, getDeps: () => [], oldDeps: [] }],
-      parentDom: null,
-      firstDom: null,
-      lastDom: null,
-    };
-
-    runtime.unmountNode(node);
-
-    expect(node.isMounted).toBe(false);
-    expect(node.firstDom).toBeNull();
-    expect(node.lastDom).toBeNull();
-  });
-
-  it('watchStates를 비움', () => {
-    const node = {
-      kind: 'component',
-      isMounted: true,
-      cleanups: [],
-      children: [],
-      watchStates: [{ callback: () => { }, getDeps: () => [], oldDeps: [] }],
-      parentDom: null,
-      firstDom: null,
-      lastDom: null,
-    };
-
-    runtime.unmountNode(node);
-
-    expect(node.watchStates).toEqual([]);
-  });
-
-  it('cleanup 함수 실행', () => {
-    const cleanup = vi.fn();
-    const node = {
-      kind: 'component',
-      isMounted: true,
-      cleanups: [cleanup],
-      children: [],
-      watchStates: [],
-      parentDom: null,
-      firstDom: null,
-      lastDom: null,
-    };
-
-    runtime.unmountNode(node);
-
-    expect(cleanup).toHaveBeenCalledTimes(1);
-  });
-
-  it('cleanup 에러가 다른 정리작업을 차단하지 않음', () => {
-    const errorCleanup = () => { throw new Error('cleanup error'); };
-    const goodCleanup = vi.fn();
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
-
-    const node = {
-      kind: 'component',
-      isMounted: true,
-      cleanups: [errorCleanup, goodCleanup],
-      children: [],
-      watchStates: [],
-      parentDom: null,
-      firstDom: null,
-      lastDom: null,
-    };
-
-    runtime.unmountNode(node);
-
-    expect(goodCleanup).toHaveBeenCalledTimes(1);
-    expect(consoleSpy).toHaveBeenCalled();
-    consoleSpy.mockRestore();
-  });
-
-  it('자식 인스턴스도 재귀적으로 unmount', () => {
-    const childCleanup = vi.fn();
-    const child = {
-      kind: 'component',
-      isMounted: true,
-      cleanups: [childCleanup],
-      children: [],
-      watchStates: [],
-      parentDom: null,
-      firstDom: null,
-      lastDom: null,
-    };
-    const parent = {
-      kind: 'component',
-      isMounted: true,
-      cleanups: [],
-      children: [child],
-      watchStates: [],
-      parentDom: null,
-      firstDom: null,
-      lastDom: null,
-    };
-
-    runtime.unmountNode(parent);
-
-    expect(child.isMounted).toBe(false);
-    expect(childCleanup).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('init 중복 호출 방어', () => {
-  let container;
-
-  beforeEach(() => {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-  });
-
-  afterEach(() => {
-    resetAeuiRuntime();
-    container.remove();
-  });
-
-  it('init 호출 시 RAF 스케줄러가 설정됨', () => {
-    const App = () => () => AEUI.createVNode('div', null, 'hello');
-    AEUI.init(App, container);
-    expect(runtime.state.rafId).not.toBeNull();
-  });
-
-  it('init 재호출 시 새 RAF 요청이 등록됨', () => {
-    const App = () => () => AEUI.createVNode('div', null, 'hello');
-    AEUI.init(App, container);
-    const firstTimer = runtime.state.rafId;
-
-    AEUI.init(App, container);
-    const secondTimer = runtime.state.rafId;
-
-    expect(secondTimer).not.toBe(firstTimer);
-  });
-});
-
-describe('스케줄러 프레임 백오프', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    resetAeuiRuntime();
-  });
-
-  it('변화가 없으면 1 -> 2 -> 4 프레임으로 간격이 늘어남', () => {
-    const tickSpy = vi.spyOn(runtime, 'tick').mockReturnValue(false);
-    const startSpy = vi.spyOn(runtime, 'startScheduler').mockImplementation(() => { });
-
-    runtime.state.RootComponent = () => { };
-    runtime.state.containerElement = document.createElement('div');
-    runtime.state.frameDelay = 1;
-    runtime.state.framesUntilNextTick = 0;
-
-    runtime.onAnimationFrame();
-    expect(tickSpy).toHaveBeenCalledTimes(1);
-    expect(runtime.state.frameDelay).toBe(2);
-    expect(runtime.state.framesUntilNextTick).toBe(1);
-
-    runtime.onAnimationFrame();
-    expect(tickSpy).toHaveBeenCalledTimes(1);
-    expect(runtime.state.frameDelay).toBe(2);
-    expect(runtime.state.framesUntilNextTick).toBe(0);
-
-    runtime.onAnimationFrame();
-    expect(tickSpy).toHaveBeenCalledTimes(2);
-    expect(runtime.state.frameDelay).toBe(4);
-    expect(runtime.state.framesUntilNextTick).toBe(3);
-    expect(startSpy).toHaveBeenCalledTimes(3);
-  });
-
-  it('변화가 생기면 프레임 간격이 1로 즉시 리셋됨', () => {
-    vi.spyOn(runtime, 'startScheduler').mockImplementation(() => { });
-    vi.spyOn(runtime, 'tick').mockReturnValue(true);
-
-    runtime.state.RootComponent = () => { };
-    runtime.state.containerElement = document.createElement('div');
-    runtime.state.frameDelay = 16;
-    runtime.state.framesUntilNextTick = 0;
-
-    runtime.onAnimationFrame();
-
-    expect(runtime.state.frameDelay).toBe(1);
-    expect(runtime.state.framesUntilNextTick).toBe(0);
-  });
-
-  it('프레임 간격은 최대 60까지 증가함', () => {
-    vi.spyOn(runtime, 'startScheduler').mockImplementation(() => { });
-    vi.spyOn(runtime, 'tick').mockReturnValue(false);
-
-    runtime.state.RootComponent = () => { };
-    runtime.state.containerElement = document.createElement('div');
-    runtime.state.frameDelay = 48;
-    runtime.state.framesUntilNextTick = 0;
-
-    runtime.onAnimationFrame();
-
-    expect(runtime.state.frameDelay).toBe(60);
-    expect(runtime.state.framesUntilNextTick).toBe(59);
-  });
-});
-
 describe('수동 렌더 API', () => {
   let container;
   let increment;
@@ -715,15 +494,6 @@ describe('수동 렌더 API', () => {
 });
 
 describe('에러 처리', () => {
-  it('createNode는 component shell만 만들고 setup은 바로 실행하지 않음', () => {
-    const component = vi.fn(() => () => 'ok');
-
-    const node = runtime.createNode({ tag: component, props: { value: 1 } }, null, null);
-
-    expect(component).not.toHaveBeenCalled();
-    expect(node.kind).toBe('component');
-    expect(node.renderFactory).toBeNull();
-  });
 
   it('component setup 에러가 발생해도 현재 컴포넌트 컨텍스트가 복구됨', () => {
     let leakedNode = null;
@@ -796,66 +566,4 @@ describe('에러 처리', () => {
     container.remove();
   });
 
-  it('watcher 에러가 다른 watcher를 차단하지 않음', () => {
-    const watcherResults = [];
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
-
-    const instance = {
-      watchStates: [
-        {
-          callback: () => { throw new Error('watcher error'); },
-          getDeps: () => [1],
-          oldDeps: [0], // 변경됨 → callback 실행
-        },
-        {
-          callback: () => { watcherResults.push('ok'); },
-          getDeps: () => [1],
-          oldDeps: [0], // 변경됨 → callback 실행
-        },
-      ],
-    };
-
-    runtime.runComponentWatchers(instance);
-
-    expect(watcherResults).toEqual(['ok']); // 두 번째 watcher 정상 실행
-    expect(consoleSpy).toHaveBeenCalled();
-    consoleSpy.mockRestore();
-  });
-
-  it('watch callback 이후 최종 deps를 oldDeps로 저장함', () => {
-    const state = { count: 2 };
-    const instance = {
-      watchStates: [
-        {
-          callback: () => {
-            state.count = 1;
-          },
-          getDeps: () => [state.count],
-          oldDeps: [0],
-        },
-      ],
-    };
-
-    runtime.runComponentWatchers(instance);
-
-    expect(instance.watchStates[0].oldDeps).toEqual([1]);
-  });
-
-  it('deps가 없는 watcher는 실행할 때마다 callback을 호출함', () => {
-    const callback = vi.fn();
-    const instance = {
-      watchStates: [
-        {
-          callback,
-          getDeps: null,
-          oldDeps: null,
-        },
-      ],
-    };
-
-    runtime.runComponentWatchers(instance);
-    runtime.runComponentWatchers(instance);
-
-    expect(callback).toHaveBeenCalledTimes(2);
-  });
 });

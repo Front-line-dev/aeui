@@ -13,7 +13,7 @@ function createState() {
 }
 
 describe('runtime-context', () => {
-  it('restores the outer runtime when component contexts nest', () => {
+  it('restores the outer runtime even when a nested component throws', () => {
     const outerState = createState();
     const innerState = createState();
     const outerNode = { id: 'outer' };
@@ -26,11 +26,12 @@ describe('runtime-context', () => {
       expect(outerState.currentComponentNode).toBe(outerNode);
       expect(outerState.currentComponentPhase).toBe('render');
 
-      withComponentContext(innerState, innerNode, 'setup', () => {
+      expect(() => withComponentContext(innerState, innerNode, 'setup', () => {
         expect(getRuntimeContext()).toBe(innerState);
         expect(innerState.currentComponentNode).toBe(innerNode);
         expect(innerState.currentComponentPhase).toBe('setup');
-      });
+        throw new Error('nested setup failed');
+      })).toThrow('nested setup failed');
 
       expect(getRuntimeContext()).toBe(outerState);
       expect(outerState.currentComponentNode).toBe(outerNode);

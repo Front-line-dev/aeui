@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { parseSync } from '@babel/core';
 import { describe, it, expect, afterEach } from 'vitest';
 import aeuiVite from '../../../../packages/core/src/vite-plugin.js';
 import {
@@ -208,15 +209,18 @@ describe('aeui/vite plugin', () => {
     });
   });
 
-  it('does not treat data attributes as manual main script attributes', () => {
+  it('ignores main script text in data attributes, comments and inline strings', () => {
     const plugin = aeuiVite();
     plugin.configResolved({ root: makeFixture() });
 
-    const result = plugin.transformIndexHtml.handler(
-      '<html><body><script data-src="/src/main.js" data-type="module"></script></body></html>'
-    );
-
-    expect(result.tags[0].attrs.src).toBe('/@aeui-entry');
+    for (const content of [
+      '<script data-src="/src/main.js" data-type="module"></script>',
+      '<!-- <script type="module" src="/src/main.js"></script> -->',
+      '<script>const sample = \'<script type="module" src="/src/main.js">\';</script>',
+    ]) {
+      const result = plugin.transformIndexHtml.handler(`<html><body>${content}</body></html>`);
+      expect(result.tags[0].attrs.src).toBe('/@aeui-entry');
+    }
   });
 
   it('provides @ as a default alias to src', () => {
@@ -252,7 +256,7 @@ describe('aeui/vite plugin', () => {
     const plugin = aeuiVite();
     plugin.configResolved({ root });
 
-    const entry = plugin.load('\0virtual:aeui-entry');
+    const entry = plugin.load(plugin.resolveId('/@aeui-entry'));
 
     expect(entry).toContain('AEUI.__runtime.initDirectoryRouter');
     expect(entry).toContain('import.meta.glob("/src/pages/**/*.{js,jsx,ts,tsx,mjs,cjs}"');
@@ -274,5 +278,10 @@ describe('aeui/vite plugin', () => {
     expect(jsx.code).toContain('AEUI.createElement("div"');
     expect(tsx.code).toContain('AEUI.createElement("h1"');
     expect(ts.code).toContain('AEUI.__runtime.runRenderPhase');
+    for (const result of [jsx, tsx, ts]) {
+      expect(() => parseSync(result.code, {
+        configFile: false, babelrc: false, parserOpts: { plugins: ['typescript'] },
+      })).not.toThrow();
+    }
   });
 });

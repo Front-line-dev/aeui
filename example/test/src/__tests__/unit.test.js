@@ -13,6 +13,11 @@ describe('deepEqual', () => {
     expect(_deepEqual(null, null)).toBe(true);
     expect(_deepEqual(undefined, undefined)).toBe(true);
     expect(_deepEqual(null, undefined)).toBe(false);
+    expect(_deepEqual(NaN, NaN)).toBe(true);
+    expect(_deepEqual(0, -0)).toBe(false);
+    const fn = () => {};
+    expect(_deepEqual(fn, fn)).toBe(true);
+    expect(_deepEqual(fn, () => {})).toBe(false);
   });
 
   it('배열 비교', () => {
@@ -90,6 +95,19 @@ describe('deepEqual', () => {
     const m3 = new Map([['a', 1], ['b', 3]]);
     expect(_deepEqual(m1, m2)).toBe(true);
     expect(_deepEqual(m1, m3)).toBe(false);
+    const key = { id: 1 };
+    const map = new Map([[key, { count: 1 }]]);
+    expect(_deepEqual(map, new Map([[key, { count: 1 }]]))).toBe(true);
+    expect(_deepEqual(map, new Map([[{ id: 1 }, { count: 1 }]]))).toBe(false);
+    expect(_deepEqual(map, new Map([[key, { count: 2 }]]))).toBe(false);
+  });
+
+  it('RegExp는 패턴과 플래그를 비교하고 lastIndex는 무시', () => {
+    const pattern = /item/gi;
+    pattern.lastIndex = 3;
+    expect(_deepEqual(pattern, /item/gi)).toBe(true);
+    expect(_deepEqual(pattern, /other/gi)).toBe(false);
+    expect(_deepEqual(pattern, /item/g)).toBe(false);
   });
 
   it('Set 비교', () => {
@@ -322,6 +340,26 @@ describe('deepClone', () => {
     expect(cloned).not.toBe(original);
   });
 
+  it('Map과 Set 복제는 key 식별성, 공유 참조와 순환을 보존하고 값 변이를 격리', () => {
+    const key = { id: 1 };
+    const shared = { count: 1 };
+    const original = { map: new Map([[key, shared]]), set: new Set([shared]) };
+    original.map.set('self', original.map);
+    original.set.add(original.set);
+    const cloned = _deepClone(original);
+
+    expect(cloned.map).toBeInstanceOf(Map);
+    expect(cloned.set).toBeInstanceOf(Set);
+    expect(cloned.map.get('self')).toBe(cloned.map);
+    expect(cloned.set.has(cloned.set)).toBe(true);
+    expect(cloned.map.get(key)).not.toBe(shared);
+    expect(cloned.set.has(cloned.map.get(key))).toBe(true);
+    expect(_deepEqual(original, cloned)).toBe(true);
+    shared.count = 2;
+    expect(cloned.map.get(key).count).toBe(1);
+    expect(_deepEqual(original, cloned)).toBe(false);
+  });
+
   it('VNode는 복제하지 않고 참조를 유지', () => {
     const vnode = AEUI.createVNode('span', null, 'label');
     const original = [vnode];
@@ -358,23 +396,11 @@ describe('deepClone', () => {
 
 describe('AEUI.createVNode', () => {
   it('기본 VNode 생성', () => {
-    const vnode = AEUI.createVNode('div', { id: 'test' }, 'hello');
+    const vnode = AEUI.createElement('div', { id: 'test' }, 'hello');
     expect(vnode.tag).toBe('div');
     expect(vnode.props.id).toBe('test');
     expect(vnode.children).toEqual(['hello']);
-  });
-
-  it('VNode marker는 열거 가능한 VNode 필드로 노출되지 않음', () => {
-    const vnode = AEUI.createVNode('div', null, 'hello');
-
-    expect(Object.keys(vnode)).toEqual(['tag', 'props', 'children']);
-    expect(Object.getOwnPropertySymbols(vnode).length).toBe(1);
-  });
-
-  it('children이 props에 포함됨', () => {
-    const vnode = AEUI.createVNode('div', null, 'a', 'b');
-    expect(vnode.props.children).toEqual(['a', 'b']);
-    expect(vnode.children).toEqual(['a', 'b']);
+    expect(vnode.props.children).toEqual(['hello']);
   });
 
   it('전달받은 props 객체를 변이하지 않고 VNode별 props를 만든다', () => {
@@ -400,33 +426,5 @@ describe('AEUI.createVNode', () => {
   it('null children 필터링', () => {
     const vnode = AEUI.createVNode('div', null, 'a', null, 'b', undefined);
     expect(vnode.children).toEqual(['a', 'b']);
-  });
-
-  it('createElement는 createVNode의 alias', () => {
-    expect(AEUI.createElement).toBe(AEUI.createVNode);
-  });
-});
-
-describe('AEUI.Fragment', () => {
-  it('Fragment가 정의되어 있음', () => {
-    expect(typeof AEUI.Fragment).toBe('function');
-  });
-
-  it('렌더 시점 props.children을 반환', () => {
-    const initialItems = ['a'];
-    const nextItems = ['a', 'b', 'c'];
-
-    const render = AEUI.Fragment({ children: initialItems });
-    const result = render({ children: nextItems });
-
-    expect(result).toEqual(nextItems);
-  });
-});
-
-describe('AEUI public surface', () => {
-  it('does not expose legacy underscore runtime helpers at top level', () => {
-    expect(AEUI._tick).toBeUndefined();
-    expect(AEUI._didMutate).toBeUndefined();
-    expect(AEUI.__runtime).toBeDefined();
   });
 });

@@ -1,235 +1,165 @@
-import { describe, it, expect } from 'vitest';
-import { transformSync } from '@babel/core';
+import { describe, it, expect, afterEach } from 'vitest';
+import { parseSync, transformSync, types as t } from '@babel/core';
+import * as aeui from 'aeui';
 import aeuiPlugin from '../../../../packages/core/src/babel-plugin.js';
+import { resetRuntimeState } from '../../../../packages/core/src/runtime-state.js';
 
 function transform(code) {
   return transformSync(code, {
-    filename: 'sample.jsx',
-    configFile: false,
-    babelrc: false,
-    plugins: [
-      aeuiPlugin,
-      ['@babel/plugin-transform-react-jsx', {
-        pragma: 'AEUI.createElement',
-        pragmaFrag: 'AEUI.Fragment',
-      }],
-    ],
+    filename: 'sample.jsx', configFile: false, babelrc: false,
+    plugins: [aeuiPlugin, ['@babel/plugin-transform-react-jsx', {
+      pragma: 'AEUI.createElement', pragmaFrag: 'AEUI.Fragment',
+    }]],
   }).code;
 }
 
+// 변환된 모듈을 실제 AEUI와 실행한다. import/export만 테스트 실행 환경에 연결한다.
+function evaluate(code) {
+  const result = transformSync(code, {
+    configFile: false, babelrc: false,
+    plugins: [() => ({ visitor: {
+      ImportDeclaration(path) {
+        if (path.node.source.value !== 'aeui') throw new Error('Unexpected test import');
+        path.replaceWithMultiple(path.node.specifiers.map((specifier) => t.variableDeclaration('const', [
+          t.variableDeclarator(specifier.local, t.isImportNamespaceSpecifier(specifier)
+            ? t.identifier('__module')
+            : t.memberExpression(t.identifier('__module'), t.isImportDefaultSpecifier(specifier)
+              ? t.identifier('default') : specifier.imported)),
+        ])));
+      },
+      ExportDefaultDeclaration(path) {
+        path.replaceWith(t.expressionStatement(t.assignmentExpression('=',
+          t.memberExpression(t.identifier('__exports'), t.identifier('default')),
+          t.toExpression(path.node.declaration))));
+      },
+      ExportNamedDeclaration(path) {
+        const declaration = path.node.declaration;
+        const names = Object.keys(t.getOuterBindingIdentifiers(declaration));
+        path.replaceWithMultiple([declaration, ...names.map((name) => t.expressionStatement(
+          t.assignmentExpression('=', t.memberExpression(t.identifier('__exports'), t.identifier(name)), t.identifier(name))
+        ))]);
+      },
+    } })],
+  });
+  return new Function('__module', `const __exports = {};\n${result.code}\nreturn __exports;`)(aeui);
+}
+
+afterEach(() => {
+  const runtime = aeui.AEUI.__runtime;
+  runtime.stopScheduler();
+  for (const child of runtime.state.rootNode?.children || []) runtime.unmountNode(child);
+  resetRuntimeState(runtime.state);
+});
+
 describe('AEUI Babel Plugin', () => {
-  it('JSX를 사용하는 파일에 AEUI import를 자동 주입한다', () => {
-    const code = transform(`
-      export default () => <div>hi</div>;
-    `);
-
-    expect(code).toMatch(/import\s+\{\s*AEUI\s*\}\s+from\s+["']aeui["']/);
-    expect(code).toMatch(/AEUI\.createElement\("div"/);
+  it('기존 import binding을 보존하면서 필요한 AEUI import를 한 번만 주입', () => {
+    for (const original of [
+      '',
+      "import { watch as observe } from 'aeui';",
+      "import DefaultRuntime, { clean } from 'aeui';",
+      "import * as framework from 'aeui';",
+    ]) {
+      const code = transform(`${original}\nexport default () => <div />;`);
+      const imports = parseSync(code).program.body.filter(t.isImportDeclaration);
+      const specifiers = imports.flatMap((declaration) => declaration.specifiers);
+      expect(specifiers.filter((specifier) => specifier.local.name === 'AEUI')).toHaveLength(1);
+      const originalBindings = parseSync(original).program.body.flatMap((declaration) =>
+        declaration.specifiers.map((specifier) => specifier.local.name));
+      expect(specifiers.map((specifier) => specifier.local.name)).toEqual(expect.arrayContaining(originalBindings));
+    }
   });
 
-  it('기존 aeui import가 있으면 AEUI specifier를 추가한다', () => {
+  it('일반 함수와 콜백의 반환값을 컴포넌트로 오인하지 않음', () => {
     const code = transform(`
-      import { watch } from 'aeui';
-      export function App() {
+      export function User(name) { return name.toUpperCase(); }
+      export const doubled = [1, 2].map(value => value * 2);
+      export default () => () => 42;
+    `);
+    expect(parseSync(code).program.body.some(t.isImportDeclaration)).toBe(false);
+    const result = evaluate(code);
+    expect(result.User('kim')).toBe('KIM');
+    expect(result.doubled).toEqual([2, 4]);
+    expect(result.default()()).toBe(42);
+  });
+
+  it('익명 default 컴포넌트의 setup은 한 번 실행되고 이벤트 이후 상태가 반영됨', () => {
+    const result = evaluate(transform(`
+      export const setups = [];
+      export default () => {
+        setups.push('setup');
         let count = 0;
-        watch(() => {}, [count]);
-        return <div>{count}</div>;
-      }
-    `);
-
-    expect(code).toMatch(/import\s+\{\s*AEUI,\s*watch\s*\}\s+from\s+["']aeui["']/);
-    expect(code).toMatch(/AEUI\.__runtime\.watch\(/);
+        return <button onClick={() => count++}>{count}</button>;
+      };
+    `));
+    const container = document.createElement('div');
+    aeui.AEUI.init(result.default, container);
+    container.querySelector('button').click();
+    aeui.AEUI.render();
+    aeui.AEUI.render();
+    expect(container.textContent).toBe('1');
+    expect(result.setups).toEqual(['setup']);
   });
 
-  it('JSX와 compiled helper가 없으면 AEUI import를 주입하지 않는다', () => {
+  it('두 번 변환해도 사용자 변수와 수동 render 인자를 보존하고 최신 props를 반영', () => {
+    const source = `
+      export function Child({ value }) {
+        const _props = 'local';
+        const _newProps = 'kept';
+        return ({ suffix }) => <span>{_props}:{_newProps}:{value}:{suffix}</span>;
+      }
+      export function App() {
+        let value = 1;
+        return <div><Child value={value} suffix="ok" /><button onClick={() => value++}>+</button></div>;
+      }
+    `;
+    const { App } = evaluate(transform(transform(source)));
+    const container = document.createElement('div');
+    aeui.AEUI.init(App, container);
+    expect(container.querySelector('span').textContent).toBe('local:kept:1:ok');
+    container.querySelector('button').click();
+    aeui.AEUI.render();
+    expect(container.querySelector('span').textContent).toBe('local:kept:2:ok');
+  });
+
+  it('다른 모듈과 지역 함수의 watch/clean 호출은 AEUI 훅으로 바꾸지 않음', () => {
     const code = transform(`
-      export default function helper() {
-        return 42;
+      import { watch, clean } from 'other-library';
+      export function App() {
+        watch(() => {}, [1]); clean(() => {});
+        function local(watch) { watch('local'); }
+        local(value => value);
+        return <div />;
       }
     `);
-
-    expect(code).not.toMatch(/from\s+["']aeui["']/);
+    const calls = [];
+    transformSync(code, { configFile: false, babelrc: false, plugins: [() => ({ visitor: {
+      CallExpression(path) {
+        const callee = path.node.callee;
+        if (t.isIdentifier(callee, { name: 'watch' }) || t.isIdentifier(callee, { name: 'clean' })) {
+          calls.push(callee.name);
+        }
+      },
+    } })] });
+    expect(calls).toEqual(['watch', 'clean', 'watch']);
   });
 
-  it('JSX를 반환하지 않는 PascalCase 유틸 함수는 컴포넌트로 변환하지 않는다', () => {
-    const code = transform(`
-      function User(name) {
-        return name.toUpperCase();
-      }
-
-      console.log(User('kim'));
-    `);
-
-    expect(code).toMatch(/function User\(name\)/);
-    expect(code).toMatch(/return name\.toUpperCase\(\);/);
-    expect(code).not.toMatch(/__props/);
-    expect(code).not.toMatch(/runRenderPhase/);
+  it('정적으로 판별할 수 없는 watch deps는 명시적 getter 안내와 함께 거부', () => {
+    for (const declaration of [
+      "import { deps } from './state.js';",
+      'let deps = [1]; deps = [2];',
+    ]) {
+      expect(() => transform(`
+        import { watch } from 'aeui';
+        ${declaration}
+        export function App() { watch(() => {}, deps); return <div />; }
+      `)).toThrow(/Ambiguous watch dependency.*explicit getter/);
+    }
   });
 
-  it('로컬 AEUI binding이 JSX runtime import를 가리면 compile error를 낸다', () => {
+  it('로컬 AEUI binding이 JSX runtime import를 가리면 compile error를 냄', () => {
     expect(() => transform(`
       const AEUI = { custom: true };
       export default () => <div />;
     `)).toThrow(/Local AEUI bindings conflict/);
-  });
-
-  it('익명 default export 화살표 컴포넌트를 render factory로 변환한다', () => {
-    const code = transform(`
-      import { AEUI } from 'aeui';
-      export default () => <div>hi</div>;
-    `);
-
-    expect(code).toMatch(/export default \(\) => \{/);
-    expect(code).toMatch(/return _newProps => AEUI\.__runtime\.runRenderPhase\(/);
-    expect(code).not.toMatch(/_runComponentWatchers/);
-    expect(code).toMatch(/AEUI\.createElement\("div"/);
-  });
-
-  it('named default export helper는 컴포넌트로 오인 변환하지 않는다', () => {
-    const code = transform(`
-      import { AEUI } from 'aeui';
-      export default function helper() {
-        return () => 42;
-      }
-    `);
-
-    expect(code).not.toMatch(/_runComponentWatchers/);
-    expect(code).not.toMatch(/return _newProps =>/);
-    expect(code).toMatch(/return \(\) => 42;/);
-  });
-
-  it('anonymous default export helper도 컴포넌트로 오인 변환하지 않는다', () => {
-    const code = transform(`
-      import { AEUI } from 'aeui';
-      export default () => () => 42;
-    `);
-
-    expect(code).not.toMatch(/_runComponentWatchers/);
-    expect(code).not.toMatch(/return _newProps =>/);
-    expect(code).toMatch(/export default \(\) => \(\) => 42;/);
-  });
-
-  it('expression-body 구조분해 props가 render 함수에서 최신 props를 참조한다', () => {
-    const code = transform(`
-      import { AEUI } from 'aeui';
-      export const Greeting = ({ name }) => <p>{name}</p>;
-    `);
-
-    expect(code).toMatch(/return _newProps => AEUI\.__runtime\.runRenderPhase\(/);
-    expect(code).toMatch(/resolvedProps\.name/);
-  });
-
-  it('default parameter를 가진 구조분해 props도 최신 props target을 사용한다', () => {
-    const code = transform(`
-      import { AEUI } from 'aeui';
-      export const Greeting = ({ name } = { name: 'Guest' }) => <p>{name}</p>;
-    `);
-
-    expect(code).toMatch(/const _props = \{/);
-    expect(code).toMatch(/runRenderPhase\(_newProps, _props,/);
-    expect(code).toMatch(/resolvedProps\.name/);
-    expect(code).not.toMatch(/runRenderPhase\([^,]+, null,/);
-  });
-
-  it('구조분해된 수동 render param을 사용하는 컴포넌트도 변환된다', () => {
-    expect(() => transform(`
-      import { AEUI } from 'aeui';
-      export function App() {
-        return ({ value }) => <div>{value}</div>;
-      }
-    `)).not.toThrow();
-
-    const code = transform(`
-      import { AEUI } from 'aeui';
-      export function App() {
-        return ({ value }) => <div>{value}</div>;
-      }
-    `);
-
-    expect(code).toMatch(/AEUI\.__runtime\.runRenderPhase\(/);
-    expect(code).not.toMatch(/_runComponentWatchers/);
-  });
-
-  it('watch와 clean 호출은 runtime hook helper로 변환된다', () => {
-    const code = transform(`
-      import { AEUI, watch, clean } from 'aeui';
-      export function App() {
-        let count = 0;
-        watch(() => {}, [count]);
-        clean(() => {});
-        return <div>{count}</div>;
-      }
-    `);
-
-    expect(code).toMatch(/AEUI\.__runtime\.watch\(/);
-    expect(code).toMatch(/AEUI\.__runtime\.clean\(/);
-    expect(code).not.toMatch(/\n\s*watch\(/);
-  });
-
-  it('named callback watch(callback, deps)는 runtime helper로 변환된다', () => {
-    const code = transform(`
-      import { AEUI, watch } from 'aeui';
-      export function App() {
-        let count = 0;
-        const syncCount = () => count;
-        watch(syncCount, [count]);
-        return <div>{count}</div>;
-      }
-    `);
-
-    expect(code).toMatch(/AEUI\.__runtime\.watch\(syncCount, \(\) => \[count\]\)/);
-  });
-
-  it('배열을 반환하는 callback도 callback-first watch로 변환한다', () => {
-    const code = transform(`
-      import { AEUI, watch } from 'aeui';
-      export function App() {
-        let count = 0;
-        watch(() => [count], [count]);
-        return <div>{count}</div>;
-      }
-    `);
-
-    expect(code).toMatch(/AEUI\.__runtime\.watch\(\(\) => \[count\], \(\) => \[count\]\)/);
-  });
-
-  it('watch(callback)은 deps 없이 runtime helper로 변환한다', () => {
-    const withoutDeps = transform(`
-      import { AEUI, watch } from 'aeui';
-      export function App() {
-        watch(() => {});
-        return <div />;
-      }
-    `);
-
-    expect(withoutDeps).toMatch(/AEUI\.__runtime\.watch\(\(\) => \{\}\)/);
-    expect(withoutDeps).not.toMatch(/\n\s*watch\(/);
-  });
-
-  it('options 인자가 있는 watch 호출은 runtime helper로 변환하지 않는다', () => {
-    const withOptions = transform(`
-      import { AEUI, watch } from 'aeui';
-      export function App() {
-        let count = 0;
-        watch(() => {}, [count], { immediate: true });
-        return <div>{count}</div>;
-      }
-    `);
-
-    expect(withOptions).not.toMatch(/AEUI\.__runtime\.watch\(/);
-  });
-
-  it('watch(callback)의 구조분해 props 참조를 최신값 조회로 변환한다', () => {
-    const code = transform(`
-      import { AEUI, watch } from 'aeui';
-      export function App({ value }) {
-        watch(() => console.log(value));
-        return <div>{value}</div>;
-      }
-    `);
-
-    expect(code).toMatch(/AEUI\.__runtime\.watch\(\(\) => \{/);
-    expect(code).toMatch(/const _resolvedProps\d* = _resolveProps\d*\(\)/);
-    expect(code).toMatch(/console\.log\(_resolvedProps\d*\.value\)/);
   });
 });
