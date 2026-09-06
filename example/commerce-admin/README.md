@@ -25,9 +25,9 @@ AEUI가 “실제 앱 형태”에서 잘 동작하는지, 그리고 **React보�
 ## 실행
 
 ```bash
-cd example/commerce-admin
-npm install
-npm run dev
+npm ci
+npm run build:core
+npm run dev --workspace commerce-admin
 ```
 
 ## 데모 시나리오 (추천)

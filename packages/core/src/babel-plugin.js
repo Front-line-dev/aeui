@@ -29,12 +29,14 @@ export default function aeuiTransform({ types: t }) {
     }
 
     const existingImport = programPath.node.body.find((statement) => (
-      isAeuiImportDeclaration(statement)
+      isAeuiImportDeclaration(statement) &&
+      !statement.specifiers.some((specifier) => t.isImportNamespaceSpecifier(specifier))
     ));
 
     if (existingImport) {
       if (!hasAeuiImportSpecifier(existingImport)) {
-        existingImport.specifiers.unshift(
+        const index = t.isImportDefaultSpecifier(existingImport.specifiers[0]) ? 1 : 0;
+        existingImport.specifiers.splice(index, 0,
           t.importSpecifier(t.identifier('AEUI'), t.identifier('AEUI'))
         );
       }
@@ -140,16 +142,78 @@ export default function aeuiTransform({ types: t }) {
   );
 
   const isAeuiHookCall = (callPath, hookName) => {
-    if (!t.isIdentifier(callPath.node.callee, { name: hookName })) {
-      return false;
+    const callee = callPath.node.callee;
+    if (!t.isIdentifier(callee)) return false;
+    const binding = callPath.scope.getBinding(callee.name);
+    if (!binding) return callee.name === hookName;
+    return binding.path.isImportSpecifier() &&
+      t.isIdentifier(binding.path.node.imported, { name: hookName }) &&
+      binding.path.parentPath.node.source.value === 'aeui';
+  };
+
+  const createDependencyGetter = (depsPath) => {
+    const node = depsPath.node;
+    if (isFunctionLike(node)) return node;
+    if (depsPath.isIdentifier()) {
+      const binding = depsPath.scope.getBinding(node.name);
+      if (binding?.constant) {
+        if (binding.path.isFunctionDeclaration()) return node;
+        if (binding.path.isVariableDeclarator()) {
+          const init = binding.path.get('init');
+          if (isFunctionLike(init.node)) return node;
+          if (init.isArrayExpression() || init.isLiteral() || init.isObjectExpression()) {
+            return t.arrowFunctionExpression([], t.cloneNode(node));
+          }
+        }
+      }
+    } else if (depsPath.isArrayExpression() || depsPath.isLiteral() || depsPath.isObjectExpression()) {
+      return t.arrowFunctionExpression([], t.cloneNode(node, true));
     }
+    throw depsPath.buildCodeFrameError(
+      '[AEUI] Ambiguous watch dependency. Use an explicit getter: () => [value] or () => getDeps().'
+    );
+  };
 
-    const binding = callPath.scope.getBinding(hookName);
-    if (!binding) return true;
-    if (!binding.path.isImportSpecifier()) return false;
+  const isRuntimeReference = (refPath, methods) => {
+    const call = refPath.parentPath;
+    if (!call.isCallExpression() || call.node.arguments[0] !== refPath.node) return false;
+    const callee = call.node.callee;
+    if (!t.isMemberExpression(callee) || callee.computed ||
+        !t.isIdentifier(callee.object) || !t.isIdentifier(callee.property) ||
+        !methods.includes(callee.property.name)) return false;
+    const binding = call.scope.getBinding(callee.object.name);
+    return bindingIsAeuiImport(binding) || (!binding && callee.object.name === 'AEUI');
+  };
 
-    const parent = binding.path.parentPath;
-    return parent.isImportDeclaration() && parent.node.source.value === 'aeui';
+  // Recognize serialized compiler output by its complete render bridge structure.
+  const hasRenderBridge = (functionPath) => {
+    let found = false;
+    functionPath.traverse({
+      ReturnStatement(returnPath) {
+        if (returnPath.getFunctionParent() !== functionPath) return;
+        const wrapper = returnPath.node.argument;
+        if (!t.isArrowFunctionExpression(wrapper) || wrapper.params.length !== 1 ||
+            !t.isIdentifier(wrapper.params[0]) || !t.isCallExpression(wrapper.body)) return;
+        const { callee, arguments: args } = wrapper.body;
+        if (!t.isMemberExpression(callee) || callee.computed ||
+            !t.isIdentifier(callee.property, { name: 'runRenderPhase' }) ||
+            !t.isMemberExpression(callee.object) || callee.object.computed ||
+            !t.isIdentifier(callee.object.property, { name: '__runtime' }) ||
+            !t.isIdentifier(callee.object.object, { name: 'AEUI' }) ||
+            !bindingIsAeuiImport(returnPath.scope.getBinding('AEUI')) ||
+            args.length !== 3 || !t.isIdentifier(args[0], { name: wrapper.params[0].name }) ||
+            !isFunctionLike(args[2]) || args[2].params.length !== 1) return;
+        if (t.isNullLiteral(args[1]) && functionPath.node.params.length === 0) found = true;
+        if (t.isIdentifier(args[1])) {
+          const binding = functionPath.scope.getBinding(args[1].name);
+          const init = binding?.path.node.init;
+          if (binding?.scope === functionPath.scope && binding.constant &&
+              t.isObjectExpression(init) && init.properties.length === 1 &&
+              t.isSpreadElement(init.properties[0])) found = true;
+        }
+      },
+    });
+    return found;
   };
 
   const containsRenderableExpression = (node) => {
@@ -241,87 +305,24 @@ export default function aeuiTransform({ types: t }) {
    * 2. Check if it's used as a JSX tag (e.g. <MyComp />) in the same scope.
    */
   const shouldTransformComponent = (path) => {
-    let varName = null;
-    let isExported = false;
-    let isUsedAsComponent = false;
-
-    const isAnonymousDefaultExport =
-      path.parentPath &&
-      path.parentPath.isExportDefaultDeclaration() &&
-      (
-        t.isArrowFunctionExpression(path.node) ||
-        ((t.isFunctionDeclaration(path.node) || t.isFunctionExpression(path.node)) && !path.node.id)
-      );
-
-    if (isAnonymousDefaultExport && returnsRenderableValue(path)) {
+    if (hasRenderBridge(path)) return false;
+    if (path.parentPath.isExportDefaultDeclaration() && !path.node.id && returnsRenderableValue(path)) {
       return true;
     }
-
-    // 1. Identify Variable Name & Export Status
-    if (t.isFunctionDeclaration(path.node) && path.node.id) {
-      varName = path.node.id.name;
-      const binding = path.scope.getBinding(varName);
-      if (binding) {
-        const parent = binding.path.parentPath; // Should be Program or Export
-        isExported = (parent && (parent.isExportNamedDeclaration() || parent.isExportDefaultDeclaration()));
-
-        binding.referencePaths.forEach(refPath => {
-          if (t.isJSXOpeningElement(refPath.parent) && refPath.parent.name === refPath.node) {
-            isUsedAsComponent = true;
-          } else if (
-            t.isCallExpression(refPath.parent) &&
-            refPath.parent.arguments.length > 0 &&
-            refPath.parent.arguments[0] === refPath.node
-          ) {
-            isUsedAsComponent = true;
-          }
-        });
-      }
-    }
-    else if (t.isVariableDeclarator(path.parent) && t.isIdentifier(path.parent.id)) {
-      varName = path.parent.id.name;
-      const binding = path.scope.getBinding(varName);
-
-      if (binding) {
-        // Check if exported
-        const parent = binding.path.parentPath;
-        const grandParent = parent.parentPath;
-        isExported = (grandParent && (grandParent.isExportNamedDeclaration() || grandParent.isExportDefaultDeclaration())) ||
-          (parent.isExportNamedDeclaration() || parent.isExportDefaultDeclaration());
-
-        // Check Usage: Used as JSX Tag? <MyComp />
-        binding.referencePaths.forEach(refPath => {
-          if (t.isJSXOpeningElement(refPath.parent) && refPath.parent.name === refPath.node) {
-            isUsedAsComponent = true;
-          }
-          // Check for transformed JSX usage: React.createElement(MyComp, ...)
-          else if (
-            t.isCallExpression(refPath.parent) &&
-            refPath.parent.arguments.length > 0 &&
-            refPath.parent.arguments[0] === refPath.node
-          ) {
-            isUsedAsComponent = true;
-          }
-        });
-      }
-    } else if (t.isAssignmentExpression(path.parent) && t.isMemberExpression(path.parent.left) && !path.parent.left.computed && t.isIdentifier(path.parent.left.property)) {
-      varName = path.parent.left.property.name;
-      isExported = true;
-    } else if (t.isObjectProperty(path.parent) && t.isIdentifier(path.parent.key)) {
-      varName = path.parent.key.name;
-      isExported = true;
-    }
-
-    // 2. Apply Heuristics
-    if (isUsedAsComponent) {
-      return true;
-    }
-
-    if (varName && /^[A-Z]/.test(varName) && returnsRenderableValue(path)) {
-      return true;
-    }
-
-    return false;
+    const name = path.parentPath.isVariableDeclarator()
+      ? path.parent.id.name
+      : path.node.id?.name;
+    if (!name) return false;
+    const binding = path.scope.getBinding(name);
+    if (!binding) return false;
+    const exported = binding.path.parentPath.isExportDeclaration() ||
+      binding.path.parentPath.parentPath?.isExportDeclaration() ||
+      binding.referencePaths.some((ref) => ref.parentPath.isExportSpecifier() || ref.parentPath.isExportDefaultDeclaration());
+    const used = binding.referencePaths.some((ref) => (
+      (ref.parentPath.isJSXOpeningElement() && ref.parent.name === ref.node) ||
+      isRuntimeReference(ref, ['createElement', 'createVNode', 'init'])
+    ));
+    return used || (exported && /^[A-Z]/.test(name) && returnsRenderableValue(path));
   };
 
   /**
@@ -349,8 +350,8 @@ export default function aeuiTransform({ types: t }) {
    * Injects props destructuring and reactive update logic.
    * Handles:
    * 1. (props) -> (_initialProps)
-   * 2. const __props = { ..._initialProps };
-   * 3. const props = __props; (or let { x } = _initialProps;)
+   * 2. const _props = { ..._initialProps };
+   * 3. const props = _props; (or let { x } = _initialProps;)
    * 4. watch() dependency transformation
    * 5. return factory transformation with update logic
    */
@@ -489,12 +490,12 @@ export default function aeuiTransform({ types: t }) {
       const bindingPattern = getPropsBindingPattern(originalParam);
       const initialPropsId = path.scope.generateUidIdentifier("initialProps");
       const initialPropsSource = createInitialPropsSource(originalParam, initialPropsId);
-      propsId = t.identifier("__props");
+      propsId = path.scope.generateUidIdentifier("props");
 
       // 1. Rename Param: (props) -> (_initialProps)
       path.node.params[0] = initialPropsId;
 
-      // 2. Setup __props
+      // 2. Setup props snapshot
       const propsSetup = t.variableDeclaration("const", [
         t.variableDeclarator(
           propsId,
@@ -567,16 +568,13 @@ export default function aeuiTransform({ types: t }) {
         const args = callPath.node.arguments;
         if (args.length !== 1 && args.length !== 2) return;
 
-        const [callbackArg, secondArg] = args;
+        const [callbackArg] = args;
         if (t.isArrayExpression(callbackArg)) {
           return;
         }
 
         if (args.length === 2) {
-          let depsArg = secondArg;
-          if (!isFunctionLike(depsArg)) {
-            depsArg = t.arrowFunctionExpression([], t.cloneNode(depsArg, true));
-          }
+          const depsArg = createDependencyGetter(callPath.get('arguments.1'));
 
           callPath.node.arguments = [callbackArg, depsArg];
         }
@@ -608,7 +606,6 @@ export default function aeuiTransform({ types: t }) {
             const renderFnPath = returnPath.get("argument");
             const renderFn = renderFnPath.node;
             const originalParam = renderFn.params[0];
-            if (t.isIdentifier(originalParam) && originalParam.name.startsWith("_newProps")) return;
 
             const renderPhaseParam = path.scope.generateUidIdentifier("newProps");
             const innerRenderParam = path.scope.generateUidIdentifier("renderProps");
@@ -649,9 +646,19 @@ export default function aeuiTransform({ types: t }) {
     });
   };
 
+  const candidates = new WeakSet();
+  const transformed = new WeakSet();
+
   return {
     visitor: {
       Program: {
+        enter(path) {
+          path.traverse({
+            'ArrowFunctionExpression|FunctionDeclaration|FunctionExpression'(candidate) {
+              if (shouldTransformComponent(candidate)) candidates.add(candidate.node);
+            },
+          });
+        },
         exit(path) {
           if (needsAeuiRuntimeBinding(path)) {
             ensureAeuiImport(path);
@@ -660,9 +667,11 @@ export default function aeuiTransform({ types: t }) {
       },
 
       "ArrowFunctionExpression|FunctionDeclaration|FunctionExpression"(path) {
-        if (!shouldTransformComponent(path)) {
+        if (!candidates.has(path.node) || transformed.has(path.node)) {
           return;
         }
+
+        transformed.add(path.node);
 
         // 1. Transform Return: Return (JSX) -> Return () => (JSX)
         transformToFactory(path);

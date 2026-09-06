@@ -1,3 +1,5 @@
+import type { Plugin } from 'vite';
+
 export interface AeuiViteOptions {
   alias?: string | false;
   aliasDir?: string;
@@ -6,4 +8,4 @@ export interface AeuiViteOptions {
   styles?: string | false;
 }
 
-export default function aeui(options?: AeuiViteOptions): unknown;
+export default function aeui(options?: AeuiViteOptions): Plugin;

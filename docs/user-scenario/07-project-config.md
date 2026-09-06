@@ -6,6 +6,8 @@ AEUI 프로젝트의 Vite 플러그인 옵션, 빌드 설정, npm 패키지 구�
 
 ## Vite 플러그인 기본 설정
 
+Node.js `^22.12.0 || >=24.0.0`과 Vite 8.2.2 이상 8.x를 사용합니다.
+
 ```js
 // vite.config.js
 import { defineConfig } from 'vite';
@@ -123,7 +125,7 @@ npm에 배포되는 물리적 이름은 `a-easy-ui`이고, 코드에서 사용�
 ```json
 {
   "dependencies": {
-    "aeui": "npm:a-easy-ui@^0.0.1"
+    "aeui": "npm:a-easy-ui@0.1.0-alpha.1"
   }
 }
 ```

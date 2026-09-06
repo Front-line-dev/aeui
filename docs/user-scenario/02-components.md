@@ -196,6 +196,7 @@ export default function () { ... } // ✅ export default는 이름 없어도 인
 
 - PascalCase 이름 + JSX를 반환 + export
 - JSX에서 태그로 사용됨: `<MyComponent />`
+- 올바른 AEUI runtime의 `createElement`, `createVNode` 첫 인자 또는 `AEUI.init`의 루트 컴포넌트로 사용됨
 - `export default`인 익명 함수이면서 JSX를 반환
 
 ---

@@ -63,3 +63,9 @@
 - **프레임워크 수정:** 이 인덱스 → `internal-implement/01` → 관련 문서
 - **결함 수정:** `issue/known-defects.md` → 관련 내부 문서 → 코드
 - **기능 추가:** `issue/planned-features.md` → 관련 내부 문서 → 코드
+
+## 공개와 기여
+
+- [기여 안내](../CONTRIBUTING.md)
+- [릴리즈 절차](releasing.md)
+- [보안 문제 신고](../SECURITY.md)

@@ -26,7 +26,7 @@ export function syncHostControlledProps(state, node) {
     if (
       node.tag === 'select' ||
       node.tag === 'textarea' ||
-      (node.tag === 'input' && node.props.type !== 'file')
+      (node.tag === 'input' && String(node.props.type ?? node.dom.type).toLowerCase() !== 'file')
     ) {
       if (node.dom.value !== normalizedValue) {
         node.dom.value = normalizedValue;
@@ -134,6 +134,10 @@ export function updateDomProps(state, domNode, props, oldProps = {}) {
       } else {
         domNode.setAttribute('value', normalizedValue);
       }
+      state.didMutate = true;
+    } else if (key.startsWith('aria-')) {
+      if (newValue == null) domNode.removeAttribute(key);
+      else domNode.setAttribute(key, String(newValue));
       state.didMutate = true;
     } else if (typeof newValue === 'boolean') {
       domNode[key] = newValue;

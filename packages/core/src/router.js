@@ -1,4 +1,4 @@
-const ROUTE_EXT_RE = /\.[cm]?[jt]sx?$/;
+const ROUTE_EXT_RE = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 const DEFAULT_ROOT_DIR = '/src/pages';
 const ROUTE_ROOT_MARKERS = ['/pages/'];
 

@@ -1,0 +1,31 @@
+name: 버그 신고
+description: 재현 가능한 AEUI 동작 문제
+title: "[버그] "
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: 버전과 환경
+      description: AEUI, Node.js, Vite, 운영체제, 브라우저 버전을 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 최소 재현
+      description: 작은 코드 또는 재현 저장소와 실행 순서. 비밀정보는 제거해 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 예상 결과
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 실제 결과
+      description: 오류 메시지와 재현 조건을 적어 주세요.
+    validations:
+      required: true

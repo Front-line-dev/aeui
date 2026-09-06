@@ -55,8 +55,8 @@ RAF, polling, DOM event, timer는 테스트가 명시적으로 제어. 각 테�
 
 | 예제 | 빌드 방식 | 핵심 검증 |
 |---|---|---|
-| `example/vite-demo` | Vite + classic JSX | local state, props, watch, clean, keyed list |
-| `example/deep-compare-test` | Vite + classic JSX | 동일 데이터 새 참조, 직접 변이의 deep snapshot |
+| `example/vite-demo` | `aeui/vite` (manual main) | local state, props, watch, clean, keyed list |
+| `example/deep-compare-test` | `aeui/vite` (manual main) | 동일 데이터 새 참조, 직접 변이의 deep snapshot |
 | `example/commerce-admin` | `aeui/vite` (router mode) | 디렉터리 라우터, 전역 store, CRUD |
 | `example/letProps` | Babel Standalone | 부모 let → 자식 props |
 | `example/shoppingCart` | Babel Standalone | 배열 직접 변이, keyed component |
@@ -119,4 +119,3 @@ RAF, polling, DOM event, timer는 테스트가 명시적으로 제어. 각 테�
 - 내부 구현 참고: [`internal-implement/`](01-architecture.md)
 - 알려진 결함: [`issue/known-defects.md`](../issue/known-defects.md)
 - 계획 기능: [`issue/planned-features.md`](../issue/planned-features.md)
-

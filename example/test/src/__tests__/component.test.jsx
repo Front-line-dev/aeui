@@ -1,3 +1,4 @@
+import { Layout, Home, Product, NotFound } from '../fixtures/router-pages.jsx';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AEUI, watch, clean } from 'aeui';
 import { resetRuntimeState } from '../../../../packages/core/src/runtime-state.js';
@@ -216,37 +217,6 @@ describe('DOM 이벤트 자동 렌더', () => {
 describe('directory router runtime', () => {
   it('renders matching pages, delegates internal anchors, and handles popstate', () => {
     window.history.replaceState({}, '', '/');
-
-    function Layout({ route, children }) {
-      return (
-        <section id="layout" data-path={route.pathname}>
-          {children}
-        </section>
-      );
-    }
-
-    function Home({ route }) {
-      return (
-        <div>
-          <h1 id="page-title">Home {route.pathname}</h1>
-          <a id="product-link" href="/products/42?tab=details">Product 42</a>
-        </div>
-      );
-    }
-
-    function Product({ route }) {
-      return (
-        <div>
-          <h1 id="page-title">Product {route.params.id}</h1>
-          <span id="query-tab">{route.query.tab}</span>
-          <a id="home-link" href="/">Home</a>
-        </div>
-      );
-    }
-
-    function NotFound({ route }) {
-      return <h1 id="page-title">Missing {route.pathname}</h1>;
-    }
 
     AEUI.__runtime.initDirectoryRouter({
       '/src/pages/_layout.jsx': { default: Layout },

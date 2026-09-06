@@ -3,11 +3,12 @@ import path from 'node:path';
 import { transformAsync } from '@babel/core';
 import jsxTransform from '@babel/plugin-transform-react-jsx';
 import aeuiTransform from './babel-plugin.js';
+import { parse } from 'parse5';
 
 const VIRTUAL_ENTRY_ID = 'virtual:aeui-entry';
 const PUBLIC_ENTRY_PATH = '/@aeui-entry';
 const RESOLVED_VIRTUAL_ENTRY_ID = `\0${VIRTUAL_ENTRY_ID}`;
-const ROUTE_EXT_RE = /\.[cm]?[jt]sx?$/;
+const ROUTE_EXT_RE = /\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 const ROUTE_GLOB_EXTENSIONS = 'js,jsx,ts,tsx,mjs,cjs';
 const DEFAULT_ROUTER_DIR = 'src/pages';
 const DEFAULT_ALIAS = '@';
@@ -15,12 +16,6 @@ const DEFAULT_ALIAS_DIR = 'src';
 
 function normalizePath(filePath) {
   return String(filePath || '').replace(/\\/g, '/');
-}
-
-function getHtmlAttribute(tag, name) {
-  const pattern = new RegExp(`(?:^|[\\s<])${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i');
-  const match = String(tag || '').match(pattern);
-  return match ? (match[1] || match[2] || match[3] || '') : null;
 }
 
 function isManualMainSrc(src) {
@@ -59,12 +54,17 @@ function createAliasConfig(config, options) {
 }
 
 function hasManualModuleEntry(html) {
-  const scriptTags = String(html || '').match(/<script\b[^>]*>/gi) || [];
-  return scriptTags.some((tag) => {
-    const type = getHtmlAttribute(tag, 'type');
-    const src = getHtmlAttribute(tag, 'src');
-    return String(type || '').toLowerCase() === 'module' && isManualMainSrc(src || '');
-  });
+  const visit = (node) => {
+    if (node.tagName === 'script') {
+      const attrs = Object.fromEntries(node.attrs.map(({ name, value }) => [name, value]));
+      const src = (attrs.src || '').split(/[?#]/)[0];
+      if (attrs.type?.toLowerCase() === 'module' && (
+        src === VIRTUAL_ENTRY_ID || src === PUBLIC_ENTRY_PATH || isManualMainSrc(src)
+      )) return true;
+    }
+    return (node.childNodes || []).some(visit);
+  };
+  return visit(parse(String(html || '')));
 }
 
 function hasFile(filePath) {
@@ -168,7 +168,7 @@ export default function aeui(options = {}) {
     transformIndexHtml: {
       order: 'pre',
       handler(html) {
-        if (html.includes(VIRTUAL_ENTRY_ID) || hasManualModuleEntry(html)) {
+        if (hasManualModuleEntry(html)) {
           return html;
         }
 

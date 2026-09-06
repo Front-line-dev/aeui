@@ -30,7 +30,7 @@ describe('AEUI Babel Plugin', () => {
   it('기존 aeui import가 있으면 AEUI specifier를 추가한다', () => {
     const code = transform(`
       import { watch } from 'aeui';
-      function App() {
+      export function App() {
         let count = 0;
         watch(() => {}, [count]);
         return <div>{count}</div>;
@@ -112,7 +112,7 @@ describe('AEUI Babel Plugin', () => {
   it('expression-body 구조분해 props가 render 함수에서 최신 props를 참조한다', () => {
     const code = transform(`
       import { AEUI } from 'aeui';
-      const Greeting = ({ name }) => <p>{name}</p>;
+      export const Greeting = ({ name }) => <p>{name}</p>;
     `);
 
     expect(code).toMatch(/return _newProps => AEUI\.__runtime\.runRenderPhase\(/);
@@ -122,11 +122,11 @@ describe('AEUI Babel Plugin', () => {
   it('default parameter를 가진 구조분해 props도 최신 props target을 사용한다', () => {
     const code = transform(`
       import { AEUI } from 'aeui';
-      const Greeting = ({ name } = { name: 'Guest' }) => <p>{name}</p>;
+      export const Greeting = ({ name } = { name: 'Guest' }) => <p>{name}</p>;
     `);
 
-    expect(code).toMatch(/const __props = \{/);
-    expect(code).toMatch(/runRenderPhase\(_newProps, __props,/);
+    expect(code).toMatch(/const _props = \{/);
+    expect(code).toMatch(/runRenderPhase\(_newProps, _props,/);
     expect(code).toMatch(/resolvedProps\.name/);
     expect(code).not.toMatch(/runRenderPhase\([^,]+, null,/);
   });
@@ -134,14 +134,14 @@ describe('AEUI Babel Plugin', () => {
   it('구조분해된 수동 render param을 사용하는 컴포넌트도 변환된다', () => {
     expect(() => transform(`
       import { AEUI } from 'aeui';
-      function App() {
+      export function App() {
         return ({ value }) => <div>{value}</div>;
       }
     `)).not.toThrow();
 
     const code = transform(`
       import { AEUI } from 'aeui';
-      function App() {
+      export function App() {
         return ({ value }) => <div>{value}</div>;
       }
     `);
@@ -153,7 +153,7 @@ describe('AEUI Babel Plugin', () => {
   it('watch와 clean 호출은 runtime hook helper로 변환된다', () => {
     const code = transform(`
       import { AEUI, watch, clean } from 'aeui';
-      function App() {
+      export function App() {
         let count = 0;
         watch(() => {}, [count]);
         clean(() => {});
@@ -169,7 +169,7 @@ describe('AEUI Babel Plugin', () => {
   it('named callback watch(callback, deps)는 runtime helper로 변환된다', () => {
     const code = transform(`
       import { AEUI, watch } from 'aeui';
-      function App() {
+      export function App() {
         let count = 0;
         const syncCount = () => count;
         watch(syncCount, [count]);
@@ -183,7 +183,7 @@ describe('AEUI Babel Plugin', () => {
   it('배열을 반환하는 callback도 callback-first watch로 변환한다', () => {
     const code = transform(`
       import { AEUI, watch } from 'aeui';
-      function App() {
+      export function App() {
         let count = 0;
         watch(() => [count], [count]);
         return <div>{count}</div>;
@@ -196,7 +196,7 @@ describe('AEUI Babel Plugin', () => {
   it('watch(callback)은 deps 없이 runtime helper로 변환한다', () => {
     const withoutDeps = transform(`
       import { AEUI, watch } from 'aeui';
-      function App() {
+      export function App() {
         watch(() => {});
         return <div />;
       }
@@ -209,7 +209,7 @@ describe('AEUI Babel Plugin', () => {
   it('options 인자가 있는 watch 호출은 runtime helper로 변환하지 않는다', () => {
     const withOptions = transform(`
       import { AEUI, watch } from 'aeui';
-      function App() {
+      export function App() {
         let count = 0;
         watch(() => {}, [count], { immediate: true });
         return <div>{count}</div>;
@@ -222,7 +222,7 @@ describe('AEUI Babel Plugin', () => {
   it('watch(callback)의 구조분해 props 참조를 최신값 조회로 변환한다', () => {
     const code = transform(`
       import { AEUI, watch } from 'aeui';
-      function App({ value }) {
+      export function App({ value }) {
         watch(() => console.log(value));
         return <div>{value}</div>;
       }

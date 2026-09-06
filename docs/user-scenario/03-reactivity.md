@@ -268,3 +268,14 @@ function AutoSaver({ data }) {
   return <p>자동 저장이 활성화되어 있습니다.</p>;
 }
 ```
+
+## 이름 있는 dependency getter와 import alias
+
+`import { watch as observe } from 'aeui'`처럼 별칭을 사용할 수 있습니다. 재할당되지 않는 local 함수는 getter로 그대로 전달합니다.
+
+```js
+const getDeps = () => [count];
+observe(() => console.log(count), getDeps);
+```
+
+import된 값, 재할당되는 binding, 동적 member는 함수인지 dependency 값인지 안전하게 결정할 수 없어 컴파일 진단을 냅니다. 이때는 `() => [value]`, `() => props.deps`, `() => getDeps()`처럼 결과가 배열인 getter를 직접 적으세요.

@@ -100,7 +100,7 @@ Babel은 코드를 AST로 파싱한 뒤 visitor 패턴으로 각 노드를 순�
 
 ```text
 1. 같은 모듈의 local function binding이 JSX opening tag에서 사용됨 → 컴포넌트
-2. 정확한 AEUI runtime 호출의 tag 인자로 같은 local function binding이 사용됨 → 컴포넌트
+2. 정확한 AEUI runtime의 createElement/createVNode tag 인자 또는 init 루트 인자로 같은 local function binding이 사용됨 → 컴포넌트
 3. 같은 모듈에서 정의·export되고 PascalCase 이름과 renderable return을 모두 가짐 → 컴포넌트
 4. renderable expression을 반환하는 anonymous default export → 컴포넌트
 5. 그 외 → 변환하지 않음
@@ -112,9 +112,10 @@ Babel은 코드를 AST로 파싱한 뒤 visitor 패턴으로 각 노드를 순�
 <Card />
 AEUI.createElement(Card, props)
 AEUI.createVNode(Card, props)
+AEUI.init(Card, container)
 ```
 
-첫 번째 형태는 JSX 변환 전 AST의 opening tag와 같은 모듈의 `Card` 함수 binding을 연결한다. 두 번째와 세 번째 형태는 callee가 올바른 `AEUI` runtime binding의 `createElement` 또는 `createVNode`이고, 첫 인자도 같은 모듈의 함수 binding일 때만 근거가 된다.
+첫 번째 형태는 JSX 변환 전 AST의 opening tag와 같은 모듈의 `Card` 함수 binding을 연결한다. 두 번째와 세 번째 형태는 callee가 올바른 `AEUI` runtime binding의 `createElement`, `createVNode` 또는 `init`이고, 첫 인자도 같은 모듈의 함수 binding일 때만 근거가 된다.
 
 임의 호출의 첫 번째 인자는 컴포넌트 근거가 아니다. 따라서 `items.map(Card)`, `setTimeout(Card)`, `register(Card)` 같은 코드는 `Card`를 컴포넌트로 판정하지 않는다. import된 함수도 사용하는 모듈에서 추측 변환하지 않고, 정의가 있는 원래 모듈에서 변환해야 한다.
 

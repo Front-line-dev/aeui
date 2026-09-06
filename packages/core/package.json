@@ -1,6 +1,6 @@
 {
   "name": "a-easy-ui",
-  "version": "0.0.1",
+  "version": "0.1.0-alpha.1",
   "type": "module",
   "description": "A lightweight, custom frontend framework",
   "main": "dist/aeui.cjs",
@@ -55,24 +55,49 @@
   ],
   "scripts": {
     "build": "rollup -c",
-    "prepublishOnly": "npm run build",
     "test": "npm --prefix ../../example/test test",
-    "typecheck": "tsc -p tsconfig.types.json --noEmit"
+    "typecheck": "tsc -p tsconfig.types.json --noEmit",
+    "prepack": "npm run build"
   },
   "keywords": [
     "frontend",
     "framework",
     "ui"
   ],
-  "author": "",
   "license": "ISC",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
-    "rollup": "^4.53.3",
-    "typescript": "^5.9.3"
+    "rollup": "^4.63.1",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.0.0"
   },
   "dependencies": {
-    "@babel/core": "^7.23.0",
-    "@babel/plugin-transform-react-jsx": "^7.23.0"
+    "@babel/core": "^7.29.7",
+    "@babel/plugin-transform-react-jsx": "^7.29.7",
+    "parse5": "^8.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Front-line-dev/aeui.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/Front-line-dev/aeui#readme",
+  "bugs": {
+    "url": "https://github.com/Front-line-dev/aeui/issues"
+  },
+  "engines": {
+    "node": "^22.12.0 || >=24.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
+  "peerDependencies": {
+    "vite": "^8.2.2"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
   }
 }

@@ -117,6 +117,7 @@ vite-plugin
 ├─ node:fs / node:path
 ├─ @babel/core
 ├─ @babel/plugin-transform-react-jsx
+├─ parse5 (HTML module script 판별, 외부 의존성)
 └─ babel-plugin
 ```
 

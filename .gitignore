@@ -137,3 +137,5 @@ dist
 .DS_Store
 .worktrees/
 .codex/
+
+/release-artifacts/

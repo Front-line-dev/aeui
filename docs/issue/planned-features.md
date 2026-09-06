@@ -10,8 +10,6 @@
 - 기존 `example/test` assertion을 계약으로 복사하지 않고 기대값을 `user-scenario`에서 도출한다.
 - 값/VNode, compiler, runtime/DOM, router/Vite, package 소비와 reference app 계층을 분리한다.
 - fragment reorder, nested destructuring props와 render parameter 조합, cleanup/watch ordering을 독립 시나리오로 검증한다.
-- source 직접 import와 빌드된 package entry를 분리하고 ESM/CJS package-consumer smoke를 자동화한다.
-- `create-aeui-app` CLI를 별도 임시 디렉터리에서 검증하는 공식 suite를 추가한다.
 - [17. 소스 배치](../internal-implement/17-source-layout.md)의 파일 경계와 private 심볼 배치는 source import를 통해 검증한다 ([18. 적합성 검증](../internal-implement/18-conformance.md)의 예외 조항).
 
 ## 중간 우선순위
@@ -74,7 +72,6 @@ component의 첫 parameter가 ArrayPattern 또는 ArrayPattern assignment인 문
 
 - base path와 SPA fallback 가이드
 - 정적 빌드·배포 command 또는 script
-- GitHub Actions workflow와 repository project page 예시
 
 ### Fragment 자동 처리
 
@@ -107,13 +104,12 @@ compiler runtime bridge를 계측 또는 error boundary의 삽입 지점으로 �
 ### 빌드와 배포 검증
 
 - Rollup minification
-- npm 배포 전 package-consumer smoke 자동화
 
 ### `create-aeui-app` 개선
 
 - AEUI version 동적 삽입
 - router-first 기본 구조를 유지하는 추가 template 정책
-- template 의존성 버전(`vite: ^8.0.0`, `aeui: npm:a-easy-ui@^0.0.1`)의 자동 갱신 방안
+- template의 Vite 지원 범위와 AEUI 버전 갱신 자동화.
 
 ### monorepo tooling
 

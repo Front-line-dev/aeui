@@ -1,6 +1,6 @@
 {
   "name": "create-aeui-app",
-  "version": "0.0.1",
+  "version": "0.1.0-alpha.1",
   "description": "Scaffolding tool for AEUI apps",
   "main": "index.js",
   "bin": {
@@ -16,6 +16,21 @@
     "cli",
     "scaffold"
   ],
-  "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Front-line-dev/aeui.git",
+    "directory": "packages/create-aeui-app"
+  },
+  "homepage": "https://github.com/Front-line-dev/aeui#readme",
+  "bugs": {
+    "url": "https://github.com/Front-line-dev/aeui/issues"
+  },
+  "engines": {
+    "node": "^22.12.0 || >=24.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  }
 }

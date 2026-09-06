@@ -3,6 +3,7 @@ import resolve from '@rollup/plugin-node-resolve';
 const external = [
   '@babel/core',
   '@babel/plugin-transform-react-jsx',
+  'parse5',
 ];
 
 export default [
