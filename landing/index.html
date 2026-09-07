@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="AEUI는 let 변수로 상태를 관리하는 프론트엔드 프레임워크입니다. let, watch, props 예제를 직접 수정하고 실행해 보세요." />
+    <meta name="theme-color" content="#fafaf9" />
+    <title>AEUI — let으로 만드는 화면</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23191919'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-family='Georgia' font-size='45' fill='white'%3Ea%3C/text%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 건너뛰기</a>
+    <header class="site-header shell">
+      <a class="wordmark" href="#" aria-label="AEUI 처음으로">aeui.</a>
+      <nav aria-label="주 메뉴">
+        <a href="#features">기능</a>
+        <a href="https://github.com/Front-line-dev/aeui/blob/main/docs/README.md" target="_blank" rel="noreferrer">문서 ↗</a>
+        <a href="https://github.com/Front-line-dev/aeui" target="_blank" rel="noreferrer">GitHub ↗</a>
+        <a class="button small" href="#start">시작하기</a>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="hero shell" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">A EASY UI</p>
+          <h1 id="hero-title"><code>let</code>으로<br />만드는 화면.</h1>
+          <p class="lead">AEUI는 JavaScript 변수로 상태를 관리하는<br class="desktop-break" /> 프론트엔드 프레임워크입니다.<br />변수의 값을 바꾸면 화면도 바뀝니다.</p>
+          <div class="hero-actions"><a class="button" href="#start">프로젝트 만들기 <span aria-hidden="true">↗</span></a><a class="text-link" href="#features">예제 살펴보기 <span aria-hidden="true">↓</span></a></div>
+          <p class="development-note">AEUI는 현재 개발 중이며, API와 동작이 변경될 수 있습니다.</p>
+        </div>
+        <div class="hero-example" aria-label="AEUI 코드 예시"><div class="hero-example-bar"><span>Counter.jsx</span><span>AEUI</span></div><pre><code><span class="code-muted">export default function</span> Counter() {
+  <strong>let count = 0;</strong>
+
+  return (
+    &lt;button onClick={() =&gt; <strong>count++</strong>}&gt;
+      클릭: {count}
+    &lt;/button&gt;
+  );
+}</code></pre><a href="#let">코드를 수정하고 실행해 보세요 <span aria-hidden="true">↓</span></a></div>
+      </section>
+      <div class="feature-nav-wrap"><nav class="feature-nav shell" aria-label="주요 기능"><a href="#let"><code>let</code><span>변수로 상태 관리</span></a><a href="#nested"><code>array / object</code><span>내부 값도 직접 변경</span></a><a href="#watch"><code>watch</code><span>상태 변경에 따라 실행</span></a><a href="#props"><code>let + props</code><span>전달받은 값과 내부 상태</span></a></nav></div>
+      <section id="features" class="features shell" aria-labelledby="features-title">
+        <div class="features-heading"><h2 id="features-title">직접 사용해 보세요.</h2><p>예제의 코드를 수정하고 실행 결과를 확인할 수 있습니다.</p></div>
+        <section id="let" class="feature">
+          <div class="feature-copy"><span class="feature-label">let</span><h3>변수를 바꾸면 화면이 바뀝니다.</h3><p><code>let</code>으로 상태를 선언하고 <code>count++</code>처럼 값을 바꾸세요. 상태를 바꾸는 별도 함수가 필요하지 않습니다.</p><p>버튼 클릭이나 입력으로 값을 바꾸면 화면에 자동으로 반영됩니다.</p><p class="try-note"><strong>직접 해보기</strong><code>count++</code>를 <code>count += 5</code>로 바꾸고 버튼을 눌러보세요.</p></div>
+          <div class="playground" data-example="counter"></div>
+        </section>
+        <section id="nested" class="feature">
+          <div class="feature-copy"><span class="feature-label">array / object</span><h3>배열 안의 값도 직접 바꿉니다.</h3><p><code>cart[0].quantity++</code>처럼 배열 안 객체의 값을 바로 바꾸세요. 새 배열을 만들거나 상태 갱신 함수를 호출할 필요가 없습니다.</p><p class="try-note"><strong>직접 해보기</strong>버튼을 눌러 커피 수량을 늘려보세요.</p></div>
+          <div class="playground" data-example="nested"></div>
+        </section>
+        <section id="watch" class="feature">
+          <div class="feature-copy"><span class="feature-label">watch</span><h3>상태가 바뀌면 코드를 실행합니다.</h3><p><code>watch</code>에 실행할 함수와 관찰할 값을 지정하세요. 아래 코드는 <code>dark</code>가 바뀔 때 화면 테마를 바꿉니다.</p><p class="try-note"><strong>직접 해보기</strong>버튼을 눌러 밝은 테마와 어두운 테마를 전환해 보세요.</p></div>
+          <div class="playground" data-example="watch"></div>
+        </section>
+        <section id="props" class="feature">
+          <div class="feature-copy"><span class="feature-label">let + props</span><h3>한 컴포넌트에서 props와 let을 함께 씁니다.</h3><p><code>Order</code>는 가격을 <code>price</code> props로 받고, 수량은 자체 <code>let quantity</code>로 관리합니다. 가격과 수량 중 어느 쪽이 바뀌어도 합계에 반영됩니다.</p><p class="try-note"><strong>직접 해보기</strong>수량을 늘린 뒤 할인을 적용해 보세요. 수량은 유지되고 새 가격으로 합계가 바뀝니다.</p></div>
+          <div class="playground" data-example="props"></div>
+        </section>
+      </section>
+      <section class="get-started" id="start"><div class="shell start-layout"><div><p class="eyebrow">GET STARTED</p><h2>새 프로젝트를<br />만들어 보세요.</h2><p><code>create-aeui-app</code>이 프로젝트 파일과<br class="desktop-break" /> Vite 설정을 만들어 줍니다.</p><a class="text-link" href="https://github.com/Front-line-dev/aeui/blob/main/docs/user-scenario/01-getting-started.md" target="_blank" rel="noreferrer">시작하기 문서 ↗</a></div><div><div class="terminal"><span>터미널</span><pre><code>npx create-aeui-app@latest my-app
+cd my-app
+npm install
+npm run dev</code></pre></div><p class="requirements">Node.js 22.12 이상인 22.x 또는 24 이상</p><p class="release-note">현재 npm 공개 버전은 0.0.1이며, 위 예제는 다음 버전 기준입니다.</p></div></div></section>
+    </main>
+    <footer class="site-footer shell"><a class="wordmark" href="#">aeui.</a><span>A Easy UI</span><a href="https://github.com/Front-line-dev/aeui/blob/main/LICENSE">ISC License ↗</a></footer>
+    <noscript><p class="shell">코드 편집과 실행 예제를 사용하려면 JavaScript를 활성화해 주세요.</p></noscript>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

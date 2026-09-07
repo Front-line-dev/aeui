@@ -53,6 +53,10 @@ npm의 물리적 패키지 이름은 `a-easy-ui`이고, 앱에서는 `aeui`라�
 
 React와 JSX 문법은 비슷하지만 컴포넌트 실행 방식, 이벤트, hook 계약은 다릅니다. React 컴포넌트·hook과의 호환성은 제공하지 않습니다. DOM/event 타입은 기본 수준이며, SSR과 동시 렌더링은 현재 지원 범위가 아닙니다.
 
+## 랜딩 페이지
+
+`npm run dev:landing`으로 소개 페이지와 편집 가능한 실행 예제를 확인할 수 있습니다. `npm run build:landing`은 GitHub Pages용 정적 파일을 생성합니다. [랜딩 페이지 개발 및 자동 배포 안내](landing/README.md)
+
 ## 문서와 기여
 
 - [시작하기](docs/user-scenario/01-getting-started.md)

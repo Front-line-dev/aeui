@@ -3,19 +3,24 @@
   "private": true,
   "scripts": {
     "test": "npm --prefix example/test test",
-    "build": "npm run build:core && npm run build:examples",
+    "build": "npm run build:core && npm run build:examples && npm run build --workspace aeui-landing",
     "build:core": "npm --workspace a-easy-ui run build",
     "build:examples": "npm --prefix example/vite-demo run build && npm --prefix example/deep-compare-test run build && npm --prefix example/commerce-admin run build",
     "typecheck": "npm --workspace a-easy-ui run typecheck",
     "pack:core": "npm pack --dry-run --workspace a-easy-ui --cache .npm",
-    "pretest": "npm run build:core"
+    "pretest": "npm run build:core",
+    "dev:landing": "npm run build:core && npm run dev --workspace aeui-landing",
+    "build:landing": "npm run build:core && npm run build --workspace aeui-landing",
+    "preview:landing": "npm run preview --workspace aeui-landing",
+    "test:landing": "npm run build:core && npm run test --workspace aeui-landing"
   },
   "workspaces": [
     "packages/*",
     "example/test",
     "example/vite-demo",
     "example/deep-compare-test",
-    "example/commerce-admin"
+    "example/commerce-admin",
+    "landing"
   ],
   "engines": {
     "node": "^22.12.0 || >=24.0.0"
