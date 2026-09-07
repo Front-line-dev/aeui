@@ -48,6 +48,7 @@
 | 16 | [라우터](internal-implement/16-router.md) | route table, segment 매칭 |
 | 17 | [소스 배치](internal-implement/17-source-layout.md) | 파일 경계, 모듈별 심볼 |
 | 18 | [적합성 검증](internal-implement/18-conformance.md) | 테스트 설계 원칙, 검증 범위 |
+| 19 | [컴포넌트 값 판별 검증](internal-implement/19-component-type-validation.md) | 값 기반 판별 적용, 회귀 검증과 지원 경계 |
 | — | [설계 결정](internal-implement/design-decisions.md) | 주요 설계 선택과 근거 |
 
 ## issue

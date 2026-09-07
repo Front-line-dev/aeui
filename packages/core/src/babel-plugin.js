@@ -298,50 +298,86 @@ export default function aeuiTransform({ types: t }) {
     return found;
   };
 
-  /**
-   * Determines if an ArrowFunctionExpression is an AEUI component.
-   * Strategies:
-   * 1. Check if it's exported and PascalCase.
-   * 2. Check if it's used as a JSX tag (e.g. <MyComp />) in the same scope.
-   */
-  const shouldTransformComponent = (path) => {
-    if (hasRenderBridge(path)) return false;
-    if (path.parentPath.isExportDefaultDeclaration() && !path.node.id && returnsRenderableValue(path)) {
-      return true;
-    }
-    const name = path.parentPath.isVariableDeclarator()
-      ? path.parent.id.name
-      : path.node.id?.name;
-    if (!name) return false;
-    const binding = path.scope.getBinding(name);
-    if (!binding) return false;
-    const exported = binding.path.parentPath.isExportDeclaration() ||
+  const isExportedFunction = (path) => {
+    if (path.parentPath.isExportDefaultDeclaration()) return true;
+    const name = path.parentPath.isVariableDeclarator() ? path.parent.id.name : path.node.id?.name;
+    const binding = name && path.scope.getBinding(name);
+    return !!binding && (binding.path.parentPath.isExportDeclaration() ||
       binding.path.parentPath.parentPath?.isExportDeclaration() ||
-      binding.referencePaths.some((ref) => ref.parentPath.isExportSpecifier() || ref.parentPath.isExportDefaultDeclaration());
-    const used = binding.referencePaths.some((ref) => (
-      (ref.parentPath.isJSXOpeningElement() && ref.parent.name === ref.node) ||
-      isRuntimeReference(ref, ['createElement', 'createVNode', 'init'])
-    ));
-    return used || (exported && /^[A-Z]/.test(name) && returnsRenderableValue(path));
+      binding.referencePaths.some((ref) => ref.parentPath.isExportSpecifier() || ref.parentPath.isExportDefaultDeclaration()));
+  };
+
+  const returnsSimpleRenderable = (path) => {
+    const params = new Set(path.node.params.flatMap((param) => Object.keys(t.getBindingIdentifiers(param))));
+    const simple = (node) => {
+      if (t.isNullLiteral(node) || t.isStringLiteral(node) || t.isNumericLiteral(node) ||
+          t.isBooleanLiteral(node) || t.isBigIntLiteral(node)) return true;
+      if (t.isIdentifier(node)) return params.has(node.name);
+      if (t.isMemberExpression(node)) return simple(node.object);
+      if (t.isArrayExpression(node)) return node.elements.every((item) => !item || simple(item));
+      if (t.isConditionalExpression(node)) return simple(node.consequent) && simple(node.alternate);
+      if (t.isLogicalExpression(node)) return simple(node.left) && simple(node.right);
+      return false;
+    };
+    if (!t.isBlockStatement(path.node.body)) return simple(path.node.body);
+    let found = false;
+    path.traverse({ ReturnStatement(returnPath) {
+      if (returnPath.getFunctionParent() === path && simple(returnPath.node.argument)) found = true;
+    } });
+    return found;
+  };
+
+  const unwrapRegisteredFunction = (node) => {
+    if (!t.isCallExpression(node) || !t.isArrowFunctionExpression(node.callee) ||
+        node.callee.params.length !== 1 || node.arguments.length !== 1) return null;
+    const call = node.callee.body;
+    if (!t.isCallExpression(call) || !t.isNodesEquivalent(call.callee, createAeuiRuntimeMember('registerComponent')) ||
+        !t.isNodesEquivalent(call.arguments[0], node.callee.params[0])) return null;
+    const value = node.arguments[0];
+    if (isFunctionLike(value)) return value;
+    if (t.isMemberExpression(value) && t.isObjectExpression(value.object) &&
+        value.object.properties.length === 1 && t.isObjectProperty(value.object.properties[0])) {
+      const original = value.object.properties[0].value;
+      if (isFunctionLike(original)) return original;
+    }
+    return null;
   };
 
   /**
-   * Transforms `return JSX` to `return () => JSX`.
+   * Transforms component return values to render functions.
    * Handles both expression bodies and block bodies.
    */
   const transformToFactory = (path) => {
-    ensureBlockBody(path);
+    const body = ensureBlockBody(path);
+    const last = body.node.body.at(-1);
+    if (!t.isReturnStatement(last) && !t.isThrowStatement(last)) {
+      body.pushContainer('body', t.returnStatement());
+    }
 
     path.traverse({
       ReturnStatement(returnPath) {
         if (returnPath.getFunctionParent().node !== path.node) return;
 
         const arg = returnPath.node.argument;
-        if (!arg || isFunctionLike(arg) || !containsRenderableExpression(arg)) {
+        const registeredRender = unwrapRegisteredFunction(arg);
+        if (registeredRender) {
+          returnPath.node.argument = t.cloneNode(registeredRender, true);
           return;
         }
+        if (isFunctionLike(arg)) return;
+        if (t.isIdentifier(arg)) {
+          const binding = returnPath.scope.getBinding(arg.name);
+          const init = binding?.path.isVariableDeclarator() ? binding.path.node.init : null;
+          if (binding?.path.isFunctionDeclaration() || isFunctionLike(init) || unwrapRegisteredFunction(init)) {
+            const renderId = path.scope.generateUidIdentifier('render');
+            const propsId = path.scope.generateUidIdentifier('renderProps');
+            returnPath.insertBefore(t.variableDeclaration('const', [t.variableDeclarator(renderId, t.cloneNode(arg))]));
+            returnPath.node.argument = t.arrowFunctionExpression([propsId], t.callExpression(renderId, [propsId]));
+            return;
+          }
+        }
 
-        returnPath.node.argument = t.arrowFunctionExpression([], t.cloneNode(arg, true));
+        returnPath.node.argument = t.arrowFunctionExpression([], arg ? t.cloneNode(arg, true) : t.unaryExpression('void', t.numericLiteral(0)));
       }
     });
   };
@@ -367,6 +403,20 @@ export default function aeuiTransform({ types: t }) {
       if (!resolvedPropsId) return;
 
       targetPath.traverse({
+        JSXIdentifier(idPath) {
+          const name = idPath.node.name;
+          if (!destructuredNames.has(name) ||
+              idPath.scope.getBinding(name)?.scope !== path.scope) return;
+          const parent = idPath.parentPath;
+          const isTag = (parent.isJSXOpeningElement() || parent.isJSXClosingElement()) &&
+            parent.node.name === idPath.node && /^[A-Z]/.test(name);
+          const isObject = parent.isJSXMemberExpression() && parent.node.object === idPath.node;
+          if (!isTag && !isObject) return;
+          idPath.replaceWith(t.jsxMemberExpression(
+            t.jsxIdentifier(resolvedPropsId.name), t.jsxIdentifier(name)
+          ));
+          idPath.skip();
+        },
         Identifier(idPath) {
           const name = idPath.node.name;
 
@@ -646,39 +696,184 @@ export default function aeuiTransform({ types: t }) {
     });
   };
 
-  const candidates = new WeakSet();
-  const transformed = new WeakSet();
+  // Follow local aliases and every assignment source without evaluating user code.
+  const collectTypeFunctions = (programPath) => {
+    const used = new Set();
+    const visited = new Set();
+    const resolve = (valuePath) => {
+      if (!valuePath?.node || visited.has(valuePath.node)) return;
+      visited.add(valuePath.node);
+      if (valuePath.isFunction()) {
+        used.add(valuePath.node);
+      } else if (valuePath.isIdentifier() || valuePath.isJSXIdentifier()) {
+        const binding = valuePath.scope.getBinding(valuePath.node.name);
+        if (!binding) return;
+        if (binding.path.isFunctionDeclaration()) resolve(binding.path);
+        if (binding.path.isVariableDeclarator()) resolve(binding.path.get('init'));
+        for (const violation of binding.constantViolations) {
+          if (violation.isAssignmentExpression()) resolve(violation.get('right'));
+        }
+      } else if (valuePath.isConditionalExpression()) {
+        resolve(valuePath.get('consequent'));
+        resolve(valuePath.get('alternate'));
+      } else if (valuePath.isLogicalExpression()) {
+        resolve(valuePath.get('left'));
+        resolve(valuePath.get('right'));
+      } else if (valuePath.isSequenceExpression()) {
+        resolve(valuePath.get('expressions').at(-1));
+      } else if (valuePath.isMemberExpression() || valuePath.isJSXMemberExpression()) {
+        const object = valuePath.get('object');
+        const binding = object.isIdentifier() || object.isJSXIdentifier()
+          ? object.scope.getBinding(object.node.name) : null;
+        const init = binding?.path.isVariableDeclarator() ? binding.path.get('init') : object;
+        if (!init?.isObjectExpression()) return;
+        const property = valuePath.node.property;
+        const key = valuePath.node.computed ? property.value : property.name;
+        if (key === undefined) return;
+        for (const prop of init.get('properties')) {
+          if (prop.isObjectProperty() && !prop.node.computed &&
+              (prop.node.key.name ?? prop.node.key.value) === key) resolve(prop.get('value'));
+        }
+      }
+    };
+    programPath.traverse({
+      JSXOpeningElement(path) {
+        const name = path.get('name');
+        if (!name.isJSXIdentifier() || /^[A-Z]/.test(name.node.name)) resolve(name);
+      },
+      JSXAttribute(path) {
+        const value = path.get('value');
+        if (value.isJSXExpressionContainer()) resolve(value.get('expression'));
+      },
+      CallExpression(path) {
+        const first = path.get('arguments.0');
+        if (first?.node && isRuntimeReference(first, ['createElement', 'createVNode', 'init'])) resolve(first);
+      },
+    });
+    return used;
+  };
+
+  const isRegistration = (path) => {
+    const callee = path.node.callee;
+    return t.isMemberExpression(callee) && !callee.computed &&
+      t.isIdentifier(callee.property, { name: 'registerComponent' }) &&
+      t.isMemberExpression(callee.object) && !callee.object.computed &&
+      t.isIdentifier(callee.object.property, { name: '__runtime' }) &&
+      t.isIdentifier(callee.object.object, { name: 'AEUI' }) &&
+      bindingIsAeuiImport(path.scope.getBinding('AEUI'));
+  };
+
+  const createComponentEntry = (path) => {
+    const original = t.cloneNode(path.node, true);
+    const isDeclaration = path.isFunctionDeclaration();
+    // A private name in a function expression must still refer to the original
+    // callable when the setup clone makes a recursive ordinary call.
+    const privateName = !isDeclaration && path.node.id;
+    if (isDeclaration && !path.node.id) {
+      path.node.id = path.scope.generateUidIdentifier('component');
+      original.id = t.cloneNode(path.node.id);
+    }
+    const typeId = isDeclaration ? t.cloneNode(path.node.id)
+      : privateName ? t.cloneNode(privateName) : path.scope.generateUidIdentifier('component');
+
+    if (path.node.async || path.node.generator) {
+      path.node.async = false;
+      path.node.generator = false;
+      path.node.params = [];
+      path.node.body = t.blockStatement([t.throwStatement(t.newExpression(t.identifier('TypeError'), [
+        t.stringLiteral('[AEUI] Component setup must be synchronous; async and generator functions cannot be element types.'),
+      ]))]);
+    } else {
+      transformToFactory(path);
+      injectReactiveProps(path);
+    }
+    const setup = t.toExpression(t.cloneNode(path.node, true));
+    setup.id = null;
+    const registration = t.callExpression(createAeuiRuntimeMember('registerComponent'), [typeId, setup]);
+
+    if (isDeclaration) {
+      const declarationPath = path.parentPath.isExportDeclaration() ? path.parentPath : path;
+      const block = declarationPath.parentPath;
+      if (!block.isProgram() && !block.isBlockStatement()) {
+        throw path.buildCodeFrameError('[AEUI] Component function declarations need a block scope.');
+      }
+      path.replaceWith(original);
+      block.unshiftContainer('body', t.expressionStatement(registration));
+    } else {
+      // Preserve inferred function names without introducing a self binding.
+      const parent = path.parentPath;
+      let inferredName = null;
+      if (!original.id && parent.isVariableDeclarator() && t.isIdentifier(parent.node.id)) {
+        inferredName = parent.node.id.name;
+      } else if (!original.id && parent.isObjectProperty() && !parent.node.computed) {
+        inferredName = parent.node.key.name ?? parent.node.key.value;
+      } else if (!original.id && (parent.isAssignmentExpression() || parent.isAssignmentPattern()) &&
+                 t.isIdentifier(parent.node.left)) {
+        inferredName = parent.node.left.name;
+      } else if (!original.id && parent.isExportDefaultDeclaration()) {
+        inferredName = 'default';
+      }
+      const value = inferredName ? t.memberExpression(t.objectExpression([
+        t.objectProperty(t.stringLiteral(inferredName), original),
+      ]), t.stringLiteral(inferredName), true) : original;
+      path.replaceWith(t.callExpression(t.arrowFunctionExpression([typeId], registration), [value]));
+    }
+  };
 
   return {
     visitor: {
       Program: {
         enter(path) {
+          const registered = new Set();
+          // Serialized compiler output retains both entry points. Do not compile
+          // their bodies again, including generated render closures.
           path.traverse({
-            'ArrowFunctionExpression|FunctionDeclaration|FunctionExpression'(candidate) {
-              if (shouldTransformComponent(candidate)) candidates.add(candidate.node);
+            CallExpression(call) {
+              if (!isRegistration(call)) return;
+              for (const arg of call.get('arguments')) {
+                if (arg.isFunction()) registered.add(arg.node);
+                if (arg.isIdentifier()) {
+                  const binding = arg.scope.getBinding(arg.node.name);
+                  if (binding?.path.isFunctionDeclaration()) registered.add(binding.path.node);
+                  if (binding?.kind === 'param') {
+                    const wrapper = binding.scope.path;
+                    const invocation = wrapper.parentPath;
+                    if (invocation.isCallExpression() && invocation.node.callee === wrapper.node) {
+                      registered.add(wrapper.node);
+                      const value = invocation.get('arguments.0');
+                      if (value?.node) {
+                        value.traverse({ Function(inner) { registered.add(inner.node); } });
+                        if (value.isFunction()) registered.add(value.node);
+                      }
+                    }
+                  }
+                }
+              }
             },
           });
+          const used = collectTypeFunctions(path);
+          const candidates = [];
+          path.traverse({
+            'ArrowFunctionExpression|FunctionDeclaration|FunctionExpression'(candidate) {
+              if (registered.has(candidate.node) || hasRenderBridge(candidate)) {
+                candidate.skip();
+                return;
+              }
+              if (used.has(candidate.node) || returnsRenderableValue(candidate) ||
+                  (isExportedFunction(candidate) && returnsSimpleRenderable(candidate))) {
+                candidates.push(candidate);
+              }
+            },
+          });
+          // Prepare nested definitions in their lexical scope before cloning an
+          // enclosing component, so both entry points keep those registrations.
+          for (const candidate of candidates.reverse()) createComponentEntry(candidate);
+          path.scope.crawl();
         },
         exit(path) {
-          if (needsAeuiRuntimeBinding(path)) {
-            ensureAeuiImport(path);
-          }
+          if (needsAeuiRuntimeBinding(path)) ensureAeuiImport(path);
         },
       },
-
-      "ArrowFunctionExpression|FunctionDeclaration|FunctionExpression"(path) {
-        if (!candidates.has(path.node) || transformed.has(path.node)) {
-          return;
-        }
-
-        transformed.add(path.node);
-
-        // 1. Transform Return: Return (JSX) -> Return () => (JSX)
-        transformToFactory(path);
-
-        // 2. Props Destructuring & Updates
-        injectReactiveProps(path);
-      }
-    }
+    },
   };
 }

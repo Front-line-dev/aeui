@@ -140,7 +140,8 @@ describe('AEUI Babel Plugin', () => {
         }
       },
     } })] });
-    expect(calls).toEqual(['watch', 'clean', 'watch']);
+    // Both the ordinary callable and its setup entry retain foreign/local hooks.
+    expect(calls).toEqual(['watch', 'clean', 'watch', 'watch', 'clean', 'watch']);
   });
 
   it('정적으로 판별할 수 없는 watch deps는 명시적 getter 안내와 함께 거부', () => {

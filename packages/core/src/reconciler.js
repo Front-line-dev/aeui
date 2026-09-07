@@ -1,3 +1,4 @@
+import { assertElementType } from './component-type.js';
 /**
  * Runtime node reconciliation, DOM range placement, and unmounting
  */
@@ -111,39 +112,48 @@ function reconcileChildren(state, parentDom, parentNode, newVNodes, beforeDom = 
     keyedOld.set(child.key, child);
   });
 
-  for (const newVNode of newVNodes) {
-    const key = getVNodeKey(newVNode);
-    let matchedChild = null;
+  try {
+    for (const newVNode of newVNodes) {
+      const key = getVNodeKey(newVNode);
+      let matchedChild = null;
 
-    if (key != null) {
-      if (seenNewKeys.has(key)) {
-        warnDuplicateKey(key);
-      } else {
-        seenNewKeys.add(key);
-      }
+      if (key != null) {
+        if (seenNewKeys.has(key)) {
+          warnDuplicateKey(key);
+        } else {
+          seenNewKeys.add(key);
+        }
 
-      const candidate = keyedOld.get(key);
-      if (candidate && !candidate._matched) {
-        matchedChild = candidate;
-      }
-    } else {
-      while (nextUnkeyedOld < oldChildren.length) {
-        const candidate = oldChildren[nextUnkeyedOld++];
-        if (!candidate._matched && candidate.key == null) {
+        const candidate = keyedOld.get(key);
+        if (candidate && !candidate._matched) {
           matchedChild = candidate;
-          break;
+        }
+      } else {
+        while (nextUnkeyedOld < oldChildren.length) {
+          const candidate = oldChildren[nextUnkeyedOld++];
+          if (!candidate._matched && candidate.key == null) {
+            matchedChild = candidate;
+            break;
+          }
         }
       }
-    }
 
-    if (matchedChild) {
-      matchedChild._matched = true;
-    }
+      if (matchedChild) {
+        matchedChild._matched = true;
+      }
 
-    const nextChild = state.reconcile(parentDom, matchedChild, newVNode, beforeDom, parentNode);
-    if (nextChild) {
-      nextChildren.push(nextChild);
+      const nextChild = state.reconcile(parentDom, matchedChild, newVNode, beforeDom, parentNode);
+      if (nextChild) {
+        nextChildren.push(nextChild);
+      }
     }
+  } catch (error) {
+    // New siblings are not committed to parentNode.children until all succeed.
+    for (const child of nextChildren) {
+      if (!oldChildren.includes(child)) state.unmountNode(child);
+    }
+    for (const child of oldChildren) delete child._matched;
+    throw error;
   }
 
   oldChildren.forEach((child) => {
@@ -224,7 +234,14 @@ function mountFragmentNode(state, parentDom, node, beforeDom) {
 }
 
 function mountComponentNode(state, parentDom, node, beforeDom) {
-  return renderComponentNode(state, parentDom, node, node.vnode.props || {}, beforeDom);
+  const afterDom = beforeDom ? beforeDom.previousSibling : parentDom.lastChild;
+  try {
+    return renderComponentNode(state, parentDom, node, node.vnode.props || {}, beforeDom);
+  } catch (error) {
+    state.unmountNode(node, false);
+    removeInsertedSiblings(state, parentDom, afterDom, beforeDom);
+    throw error;
+  }
 }
 
 function mountNode(state, parentDom, node, beforeDom) {
@@ -300,7 +317,7 @@ function removeDomRange(state, parentDom, node) {
 }
 
 export function unmountNode(state, node, removeDom = true) {
-  if (!node) return;
+  if (!node || !node.isMounted) return;
 
   node.isMounted = false;
 
@@ -330,6 +347,10 @@ export function reconcile(state, parentDom, oldNode, newVNode, beforeDom = null,
       state.unmountNode(oldNode);
     }
     return null;
+  }
+
+  if (typeof newVNode === 'object' && !isFragmentVNode(state.Fragment, newVNode)) {
+    assertElementType(newVNode.tag);
   }
 
   if (oldNode && !isSameNodeType(state, oldNode, newVNode)) {

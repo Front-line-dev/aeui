@@ -25,7 +25,7 @@ unmountNode(state, node, removeDom = true)
 
 ```
 unmountNode(state, node, removeDom = true):
-  0. null 체크 (node가 없으면 리턴)
+  0. node가 없거나 이미 isMounted=false이면 리턴
 
   1. node.isMounted = false
      → 이미 정리된 node의 재사용을 방지
@@ -55,7 +55,7 @@ unmountNode(state, node, removeDom = true):
 
 ```javascript
 export function unmountNode(state, node, removeDom = true) {
-  if (!node) return;
+  if (!node || !node.isMounted) return;
 
   node.isMounted = false;
 

@@ -1,3 +1,4 @@
+import { resolveComponentSetup } from './component-type.js';
 import { runComponentWatchers } from './component-watchers.js';
 import { withComponentContext } from './runtime-context.js';
 import { getVNodeKey } from './vnode-helpers.js';
@@ -30,20 +31,38 @@ export function createComponentNode(vnode, parentNode = null, parentDom = null) 
     watchStates: [],
     cleanups: [],
     renderedNode: null,
+    setupStatus: 'new',
     renderFactory: null,
     render: null,
   };
 }
 
 export function setupComponentNode(state, node) {
-  if (node.renderFactory) return node.renderFactory;
-
-  return withComponentContext(state, node, 'setup', () => {
-    const renderFactory = node.component(node.props);
-    node.renderFactory = renderFactory;
-    node.render = renderFactory;
-    return renderFactory;
-  });
+  if (node.setupStatus === 'done') return node.renderFactory;
+  if (node.setupStatus !== 'new') {
+    throw new Error('[AEUI] Component setup cannot be re-entered or retried after failure.');
+  }
+  node.setupStatus = 'running';
+  try {
+    return withComponentContext(state, node, 'setup', () => {
+      const setup = resolveComponentSetup(node.component);
+      const renderFactory = Reflect.apply(setup, undefined, [node.props]);
+      if (typeof renderFactory !== 'function') {
+        // Observe rejected native Promises from uncompiled async setup without
+        // looking up or invoking a user-defined then property.
+        try { Promise.prototype.then.call(renderFactory, undefined, () => {}); } catch {}
+        throw new TypeError('[AEUI] Component setup must return a render function. Compile the component with the AEUI Babel/Vite plugin.');
+      }
+      node.renderFactory = renderFactory;
+      node.render = renderFactory;
+      node.setupStatus = 'done';
+      return renderFactory;
+    });
+  } catch (error) {
+    node.setupStatus = 'failed';
+    cleanupComponentNode(state, node);
+    throw error;
+  }
 }
 
 export function runComponentRenderPhase(
@@ -111,7 +130,9 @@ export function commitRenderedNode(node, renderedNode) {
 export function cleanupComponentNode(state, node, options = {}) {
   const { preserveChildren = false, preserveDomRange = false } = options;
 
-  node.cleanups.forEach((cleanup) => {
+  const cleanups = node.cleanups;
+  node.cleanups = [];
+  cleanups.forEach((cleanup) => {
     try {
       cleanup();
     } catch (error) {

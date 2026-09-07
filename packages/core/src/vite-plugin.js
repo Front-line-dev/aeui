@@ -130,6 +130,8 @@ function createRouterEntry(root, options) {
 }
 
 function shouldTransform(id) {
+  // Bundler helpers are not application modules and may run before AEUI exists.
+  if (id.startsWith('\0')) return false;
   const filePath = id.split('?')[0];
   if (!ROUTE_EXT_RE.test(filePath)) return false;
   if (filePath.includes('/node_modules/')) return false;

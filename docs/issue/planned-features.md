@@ -14,11 +14,9 @@
 
 ## 중간 우선순위
 
-### `AEUI-LIFECYCLE-PLAN-001`: 부분 mount 실패 cleanup
+### host props snapshot 실패 정리 범위
 
-최초 mount 도중 뒤쪽 sibling이 실패해도 앞에서 setup을 끝낸 provisional component의 cleanup을 정확히 한 번 실행하는 계약을 설계한다. 전체 render의 완전한 transaction rollback이나 error boundary와는 별개로 관리한다.
-
-> 참고: 현재 host mount 실패 정리는 `mountHostNode` 내부의 `try/catch`에서 수행하며, `cloneHostPropsSnapshot`은 `try` 밖에서 실행되므로 이 단계에서 실패하면 직접 `reconcile` 경로에서는 DOM이 남을 수 있다. root 경로에서만 `removeUncommittedDom`이 별도 정리한다.
+setup·첫 render·뒤쪽 sibling 실패 시 신규 컴포넌트 cleanup은 구현되어 [컴포넌트 계약](../user-scenario/02-components.md)에 포함한다. 별도로 `mountHostNode`의 props snapshot은 `try` 밖에서 실행되므로 이 단계의 실패까지 직접 reconcile 경로에서 DOM을 정리하는 개선을 검토한다. 기존 subtree 업데이트 전체의 transaction rollback은 포함하지 않는다.
 
 ### `AEUI-DOM-PLAN-002`: file input polling 변화 감지
 

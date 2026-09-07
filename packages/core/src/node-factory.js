@@ -1,3 +1,4 @@
+import { assertElementType } from './component-type.js';
 import { createComponentNode } from './component-lifecycle.js';
 import { getVNodeKey, isFragmentVNode } from './vnode-helpers.js';
 
@@ -52,5 +53,6 @@ export function createNode(state, vnode, parentNode = null, parentDom = null) {
     return node;
   }
 
+  assertElementType(vnode.tag);
   return createComponentNode(vnode, parentNode, parentDom);
 }

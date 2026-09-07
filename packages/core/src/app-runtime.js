@@ -1,3 +1,4 @@
+import { registerComponent } from './component-type.js';
 import {
   runComponentWatchersBridge,
   runRenderPhaseBridge,
@@ -53,6 +54,7 @@ export function createAppRuntime({
 
   const internalRuntime = {
     state,
+    registerComponent,
     deepEqual,
     deepClone,
     createRootNode,

@@ -31,28 +31,14 @@ phase 값은 `'setup'`과 `'render'` 두 가지. **훅 등록은 `'setup'` phase
 
 ## Setup — 최초 마운트 시
 
-```js
-function setupComponentNode(state, node) {
-  if (node.renderFactory) return node.renderFactory;  // 캐시
+`setupStatus`는 `new → running → done`으로 전이한다. 실패하면 `failed`가 된다. `done`일 때만 캐시한 render 함수를 반환하며, 같은 노드의 setup 재진입과 실패 후 재시도는 거부한다.
 
-  return withComponentContext(state, node, 'setup', () => {
-    const renderFactory = node.component(node.props);
-    node.renderFactory = renderFactory;
-    node.render = renderFactory;
-    return renderFactory;
-  });
-}
-```
+1. `component-type.js`에서 원본 함수 값에 연결된 setup을 조회한다.
+2. 등록이 없으면 기존 수동 setup으로 간주하고 원본을 호출한다.
+3. setup context에서 props를 전달하고 render 함수 반환을 검증한다.
+4. VNode·null·Promise 등 비함수 반환은 컴파일 안내 오류로 처리하고 등록된 cleanup을 실행한다. 미컴파일 async setup의 거절된 native Promise도 관찰하여 별도의 unhandled rejection을 남기지 않는다.
 
-정상적인 Babel 변환 컴포넌트는 **함수**인 렌더 팩토리를 반환한다.
-
-| 반환값 | 결과 |
-|---|---|
-| 함수 (정상) | 캐시, 이후 매 렌더마다 호출 |
-| falsy (`null`, `0`, `''`) | 캐시 안 됨 → 다음 렌더에서 setup 재실행 |
-| truthy + 비함수 (VNode 등) | 캐시되지만 render 결과 항상 null |
-
-**캐시 조건:** `if (node.renderFactory)` — boolean이 아니라 truthy 여부로 판단.
+최초 render 또는 자식 mount 실패는 reconciler의 mount 경계에서 정리한다. 앞에서 생성했으나 아직 parent children에 commit되지 않은 형제도 정리 대상이다. cleanup 배열은 호출 전에 분리하고 unmount는 `isMounted`로 재진입을 막아 같은 정리를 반복하지 않는다.
 
 ---
 

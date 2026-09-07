@@ -1,3 +1,4 @@
+import { assertElementType } from './component-type.js';
 /**
  * AEUI Framework Core
  */
@@ -6,6 +7,7 @@ import { _deepEqual, _deepClone } from './deep-compare.js';
 import { VNODE_MARKER } from './vnode-marker.js';
 
 function createVNode(tag, props, ...children) {
+  assertElementType(tag);
   const validChildren = children.flat().filter((child) => child != null && typeof child !== 'boolean');
   const finalProps = { ...(props || {}), children: validChildren };
   const vnode = { tag, props: finalProps, children: validChildren };

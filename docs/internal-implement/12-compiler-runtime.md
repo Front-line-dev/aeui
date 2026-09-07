@@ -70,6 +70,7 @@ Babel 플러그인이 생성하는 코드와 이 모듈의 대응:
 | Babel 생성 코드 | bridge 함수 | 최종 목적지 |
 |-----------------|-------------|-------------|
 | `AEUI.__runtime.runRenderPhase(...)` | `runRenderPhaseBridge` | `component-lifecycle.js:runComponentRenderPhase` |
+| `AEUI.__runtime.registerComponent(type, setup)` | (직접) | `component-type.js:registerComponent` |
 | `AEUI.__runtime.watch(...)` | (직접) | `hook-registry.js:registerWatch` |
 | `AEUI.__runtime.clean(...)` | (직접) | `hook-registry.js:registerCleanup` |
 

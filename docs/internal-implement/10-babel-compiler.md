@@ -67,65 +67,42 @@ function Counter(_initialProps) {
 
 ---
 
-## 플러그인 진입점
+## 플러그인 진입점과 후보 수집
 
-```javascript
-export default function aeuiTransform({ types: t }) {
-  return {
-    visitor: {
-      "ArrowFunctionExpression|FunctionDeclaration|FunctionExpression"(path) {
-        if (!shouldTransformComponent(path)) return;
-        transformToFactory(path);
-        injectReactiveProps(path);
-      }
-    }
-  };
+`Program.enter`에서 JSX lowering 전에 후보와 Babel binding을 수집한다. 이미 `registerComponent`로 연결된 원본/실행 함수와 `runRenderPhase` 출력은 재변환하지 않는다. 중첩 함수부터 처리한 다음 상위 함수를 복제하여 두 경로가 같은 lexical scope의 준비된 내부 함수를 갖도록 한다.
+
+후보는 다음과 같다.
+
+1. JSX 또는 AEUI VNode 생성 표현식을 직접 반환하거나, 그런 render 함수를 반환하는 함수
+2. JSX 태그·AEUI `createElement`/`createVNode`/`init`·JSX props에서 local binding을 따라 도달하는 함수
+3. export되어 있고 리터럴·props 참조 등 단순 renderable 값을 반환하는 함수
+
+이름의 PascalCase 여부로 함수를 제외하지 않는다. 소문자 단독 JSX 태그를 host 문자열로 처리하는 JSX 문법은 유지한다.
+
+`collectTypeFunctions`는 식별자 binding의 초기값과 재할당 우변, 조건식·논리식, sequence의 마지막 값, 단순 객체 속성을 순회한다. 방문한 AST 노드를 기록하여 별칭 순환을 끝낸다. 사용자 함수나 getter를 실행하지 않으며, import 정의를 다른 파일에서 역으로 분석하지 않는다. JSX 반환 함수와 export된 단순 반환 함수를 정의 파일에서 준비하므로 일반적인 import·props 전달은 파일 간 분석 없이 처리된다.
+
+## 일반 호출과 컴포넌트 실행 분리
+
+```js
+// 개념 예시: 원래 함수 identity와 일반 호출 결과를 보존한다.
+function badge(props) {
+  return AEUI.createElement('span', null, props.text);
 }
+AEUI.__runtime.registerComponent(badge, function (_initialProps) {
+  const props = { ..._initialProps };
+  return nextProps => AEUI.__runtime.runRenderPhase(
+    nextProps, props, () => AEUI.createElement('span', null, props.text)
+  );
+});
 ```
 
-Babel은 코드를 AST로 파싱한 뒤 visitor 패턴으로 각 노드를 순회한다. 이 플러그인은 함수 선언/표현식을 방문하여:
+함수 선언의 등록문은 같은 Program/Block의 시작에 놓아 선언보다 앞선 마운트도 지원한다. 함수 표현식은 생성 위치에서 원본과 setup을 연결하고 원본을 그대로 반환한다. 새 함수 scope에서 원래 이름을 임의로 바인딩하지 않으며, 기명 함수 표현식의 자기 참조는 원본 callable을 가리킨다. 원래 arrow의 lexical `this`/`arguments`와 일반 함수의 호출 semantics를 유지한다.
 
-1. `shouldTransformComponent`로 AEUI 컴포넌트인지 판별
-2. `transformToFactory`로 `return JSX`를 `return () => JSX`로 변환
-3. `injectReactiveProps`로 props 반응화, watch deps 래핑, render phase helper 주입 수행
-4. JSX 또는 compiled helper가 있으면 `AEUI` import를 자동 주입
+`component-type.js`의 모듈 단위 WeakMap이 `원본 함수 → setup`을 저장한다. 함수 속성을 검사하거나 수정하지 않으며 앱 인스턴스가 달라도 같은 런타임 모듈의 등록 정보를 공유한다. 서로 다른 setup의 중복 등록은 오류다. 원본 함수와 key가 reconciliation identity이고 setup clone의 identity는 비교에 사용하지 않는다.
 
----
+함수 선언 등록도 ESM 모듈 본문 실행이 필요하므로 순환 import의 너무 이른 마운트는 지원하지 못한다. 등록하지 않은 기존 수동 setup은 런타임이 반환 계약을 검증하여 허용한다. async/generator 후보는 원래 일반 호출을 보존하되 컴포넌트 경로에서는 사용자 본문 실행 전에 동기 setup 전용 오류를 낸다.
 
-## 1단계: `shouldTransformComponent` — 컴포넌트 판별
-
-모든 함수가 AEUI 컴포넌트인 것은 아니다. 이벤트 핸들러나 유틸리티 함수까지 변환하면 안 되므로, 먼저 컴포넌트 여부를 판별한다.
-
-### 판별 기준
-
-```text
-1. 같은 모듈의 local function binding이 JSX opening tag에서 사용됨 → 컴포넌트
-2. 정확한 AEUI runtime의 createElement/createVNode tag 인자 또는 init 루트 인자로 같은 local function binding이 사용됨 → 컴포넌트
-3. 같은 모듈에서 정의·export되고 PascalCase 이름과 renderable return을 모두 가짐 → 컴포넌트
-4. renderable expression을 반환하는 anonymous default export → 컴포넌트
-5. 그 외 → 변환하지 않음
-```
-
-### 컴포넌트 사용 근거
-
-```jsx
-<Card />
-AEUI.createElement(Card, props)
-AEUI.createVNode(Card, props)
-AEUI.init(Card, container)
-```
-
-첫 번째 형태는 JSX 변환 전 AST의 opening tag와 같은 모듈의 `Card` 함수 binding을 연결한다. 두 번째와 세 번째 형태는 callee가 올바른 `AEUI` runtime binding의 `createElement`, `createVNode` 또는 `init`이고, 첫 인자도 같은 모듈의 함수 binding일 때만 근거가 된다.
-
-임의 호출의 첫 번째 인자는 컴포넌트 근거가 아니다. 따라서 `items.map(Card)`, `setTimeout(Card)`, `register(Card)` 같은 코드는 `Card`를 컴포넌트로 판정하지 않는다. import된 함수도 사용하는 모듈에서 추측 변환하지 않고, 정의가 있는 원래 모듈에서 변환해야 한다.
-
-### PascalCase 검사
-
-React와 같은 관례로, AEUI에서도 컴포넌트 이름은 PascalCase를 사용한다. 다만 일반 유틸리티 함수가 대문자로 시작할 수 있으므로, 같은 모듈의 export된 정의이면서 renderable return까지 확인된 경우에만 이 이름 규칙을 근거로 사용한다.
-
-### anonymous default export 예외
-
-이름이 없는 `export default` 함수/화살표 함수도 직접 return이 JSX 또는 renderable expression이면 컴포넌트로 인식한다. 컴포넌트 후보 분석은 JSX를 `createElement` 호출로 낮추기 전에 수행하고, 선택한 local function 정의를 한 번만 변환한다.
+다음 변환 예시들은 등록된 setup 쪽 코드만 보여준다. 실제 출력에는 일반 호출용 원본도 남는다.
 
 ---
 
@@ -165,7 +142,7 @@ function Counter() {
 - `flag && <A />` 같은 logical expression
 - JSX를 포함한 array return
 
-즉, 단순한 `return <div />`뿐 아니라 "renderable expression"이면 같은 규칙으로 render factory로 감싼다.
+선택된 후보의 일반 반환식은 `null`, 텍스트, children 참조를 포함하여 render factory로 감싼다. 반환식이 없는 경로는 빈 render를 만든다. 함수 자체를 반환하는 수동 render 형태는 그대로 연결한다. 팩토리의 일반 호출이 반환하는 내부 함수는 별도의 컴포넌트로도 쓸 수 있도록 등록한다.
 
 ### 중첩 함수 return은 제외
 
@@ -442,7 +419,7 @@ export function TodoItem(_initialProps) {
 - `watch(cb, [done])` → `AEUI.__runtime.watch(cb, () => [done])` 형태로 변환
 - `clean(cb)` → `AEUI.__runtime.clean(cb)` 형태로 변환
 - `return (JSX)` → render factory + `AEUI.__runtime.runRenderPhase(...)`
-- render/watch 내부의 구조 분해 props 참조는 `_resolveProps()` 결과를 통해 최신값 사용
+- render/watch 내부의 구조 분해 props 참조는 `_resolveProps()` 결과를 통해 최신값 사용. JSX 태그의 식별자와 member의 루트도 binding을 확인하여 재작성
 - `editing`은 props가 아닌 로컬 상태이므로 변환하지 않음
 
 ---
@@ -453,7 +430,7 @@ export function TodoItem(_initialProps) {
 |------|------|
 | 로컬 `let` 변수 | 클로저에 의해 최신 값 참조 가능 |
 | 이벤트 핸들러 내부 코드 | 이미 클로저로 최신 상태를 참조함 |
-| 이름 또는 사용 근거만 있고 renderable return이 확인되지 않은 함수 | 컴포넌트로 추측하지 않음 |
+| JSX·단순 export 반환·태그/props 사용 근거가 없는 함수 | 자동 준비 범위 밖 |
 | local/다른 패키지의 `watch`·`clean` 동명 binding | AEUI hook binding이 아님 |
 
 ---
