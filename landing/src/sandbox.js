@@ -1,3 +1,5 @@
+import { getMessages, languageTag } from './i18n.js';
+
 const previewStyles = `
   * { box-sizing: border-box; }
   body { margin: 0; padding: 38px 28px; background: #fff; color: #242424;
@@ -21,8 +23,9 @@ const previewStyles = `
 // JSON is inserted into a script element: escape markup, including </script>.
 const serialize = value => JSON.stringify(value).replace(/</g, '\\u003c');
 
-export function sandboxDocument(code, token, runtimeSource) {
-  return `<!doctype html><html lang="ko"><head><meta charset="utf-8">
+export function sandboxDocument(code, token, runtimeSource, locale = 'en') {
+  const t = getMessages(locale).ui;
+  return `<!doctype html><html lang="${languageTag(locale)}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <style>${previewStyles}</style></head><body><div id="root"></div><script>
@@ -42,18 +45,18 @@ export function sandboxDocument(code, token, runtimeSource) {
       resetPending = true;
       setTimeout(() => { budget = 50000; resetPending = false; }, 0);
     }
-    if (--budget < 0) throw new Error('반복 실행 한도를 넘었습니다. 반복문의 종료 조건을 확인해 주세요.');
+    if (--budget < 0) throw new Error(${serialize(t.loopLimit)});
   }
   try {
     const runtime = {};
     new Function('exports', ${serialize(runtimeSource)})(runtime);
     const exports = {};
     const require = name => {
-      if (name !== 'aeui') throw new Error("'aeui' import만 지원합니다.");
+      if (name !== 'aeui') throw new Error(${serialize(t.importError)});
       return runtime;
     };
     new Function('require', 'exports', '__aeuiCheckBudget', ${serialize(code)})(require, exports, __aeuiCheckBudget);
-    if (typeof exports.default !== 'function') throw new Error('export default function으로 컴포넌트를 내보내 주세요.');
+    if (typeof exports.default !== 'function') throw new Error(${serialize(t.defaultExport)});
     runtime.AEUI.init(exports.default, document.getElementById('root'));
     if (!failed) report('ready');
   } catch (error) { fail(error); }

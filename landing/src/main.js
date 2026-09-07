@@ -1,5 +1,10 @@
 import './styles.css';
-import { examples } from './examples.js';
+import { getExamples } from './examples.js';
+import { applyLocale, getMessages, resolveLocale } from './i18n.js';
+
+const locale = resolveLocale(navigator.languages?.length ? navigator.languages : [navigator.language]);
+applyLocale(document, locale);
+const examples = getExamples(locale);
 
 const disposers = [];
 let playgroundModule;
@@ -9,9 +14,9 @@ const observer = new IntersectionObserver(entries => {
     observer.unobserve(entry.target);
     playgroundModule ??= import('./playground.js');
     playgroundModule.then(({ mountPlayground }) => {
-      disposers.push(mountPlayground(entry.target, examples[entry.target.dataset.example]));
+      disposers.push(mountPlayground(entry.target, examples[entry.target.dataset.example], locale));
     }).catch(() => {
-      entry.target.textContent = '예제를 불러오지 못했습니다. 페이지를 새로고침해 주세요.';
+      entry.target.textContent = getMessages(locale).ui.loadError;
     });
   }
 }, { rootMargin: '400px' });

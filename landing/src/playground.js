@@ -1,19 +1,22 @@
 import { basicSetup, EditorView } from 'codemirror';
+import { editorHighlighting } from './editor-highlight.js';
+import { getMessages } from './i18n.js';
 import { javascript } from '@codemirror/lang-javascript';
 import { compileInWorker } from './compiler-client.js';
 import { sandboxDocument } from './sandbox.js';
 import runtimeSource from '../../packages/core/dist/aeui.cjs?raw';
 
-export function mountPlayground(element, example) {
+export function mountPlayground(element, example, locale = 'en') {
+  const t = getMessages(locale).ui;
   element.style.setProperty('--editor-height', `${Math.max(344, example.source.split('\n').length * 24 + 64)}px`);
   element.innerHTML = `
     <div class="playground-toolbar"><span class="file-label"></span><div class="editor-actions">
-      <button class="reset-button" type="button">초기화</button>
-      <button class="run-button" type="button" title="Ctrl 또는 ⌘ + Enter">다시 실행 <span aria-hidden="true">↻</span></button>
+      <button class="reset-button" type="button">${t.reset}</button>
+      <button class="run-button" type="button" title="${t.shortcut}">${t.run} <span aria-hidden="true">↻</span></button>
     </div></div>
-    <div class="playground-panes"><div class="code-pane"><div class="pane-label">코드 <span>직접 수정해 보세요</span></div><div class="editor"></div></div>
-      <div class="preview-pane"><div class="pane-label">실행 결과 <span class="live-label">LIVE</span></div><div class="preview-slot"></div></div></div>
-    <div class="playground-footer"><span class="status" role="status" aria-live="polite">예제 준비 중…</span><span>수정 후 자동 실행 · ⌘ / Ctrl + Enter</span></div>
+    <div class="playground-panes"><div class="code-pane"><div class="pane-label">${t.code} <span>${t.edit}</span></div><div class="editor"></div></div>
+      <div class="preview-pane"><div class="pane-label">${t.preview} <span class="live-label">LIVE</span></div><div class="preview-slot"></div></div></div>
+    <div class="playground-footer"><span class="status" role="status" aria-live="polite">${t.preparing}</span><span>${t.autoRun}</span></div>
     <pre class="error-message" role="alert" hidden></pre>`;
   element.querySelector('.file-label').textContent = example.filename;
   const status = element.querySelector('.status');
@@ -29,7 +32,7 @@ export function mountPlayground(element, example) {
     clearTimeout(readyTimeout);
     error.textContent = message;
     error.hidden = false;
-    status.textContent = '코드를 확인해 주세요';
+    status.textContent = t.check;
     status.dataset.state = 'error';
   }
 
@@ -38,20 +41,20 @@ export function mountPlayground(element, example) {
     clearTimeout(readyTimeout);
     const currentRevision = ++revision;
     token = undefined;
-    status.textContent = '실행 준비 중…';
+    status.textContent = t.running;
     status.dataset.state = 'loading';
     error.hidden = true;
     try {
-      const code = await compileInWorker(editor.state.doc.toString());
+      const code = await compileInWorker(editor.state.doc.toString(), locale);
       if (currentRevision !== revision) return;
       token = crypto.randomUUID();
       iframe = document.createElement('iframe');
-      iframe.title = example.title + ' 실행 화면';
+      iframe.title = example.title + ' ' + t.previewSuffix;
       iframe.setAttribute('sandbox', 'allow-scripts');
       iframe.setAttribute('referrerpolicy', 'no-referrer');
-      iframe.srcdoc = sandboxDocument(code, token, runtimeSource);
+      iframe.srcdoc = sandboxDocument(code, token, runtimeSource, locale);
       slot.replaceChildren(iframe);
-      readyTimeout = setTimeout(() => showError('실행 응답이 없습니다. 코드를 확인하고 다시 실행해 주세요.'), 5000);
+      readyTimeout = setTimeout(() => showError(t.noResponse), 5000);
     } catch (failure) {
       if (currentRevision === revision) showError(failure.message);
     }
@@ -62,8 +65,9 @@ export function mountPlayground(element, example) {
     extensions: [
       basicSetup,
       javascript({ jsx: true }),
+      editorHighlighting,
       EditorView.lineWrapping,
-      EditorView.contentAttributes.of({ 'aria-label': example.title + ' 코드 입력창' }),
+      EditorView.contentAttributes.of({ 'aria-label': example.title + ' ' + t.editorSuffix }),
       EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
       EditorView.domEventHandlers({ keydown(event) {
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); run(); return true; }
@@ -74,7 +78,7 @@ export function mountPlayground(element, example) {
         clearTimeout(debounce);
         clearTimeout(readyTimeout);
         token = undefined;
-        status.textContent = '입력 중…';
+        status.textContent = t.typing;
         error.hidden = true;
         debounce = setTimeout(run, 650);
       }),
@@ -86,7 +90,7 @@ export function mountPlayground(element, example) {
     if (event.source !== iframe?.contentWindow || data?.channel !== 'aeui-preview' || data.token !== token) return;
     if (data.type === 'ready') {
       clearTimeout(readyTimeout);
-      status.textContent = '실행 완료';
+      status.textContent = t.ready;
       status.dataset.state = 'ready';
     } else if (data.type === 'error') showError(String(data.message));
   };

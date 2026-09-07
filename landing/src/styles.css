@@ -73,7 +73,15 @@ h2 { margin: 0; font: 500 38px/1.4 var(--serif); letter-spacing: -1.5px; word-br
 .cm-editor { font: 13px/1.8 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; }
 .cm-editor .cm-scroller { font-family: inherit; }
 .cm-editor .cm-content { padding: 8px 0 22px; caret-color: #222; }
-.cm-editor .cm-content span { color: inherit !important; }
+/* Stable CodeMirror token classes keep syntax colors independent of theme IDs. */
+.cm-editor .cmt-keyword { color: #8137a4; }
+.cm-editor .cmt-string { color: #246632; }
+.cm-editor .cmt-number { color: #99500c; }
+.cm-editor .cmt-function { color: #2457a6; }
+.cm-editor .cmt-tagName { color: #a12e39; }
+.cm-editor .cmt-propertyName { color: #775215; }
+.cm-editor .cmt-operator { color: #62519a; }
+.cm-editor .cmt-comment { color: #687368; font-style: italic; }
 .cm-editor .cm-line { padding: 0 16px 0 9px; }
 .cm-editor .cm-gutters { background: transparent; color: #999; border: 0; font-size: 11px; }
 .cm-editor .cm-lineNumbers .cm-gutterElement { padding-left: 12px; }
@@ -146,3 +154,13 @@ h2 { margin: 0; font: 500 38px/1.4 var(--serif); letter-spacing: -1.5px; word-br
   .site-footer { gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* Translations wrap naturally in narrow viewports. */
+.hero-copy { min-width: 0; }
+h1 { overflow-wrap: anywhere; }
+html:lang(en) h1 { letter-spacing: -2px; }
+html:lang(ja) h1, html:lang(zh) h1 { letter-spacing: -2px; }
+html:lang(ja) :is(h1, h2, h3, .lead, .feature-copy > p),
+html:lang(zh) :is(h1, h2, h3, .lead, .feature-copy > p) { line-break: strict; word-break: normal; }
+.site-header nav, .playground-toolbar { flex-wrap: wrap; }
+.pane-label { gap: 10px; flex-wrap: wrap; }

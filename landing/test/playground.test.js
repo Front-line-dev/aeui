@@ -3,14 +3,15 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { JSDOM, VirtualConsole } from 'jsdom';
 import { compile } from '../src/compile.js';
-import { examples } from '../src/examples.js';
+import { getExamples } from '../src/examples.js';
+const examples = getExamples('ko');
 import { sandboxDocument } from '../src/sandbox.js';
 
 const runtime = readFileSync(new URL('../../packages/core/dist/aeui.cjs', import.meta.url), 'utf8');
 const wait = (ms = 55) => new Promise(resolve => setTimeout(resolve, ms));
 function execute(t, source) {
   const messages = [];
-  const html = sandboxDocument(compile(source), 'test-token', runtime);
+  const html = sandboxDocument(compile(source, 'ko'), 'test-token', runtime, 'ko');
   const dom = new JSDOM(html, {
     runScripts: 'dangerously',
     pretendToBeVisual: true,
@@ -105,7 +106,7 @@ test('one component combines changing price props with its own persistent quanti
 
 test('syntax errors and unsupported imports produce usable compiler errors', () => {
   assert.throws(() => compile('export default function () { return <div>'), /Unexpected|Unterminated/);
-  assert.throws(() => compile("import x from 'react'; export default function App() { return <p />; }"), /aeui.*import/);
+  assert.throws(() => compile("import x from 'react'; export default function App() { return <p />; }"), /imports.*aeui/);
 });
 
 test('mount and event errors are reported, including errors caught by AEUI', async t => {
