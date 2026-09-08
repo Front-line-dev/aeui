@@ -46,7 +46,11 @@ test('an object inside an array updates without replacing either reference', asy
   document.querySelector('button').click();
   await wait();
   assert.equal(item.quantity, 2);
-  assert.equal(document.querySelector('#root p').textContent, '커피: 2개');
+  assert.deepEqual([...document.querySelectorAll('#root p')].map(p => p.textContent), ['커피: 2개', '빵: 1개']);
+  document.querySelectorAll('button')[1].click();
+  await wait();
+  assert.deepEqual([...document.querySelectorAll('#root p')].map(p => p.textContent), ['커피: 2개', '빵: 2개']);
+  assert.equal(cart[1].quantity, 2);
   assert.equal(dom.window.exampleCart, cart);
   assert.equal(cart[0], item);
 });
@@ -80,28 +84,6 @@ test('omitting deps runs on the first render and still responds to theme changes
   document.querySelector('button').click();
   await wait();
   assert.equal(document.body.classList.contains('dark'), false);
-});
-
-test('one component combines changing price props with its own persistent quantity state', async t => {
-  const { document } = execute(t, examples.props.source);
-  const [discount, quantity] = document.querySelectorAll('button');
-  assert.equal(document.querySelector('h3').textContent, '합계: 4000원');
-  quantity.click();
-  await wait();
-  assert.equal(quantity.textContent, '수량: 2개 (+)');
-  assert.equal(document.querySelector('h3').textContent, '합계: 8000원');
-  discount.click();
-  await wait();
-  assert.equal(document.querySelector('p').textContent, '커피 한 개: 3000원');
-  assert.equal(quantity.textContent, '수량: 2개 (+)');
-  assert.equal(document.querySelector('h3').textContent, '합계: 6000원');
-  quantity.click();
-  await wait();
-  assert.equal(document.querySelector('h3').textContent, '합계: 9000원');
-  discount.click();
-  await wait();
-  assert.equal(quantity.textContent, '수량: 3개 (+)');
-  assert.equal(document.querySelector('h3').textContent, '합계: 12000원');
 });
 
 test('syntax errors and unsupported imports produce usable compiler errors', () => {

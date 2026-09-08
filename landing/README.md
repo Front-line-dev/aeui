@@ -21,11 +21,11 @@ npm run preview:landing
 
 ## 내용과 예제 수정
 
-- `index.html`: 영어 기본 문구, 섹션, 문서 링크, Simple Analytics 스크립트
+- `index.html`: 영어 기본 문구, 섹션, 읽기 전용 JSX 코드, 문서 링크, Simple Analytics 스크립트
 - `src/locales.js`: 영어·한국어·일본어·중국어 번역
 - `src/i18n.js`: 브라우저 언어 선택과 문구·메타데이터 적용
 - `src/styles.css`: 모노톤 테마와 반응형 레이아웃
-- `src/examples.js`: 네 가지 기본 예제
+- `src/examples.js`: 세 가지 기본 예제
 - `src/compile.js`: AEUI Babel 변환, JSX 변환, 예제 반복문 제한
 - `src/playground.js`: CodeMirror 편집, 650ms 자동 실행, 초기화, 오류 표시
 - `src/editor-highlight.js`: JavaScript/JSX 토큰별 하이라이트
@@ -55,9 +55,10 @@ CodeMirror의 JavaScript/JSX 구문 분석 결과에 토큰별 색상을 적용�
 
 `.github/workflows/landing-pages.yml`이 다음을 수행합니다.
 
-1. `main`에 랜딩 페이지, 코어, 루트 의존성 또는 워크플로 변경이 push되면 설치 → 예제 검증 → 빌드 → Pages 배포를 실행합니다.
-2. Pull request에서는 같은 검증과 빌드를 수행하고 배포하지 않습니다.
-3. GitHub Actions의 **Landing page → Run workflow**로 `main`을 수동 배포할 수도 있습니다.
+1. `main`에 `landing/` 변경이 push되면 설치 → 예제 검증 → 빌드 → Pages 배포를 실행합니다.
+2. `landing/` 변경이 있는 pull request에서는 같은 검증과 빌드를 수행하고 배포하지 않습니다.
+
+코어, 공용 로고, 루트 의존성, 워크플로만 변경하면 실행하지 않습니다. 수동 배포 트리거는 제공하지 않습니다.
 
 최초 한 번 저장소의 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 설정해야 합니다. 조직에서 Actions 또는 `github-pages` 환경 보호 규칙을 적용한다면 해당 정책에 따라 허용 또는 승인이 필요합니다. 별도 배포 토큰 없이 기본 `GITHUB_TOKEN`과 OIDC를 사용합니다.
 

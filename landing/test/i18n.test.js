@@ -49,7 +49,12 @@ for (const locale of ['en', 'ko', 'ja', 'zh']) {
     assert.equal(document.documentElement.lang, languageTag(locale));
     assert.equal(document.title, messages.title);
     assert.equal(document.querySelector('meta[name="description"]').content, messages.description);
-    assert.equal(document.querySelectorAll('[data-example]').length, 4);
+    assert.equal(document.querySelectorAll('[data-example]').length, 3);
+    assert.equal(document.querySelector('#jsx h3').textContent, messages.jsxTitle);
+    assert.equal(document.querySelector('#jsx [data-example]'), null);
+    for (const link of document.querySelectorAll('.feature-nav a')) {
+      assert.ok(document.querySelector(link.getAttribute('href')));
+    }
     assert.equal(document.querySelectorAll('#hero-title code').length, 1);
     for (const element of document.querySelectorAll('[data-i18n]')) {
       assert.ok(messages[element.dataset.i18n], element.dataset.i18n);
@@ -74,7 +79,14 @@ for (const locale of ['en', 'ko', 'ja', 'zh']) {
     const nested = execute(t, examples.nested.source, locale);
     nested.document.querySelector('button').click();
     await wait();
-    assert.equal(nested.document.querySelector('p').textContent, `${copy.coffee}: 2${copy.unit}`);
+    assert.deepEqual([...nested.document.querySelectorAll('p')].map(p => p.textContent), [
+      `${copy.coffee}: 2${copy.unit}`, `${copy.bread}: 1${copy.unit}`,
+    ]);
+    nested.document.querySelectorAll('button')[1].click();
+    await wait();
+    assert.deepEqual([...nested.document.querySelectorAll('p')].map(p => p.textContent), [
+      `${copy.coffee}: 2${copy.unit}`, `${copy.bread}: 2${copy.unit}`,
+    ]);
 
     const theme = execute(t, examples.watch.source, locale);
     assert.equal(theme.document.querySelector('button').textContent, copy.dark);
@@ -83,15 +95,23 @@ for (const locale of ['en', 'ko', 'ja', 'zh']) {
     assert.ok(theme.document.body.classList.contains('dark'));
     assert.equal(theme.document.querySelector('button').textContent, copy.light);
 
-    const props = execute(t, examples.props.source, locale);
-    const [discount, quantity] = props.document.querySelectorAll('button');
-    quantity.click();
+    const page = new JSDOM(html);
+    t.after(() => page.window.close());
+    applyLocale(page.window.document, locale);
+    const showcase = execute(t, page.window.document.querySelector('#jsx pre code').textContent, locale);
+    const titles = () => [...showcase.document.querySelectorAll('h2')].map(h => h.textContent);
+    assert.deepEqual(titles(), ['Dune', '1984']);
+    showcase.document.querySelector('input').click();
     await wait();
-    discount.click();
+    assert.deepEqual(titles(), ['Dune']);
+    showcase.document.querySelector('button').click();
     await wait();
-    assert.equal(quantity.textContent, `${copy.quantity}2${copy.unit} (+)`);
-    assert.equal(props.document.querySelector('h3').textContent, `${copy.total}6000${copy.currency}`);
-    for (const result of [counter, nested, theme, props]) assert.deepEqual(result.messages.map(m => m.type), ['ready']);
+    assert.deepEqual(titles(), []);
+    showcase.document.querySelector('input').click();
+    await wait();
+    assert.deepEqual(titles(), ['Dune', '1984']);
+    assert.equal(showcase.document.querySelector('button').textContent.trim(), getMessages(locale).jsxSave);
+    for (const result of [counter, nested, theme, showcase]) assert.deepEqual(result.messages.map(m => m.type), ['ready']);
   });
 
   test(`${locale}: playground guard errors use the selected language`, t => {

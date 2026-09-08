@@ -5,20 +5,9 @@ on:
     branches: [main]
     paths:
       - 'landing/**'
-      - 'assets/brand/**'
-      - 'packages/core/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/landing-pages.yml'
   pull_request:
     paths:
       - 'landing/**'
-      - 'assets/brand/**'
-      - 'packages/core/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/landing-pages.yml'
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -44,7 +33,7 @@ jobs:
           path: landing/dist
 
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     permissions:
