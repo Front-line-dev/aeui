@@ -1,3 +1,5 @@
+<p><img src="../assets/brand/aeui-logo-wordmark.svg" alt="AEUI" width="180"></p>
+
 # AEUI 문서 인덱스
 
 이 문서는 AEUI 문서의 **역할, 권위 순서, 읽기 순서**를 정의하는 루트 인덱스다.

@@ -1,3 +1,5 @@
+<p><img src="assets/brand/aeui-logo-wordmark.svg" alt="AEUI" width="240"></p>
+
 # AEUI
 
 **일반 `let` 변수를 직접 바꾸면 화면이 갱신되는 프론트엔드 프레임워크입니다.** JSX, VDOM, 파일 기반 라우터를 제공하며 React 런타임을 사용하지 않습니다.

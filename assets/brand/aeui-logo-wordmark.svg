@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="232.25" height="120" viewBox="136 6 232.25 120" fill="none" role="img" aria-labelledby="title desc">
+<title id="title">AEUI 워드마크</title>
+<desc id="desc">회색 소문자 aeui와 코랄색 i의 점으로 구성된 AEUI 로고.</desc>
+<g transform="translate(140 35.84) scale(.34)"><path stroke="#77777D" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" d="M70 74C80 52 99 44 124 44C161 44 184 65 184 100V174C184 190 194 198 212 198M184 116H104C74 116 54 131 54 155C54 182 76 198 108 198C148 198 184 170 184 136"/></g>
+<g fill="none" stroke="#77777D" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+<path transform="translate(-18 0)" d="M241 76H287C287 60 278 50 264 50S240 60 240 77S250 104 265 104C274 104 281 100 286 95"/>
+<path transform="translate(-26.25 0)" d="M311 51V80C311 95 319 104 332 104S353 95 353 80V51M353 80V103"/>
+<path transform="translate(-37.75 0)" d="M383 52V103"/>
+</g>
+<circle cx="345.25" cy="29" r="7" fill="#EA5860"/>
+</svg>
