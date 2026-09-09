@@ -42,7 +42,7 @@
       <section id="features" class="features shell" aria-labelledby="features-title">
         <div class="features-heading"><h2 id="features-title" data-i18n="featuresTitle">Code examples</h2></div>
         <section id="let" class="feature">
-          <div class="feature-copy"><span class="feature-label">let</span><h3 data-i18n="letTitle">Change a variable. Update the screen.</h3><p data-i18n="letBody">Declare state with <code>let</code> and change its value with code like <code>count++</code>. No separate state setter needed.</p><p data-i18n="letDetail">Changes from clicks and input appear on screen automatically.</p><p class="try-note" data-i18n="letTry"><strong>When does the component run?</strong>The component body runs once on mount. State updates re-evaluate the returned JSX, so local variables keep their values.</p></div>
+          <div class="feature-copy"><span class="feature-label">let</span><h3 data-i18n="letTitle">Change a variable. Update the screen.</h3><p data-i18n="letBody">Declare state with <code>let</code> and change its value with code like <code>count++</code>. No separate state setter needed.</p><p data-i18n="letDetail">Changes from clicks and input appear on screen automatically.</p><p class="try-note" data-i18n="letTry"><strong>When does the component run?</strong>The component body runs once on mount. Screen updates re-evaluate only the JSX. Since <code>let count = 0</code> does not run again, <code>count</code> is not reset to zero.</p></div>
           <div class="playground" data-example="counter"></div>
         </section>
         <section id="nested" class="feature">
