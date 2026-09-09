@@ -35,7 +35,7 @@ Babel은 Web Worker에서 실행되며 편집기는 해당 섹션 근처로 스�
 
 예제는 `export default` 함수 컴포넌트이며 `aeui` import를 지원합니다. watch 예제는 `classList.toggle()`을 호출해 실행 프레임의 밝은 테마와 어두운 테마를 전환합니다. 테마 스타일은 `src/sandbox.js`에 정의합니다. 외부 패키지와 네트워크 요청은 지원하지 않습니다. 프레임은 `sandbox="allow-scripts"`로 부모 DOM과 저장소 접근을 분리하고, CSP로 외부 연결을 차단합니다. 반복문에는 실행 횟수 제한을 주입합니다. 이 제한은 임의의 JavaScript에 대한 완전한 자원 격리를 제공하지 않으므로 무거운 계산용 실행 환경으로 사용하지 않습니다.
 
-설치 영역은 `npx create-aeui-app@latest my-app`을 안내합니다. 현재 npm 공개 버전은 `0.0.1`이고 페이지 예제는 저장소의 다음 버전 기준임을 함께 표시합니다. 릴리스 후에는 이 안내를 공개 버전에 맞추세요.
+설치 영역은 `npx create-aeui-app@latest my-app`을 안내합니다.
 
 ## 언어와 하이라이트
 

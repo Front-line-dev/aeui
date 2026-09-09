@@ -22,7 +22,7 @@
     <main id="main">
       <section class="hero shell" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow">A EASY UI</p>
+          <p class="eyebrow">A Easy UI</p>
           <h1 id="hero-title" data-i18n="heroTitle">Build interfaces<br>with <code>let</code>.</h1>
           <p class="lead" data-i18n="lead">AEUI is a frontend framework that manages state with JavaScript variables.<br>Update the screen without a state update function.</p>
           <div class="hero-actions"><a class="button" href="#start" data-i18n="create">Create a project <span aria-hidden="true">↗</span></a><a class="text-link" href="#features" data-i18n="explore">Explore examples <span aria-hidden="true">↓</span></a></div>
@@ -40,17 +40,17 @@
       </section>
       <div class="feature-nav-wrap"><nav class="feature-nav shell" aria-label="Key features" data-i18n-aria="featuresLabel"><a href="#let"><code>let</code><span data-i18n="navLet">Use variables for state</span></a><a href="#nested"><code>array / object</code><span data-i18n="navNested">Update nested values directly</span></a><a href="#watch"><code>watch</code><span data-i18n="navWatch">Run code when state changes</span></a><a href="#jsx"><code>JSX</code><span data-i18n="navJsx">Start with familiar JSX</span></a></nav></div>
       <section id="features" class="features shell" aria-labelledby="features-title">
-        <div class="features-heading"><h2 id="features-title" data-i18n="featuresTitle">Try it yourself.</h2><p data-i18n="featuresIntro">Edit the examples and see the results.</p></div>
+        <div class="features-heading"><h2 id="features-title" data-i18n="featuresTitle">Code examples</h2></div>
         <section id="let" class="feature">
-          <div class="feature-copy"><span class="feature-label">let</span><h3 data-i18n="letTitle">Change a variable. Update the screen.</h3><p data-i18n="letBody">Declare state with <code>let</code> and change its value with code like <code>count++</code>. No separate state setter needed.</p><p data-i18n="letDetail">Changes from clicks and input appear on screen automatically.</p><p class="try-note" data-i18n="letTry"><strong>Try it</strong>Replace <code>count++</code> with <code>count += 5</code>, then click the button.</p></div>
+          <div class="feature-copy"><span class="feature-label">let</span><h3 data-i18n="letTitle">Change a variable. Update the screen.</h3><p data-i18n="letBody">Declare state with <code>let</code> and change its value with code like <code>count++</code>. No separate state setter needed.</p><p data-i18n="letDetail">Changes from clicks and input appear on screen automatically.</p><p class="try-note" data-i18n="letTry"><strong>When does the component run?</strong>The component body runs once on mount. State updates re-evaluate the returned JSX, so local variables keep their values.</p></div>
           <div class="playground" data-example="counter"></div>
         </section>
         <section id="nested" class="feature">
-          <div class="feature-copy"><span class="feature-label">array / object</span><h3 data-i18n="nestedTitle">Update values inside arrays directly.</h3><p data-i18n="nestedBody">Change an object inside an array with <code>item.quantity++</code>. No need to create a new array or call a state update function.</p><p class="try-note" data-i18n="nestedTry"><strong>Try it</strong>Add coffee or bread. Only the quantity of the item you choose updates.</p></div>
+          <div class="feature-copy"><span class="feature-label">array / object</span><h3 data-i18n="nestedTitle">Update values inside arrays directly.</h3><p data-i18n="nestedBody">Change an object inside an array with <code>item.quantity++</code>. No need to create a new array or call a state update function.</p><p class="try-note" data-i18n="nestedTry"><strong>How are changes detected?</strong>AEUI compares current values with a saved copy of the previous values. Deep equality checks detect changes inside an object even when its reference stays the same.</p></div>
           <div class="playground" data-example="nested"></div>
         </section>
         <section id="watch" class="feature">
-          <div class="feature-copy"><span class="feature-label">watch</span><h3 data-i18n="watchTitle">Run code when state changes.</h3><p data-i18n="watchBody">Pass a callback and the values to observe to <code>watch</code>. This example switches the theme when <code>dark</code> changes.</p><p class="try-note" data-i18n="watchTry"><strong>Try it</strong>Click the button to switch between light and dark themes.</p></div>
+          <div class="feature-copy"><span class="feature-label">watch</span><h3 data-i18n="watchTitle">Run code when state changes.</h3><p data-i18n="watchBody">Pass a callback and the values to observe to <code>watch</code>. This example switches the theme when <code>dark</code> changes.</p><p class="try-note" data-i18n="watchTry"><strong>When does watch run?</strong>With <code>[dark]</code>, the callback skips the initial render and runs when the value changes. Without dependencies, it runs on every render.</p></div>
           <div class="playground" data-example="watch"></div>
         </section>
         <section id="jsx" class="feature" aria-labelledby="jsx-title">
@@ -89,7 +89,7 @@
       <section class="get-started" id="start"><div class="shell start-layout"><div><p class="eyebrow">GET STARTED</p><h2 data-i18n="startTitle">Create your<br>next project.</h2><p data-i18n="startBody"><code>create-aeui-app</code> generates your project files and Vite configuration.</p><a class="text-link" href="https://github.com/Front-line-dev/aeui/blob/main/docs/user-scenario/01-getting-started.md" target="_blank" rel="noreferrer" data-i18n="startDocs">Getting started guide ↗</a></div><div><div class="terminal"><span data-i18n="terminal">Terminal</span><pre><code>npx create-aeui-app@latest my-app
 cd my-app
 npm install
-npm run dev</code></pre></div><p class="requirements" data-i18n="requirements">Node.js 22.x (22.12 or later), or 24 and above</p><p class="release-note" data-i18n="release">The current npm release is 0.0.1. The examples above use the upcoming version.</p></div></div></section>
+npm run dev</code></pre></div><p class="requirements" data-i18n="requirements">Requires Node.js 22 (22.12 or later) or Node.js 24 and above.</p></div></div></section>
     </main>
     <footer class="site-footer shell"><a class="wordmark" href="#" aria-label="AEUI home" data-i18n-aria="homeLabel"><img src="../assets/brand/aeui-logo-wordmark.svg?no-inline" alt="" width="232.25" height="120"></a><span>A Easy UI</span><a href="https://github.com/Front-line-dev/aeui/blob/main/LICENSE">ISC License ↗</a></footer>
     <noscript><p class="shell" data-i18n="noscript">Enable JavaScript to edit and run the examples.</p></noscript>
