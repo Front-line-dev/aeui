@@ -284,4 +284,19 @@ describe('aeui/vite plugin', () => {
       })).not.toThrow();
     }
   });
+
+  it('JSX와 TSX의 인접 요소를 Fragment로 묶고 원본 source map을 제공한다', async () => {
+    const plugin = aeuiVite();
+    for (const extension of ['jsx', 'tsx']) {
+      const annotation = extension === 'tsx' ? ': string' : '';
+      const source = `const title${annotation} = "Home"; export default () => <h1>{title}</h1><p>Welcome</p>;`;
+      const result = await plugin.transform(source, `/app/src/pages/index.${extension}`);
+      expect(result.code).toContain('AEUI.createElement(AEUI.Fragment');
+      expect(result.code).toContain('AEUI.__runtime.runRenderPhase');
+      expect(result.map.sourcesContent).toEqual([source]);
+      expect(() => parseSync(result.code, {
+        configFile: false, babelrc: false, parserOpts: { plugins: ['typescript'] },
+      })).not.toThrow();
+    }
+  });
 });

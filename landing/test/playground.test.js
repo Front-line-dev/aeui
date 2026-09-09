@@ -38,6 +38,21 @@ test('let mutation updates the screen; editing the increment changes actual beha
   assert.equal(document.querySelector('h2').textContent, '5');
 });
 
+test('Fragment 자동 처리가 브라우저용 컴파일러에서도 렌더링과 갱신을 지원한다', async t => {
+  const { document, messages } = execute(t, `
+    export default function Counter() {
+      let count = 0;
+      return <h2>{count}</h2> /* 화면에 표시하지 않는 주석 */ <button onClick={() => count++}>증가</button>;
+    }
+  `);
+  assert.deepEqual([...document.querySelector('#root').children].map(node => node.tagName), ['H2', 'BUTTON']);
+  assert.equal(document.querySelector('#root').textContent, '0증가');
+  document.querySelector('button').click();
+  await wait();
+  assert.equal(document.querySelector('h2').textContent, '1');
+  assert.deepEqual(messages.map(message => message.type), ['ready']);
+});
+
 test('an object inside an array updates without replacing either reference', async t => {
   const source = examples.nested.source.replace('  return (', '  window.exampleCart = cart;\n  return (');
   const { dom, document } = execute(t, source);

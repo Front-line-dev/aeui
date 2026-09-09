@@ -1,3 +1,5 @@
+import { parseWithAutomaticFragments } from './jsx-fragments.js';
+
 export default function aeuiTransform({ types: t }) {
   const isAeuiImportDeclaration = (node) => (
     t.isImportDeclaration(node) && node.source.value === 'aeui'
@@ -821,6 +823,7 @@ export default function aeuiTransform({ types: t }) {
   };
 
   return {
+    parserOverride: parseWithAutomaticFragments,
     visitor: {
       Program: {
         enter(path) {

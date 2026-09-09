@@ -6,10 +6,11 @@ AEUI Babel 플러그인은 사용자가 작성한 컴포넌트 코드를 **AEUI 
 
 AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은 이 Babel 플러그인이 컴포넌트를 setup/render 이중 구조로 바꿔주기 때문에 가능하다. 플러그인 없이는 AEUI 컴포넌트가 정상 동작하지 않는다.
 
-### 플러그인이 수행하는 4가지 변환
+### 플러그인이 수행하는 5가지 변환
 
 | 변환 | 입력 | 출력 | 목적 |
 |------|------|------|------|
+| **Fragment 자동 처리** | `<h1 /><p />` | `<><h1 /><p /></>`와 같은 JSX AST | 인접한 JSX 요소의 수동 래핑 생략 |
 | **Runtime import 주입** | JSX 또는 compiled helper 사용 | `import { AEUI } from 'aeui'` 자동 추가 | 사용자가 JSX 때문에 `AEUI` import를 직접 쓰지 않도록 함 |
 | **Return 래핑** | `return <div />` | `return () => <div />` | setup 1회 실행 + render 반복 실행 구조 생성 |
 | **Props 반응화** | `function Comp(props)` | 초기 props 파라미터 + 내부 props 저장 객체 | props 변경 시 클로저 참조를 최신 상태로 유지 |
@@ -68,6 +69,10 @@ function Counter(_initialProps) {
 ---
 
 ## 플러그인 진입점과 후보 수집
+
+`parserOverride`는 `jsx-fragments.js`의 `parseWithAutomaticFragments`를 사용한다. 표준 파싱이 성공하면 AST를 그대로 반환한다. `UnwrappedAdjacentJSXElements` 오류가 발생하면 해당 경계에 임시 연산자를 넣고 다시 파싱하여 JSX 노드의 정확한 범위를 구한다. 문자열·정규식·주석을 JSX처럼 검색하거나 Babel 내부 파서를 수정하지 않는다.
+
+찾은 인접 노드를 그룹으로 묶어 Fragment와 자식별 표현식 컨테이너를 삽입한 뒤 다시 파싱한다. 표현식 컨테이너는 요소 사이의 JavaScript 주석을 보존하면서 화면에 문자열로 출력되는 것을 막는다. 최종 재파싱은 조건식·논리식·멤버 접근에서 명시적 Fragment와 같은 우선순위를 보장한다. 삽입 위치를 역으로 매핑하여 AST·주석·토큰·오류의 위치를 원본 소스에 맞춘다. 중첩 그룹을 지원하며, 인접 JSX 이외의 문법 오류는 그대로 보고한다. 인접 경계마다 재파싱하므로 매우 큰 그룹은 명시적 Fragment보다 파싱 비용이 크다.
 
 `Program.enter`에서 JSX lowering 전에 후보와 Babel binding을 수집한다. 이미 `registerComponent`로 연결된 원본/실행 함수와 `runRenderPhase` 출력은 재변환하지 않는다. 중첩 함수부터 처리한 다음 상위 함수를 복제하여 두 경로가 같은 lexical scope의 준비된 내부 함수를 갖도록 한다.
 

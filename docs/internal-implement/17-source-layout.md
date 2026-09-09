@@ -6,7 +6,7 @@
 
 ## 소스 트리
 
-`packages/core/src`에 **20개 파일**:
+`packages/core/src`의 주요 파일:
 
 ```
 src/
@@ -29,6 +29,7 @@ src/
 ├── deep-compare.js       → _deepEqual, _deepClone
 ├── router.js             → route table, URL 매칭, SPA 네비게이션
 ├── babel-plugin.js       → AEUI Babel 변환 플러그인
+├── jsx-fragments.js      → 인접 JSX 파싱과 원본 위치 복원
 └── vite-plugin.js        → Vite 빌드 플러그인
 ```
 
@@ -91,6 +92,7 @@ runtime.js의 module constant: `MAX_FRAME_DELAY = 60`
 | 파일 | export |
 |---|---|
 | `babel-plugin.js` | `default function aeuiTransform({ types: t })` |
+| `jsx-fragments.js` | `parseWithAutomaticFragments` |
 | `vite-plugin.js` | `default function aeui(options = {})` |
 
 ---
@@ -118,7 +120,7 @@ vite-plugin
 ├─ @babel/core
 ├─ @babel/plugin-transform-react-jsx
 ├─ parse5 (HTML module script 판별, 외부 의존성)
-└─ babel-plugin
+└─ babel-plugin ─ jsx-fragments
 ```
 
 **핵심 규칙:** source 모듈은 `app-runtime` singleton을 역으로 import하지 않는다.

@@ -71,10 +71,6 @@ component의 첫 parameter가 ArrayPattern 또는 ArrayPattern assignment인 문
 - base path와 SPA fallback 가이드
 - 정적 빌드·배포 command 또는 script
 
-### Fragment 자동 처리
-
-JSX 변환 단계가 필요한 Fragment를 자동 삽입해 사용자가 직접 Fragment를 작성할 필요를 줄이는 방식을 설계한다.
-
 ### 문서 보강
 
 - `user-scenario`: AEUI의 역할과 간결한 사용자 경험, 일반 변수 반응성과 compiler 기반 문법의 개념
