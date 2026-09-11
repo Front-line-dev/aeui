@@ -11,6 +11,8 @@
 ```bash
 npm ci
 npm test
+npx playwright install chromium
+npm run test:extra
 npm run typecheck
 npm run build
 mkdir -p release-artifacts

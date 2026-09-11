@@ -1,5 +1,7 @@
 # AEUI Project Context
 
+- GitHub Actions workflow를 추가하지 않는다.
+
 이 프로젝트는 **AEUI (A Easy UI)**라는 자체 개발 프론트엔드 프레임워크의 모노레포입니다.
 React와 유사한 VDOM 기반의 UI 라이브러리이지만, `setState` 대신 **일반 `let` 변수와 Dirty Checking 반응성 시스템**, 그리고 **컴파일러(Babel 플러그인) 기반의 Setup/Render 분리 모델**을 채택하고 있습니다.
 

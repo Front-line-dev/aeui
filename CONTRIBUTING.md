@@ -13,7 +13,16 @@ npm run typecheck
 npm run build
 ```
 
-모든 테스트·예제가 npm workspace이며 루트 `package-lock.json` 하나로 설치합니다. 예제별 lockfile을 만들지 않습니다. `npm test`는 먼저 코어를 빌드하므로 이전 `dist`에 의존하지 않습니다.
+모든 테스트·예제가 npm workspace이며 루트 `package-lock.json` 하나로 설치합니다. 예제별 lockfile을 만들지 않습니다. `npm test`는 계약 연결을 검사하고 코어를 빌드한 뒤 새 적합성 테스트를 실행하므로 이전 `dist`에 의존하지 않습니다. 기존 테스트 파일은 자동 실행 대상에 포함하지 않습니다.
+
+설치·전체 예제·실제 브라우저 검증은 extra로 분리합니다. 관련 경로나 릴리즈를 변경했다면 함께 실행합니다.
+
+```bash
+npx playwright install chromium
+npm run test:extra
+```
+
+각 테스트는 상황·기대 결과와 발생하면 안 되는 결과를 검증하고 계약 ID를 갖습니다. 실행 명령과 문서 변경 시 검토 절차는 [적합성 검증](docs/internal-implement/18-conformance.md)을 참고하세요. 성공 시 요약만 출력하며 상세 로그와 실패 자료는 `.conformance/`에 저장합니다.
 
 ```bash
 npm run dev --workspace commerce-admin
@@ -23,7 +32,7 @@ npm run dev --workspace commerce-admin
 
 [문서 인덱스](docs/README.md)의 사용자 계약 → 내부 설계 → 명시되지 않은 코드 세부 동작 순서를 따릅니다. 프레임워크 소스는 `packages/core/src`에서만 수정하고 `dist`는 직접 편집하지 않습니다. 공개 타입과 배포 설정은 해당 파일을 함께 갱신합니다.
 
-코어 수정 후에는 기존 테스트를 `npm test`로 확인합니다. 기대값은 현재 구현이 아니라 사용자 계약에서 정합니다. 컴파일러 테스트는 생성된 문자열뿐 아니라 문법·바인딩·실행 결과를 검증합니다. 테스트 fixture도 실제 컴포넌트의 export 또는 JSX/runtime 사용 근거를 갖춰야 합니다.
+코어 수정 후에는 적합성 테스트를 `npm test`로 확인합니다. 기대값은 현재 구현이나 과거 assertion이 아니라 사용자 계약에서 정합니다. 컴파일러 테스트는 생성된 문자열뿐 아니라 문법·바인딩·실행 결과를 검증합니다. 테스트 fixture도 실제 컴포넌트의 export 또는 JSX/runtime 사용 근거를 갖춰야 합니다.
 
 ## Pull request
 

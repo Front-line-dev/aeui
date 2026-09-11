@@ -2,15 +2,7 @@
 
 이 문서는 아직 `user-scenario`에서 약속하지 않은 기능과 개선 작업을 관리한다. 여기 적힌 내용은 지금 반드시 구현해야 하는 동작이나 테스트 기대값이 아니다. 현재 계약을 구현하지 못한 항목은 여기가 아니라 [`known-defects.md`](known-defects.md)에서 추적한다.
 
-## 높은 우선순위
-
-### 공식 적합성 suite 구축
-
-- 모든 테스트가 검증하는 `user-scenario` 문장을 직접 가리키게 한다.
-- 기존 `example/test` assertion을 계약으로 복사하지 않고 기대값을 `user-scenario`에서 도출한다.
-- 값/VNode, compiler, runtime/DOM, router/Vite, package 소비와 reference app 계층을 분리한다.
-- fragment reorder, nested destructuring props와 render parameter 조합, cleanup/watch ordering을 독립 시나리오로 검증한다.
-- [17. 소스 배치](../internal-implement/17-source-layout.md)의 파일 경계와 private 심볼 배치는 source import를 통해 검증한다 ([18. 적합성 검증](../internal-implement/18-conformance.md)의 예외 조항).
+공식 적합성 suite는 구축되어 기본/extra 실행으로 관리한다. 실행 방법과 계약 연결·부정 검증 기준은 [18. 적합성 검증](../internal-implement/18-conformance.md)을 따른다.
 
 ## 중간 우선순위
 

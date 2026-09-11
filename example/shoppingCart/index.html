@@ -11,43 +11,8 @@
 
     <!-- Framework & Plugin Definition (Imported from Modules) -->
     <script type="module">
-      import { AEUI, watch, clean } from "../../packages/core/src/index.js";
-      import aeuiTransform from "../../packages/core/src/babel-plugin.js";
-
-      // Expose to global scope for the eval'd code to see
-      window.AEUI = AEUI;
-      window.watch = watch;
-      window.clean = clean;
-
-      console.log("AEUI Framework Loading...");
-
-      // Register Plugin
-      if (window.Babel) {
-          Babel.registerPlugin("aeui-transform", aeuiTransform);
-
-          // Compile and Run
-          try {
-            const userCode = document.getElementById("user-code").textContent;
-            const output = Babel.transform(userCode, {
-              presets: ["react"],
-              plugins: ["aeui-transform"]
-            }).code;
-
-            console.log("Compiled Code:", output);
-            
-            // Execute
-            // We use a function to wrap the eval so it has access to the module scope if needed,
-            // but since we attached AEUI to window, it should be fine.
-            // However, the eval'd code needs to see 'AEUI' in its scope.
-            // Since 'AEUI' is on window, it is globally available.
-            eval(output);
-          } catch (e) {
-            console.error("Compilation/Execution Error:", e);
-            document.body.innerHTML += `<pre style="color:red">${e.message}</pre>`;
-          }
-      } else {
-          console.error("Babel not loaded");
-      }
+      import { runStandalone } from "../standalone-runner.js";
+      await runStandalone(document.getElementById("user-code").textContent);
     </script>
 
     <!-- User Code Template (Not executed directly) -->

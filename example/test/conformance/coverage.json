@@ -1,0 +1,447 @@
+[
+  {
+    "source": "docs/user-scenario/01-getting-started.md",
+    "sha256": "f8fb34b6322e75115210de3a2c7a6fb47cd012144b40156856bee5be1c47d024",
+    "sections": [
+      {
+        "heading": "프로젝트 만들기",
+        "contracts": [
+          "START-CLI",
+          "CONFIG-PACKAGE"
+        ],
+        "review": {
+          "id": "REVIEW-01-01",
+          "result": "reviewed",
+          "reason": "설치 명령은 npm 발행 후 안내다. 현재 검증은 같은 버전의 로컬 tarball을 사용하며 공개 registry 발행 여부를 주장하지 않는다."
+        }
+      },
+      {
+        "heading": "생성된 프로젝트 구조",
+        "contracts": [
+          "START-CLI"
+        ]
+      },
+      {
+        "heading": "첫 페이지 작성",
+        "contracts": [
+          "START-CLI"
+        ]
+      },
+      {
+        "heading": "컴포넌트는 어떻게 화면에 나타나나?",
+        "contracts": [
+          "CONFIG-ENTRY"
+        ]
+      },
+      {
+        "heading": "사용 가능한 스크립트",
+        "contracts": [
+          "START-CLI",
+          "CONFIG-BUILD"
+        ]
+      }
+    ]
+  },
+  {
+    "source": "docs/user-scenario/02-components.md",
+    "sha256": "aa352f935df44a2ae52bdac5f192b147a0a0306051bd3810cb6c74fbe1257659",
+    "sections": [
+      {
+        "heading": "React와의 핵심 차이",
+        "contracts": [
+          "CMP-SETUP"
+        ],
+        "review": {
+          "id": "REVIEW-02-01",
+          "result": "reviewed",
+          "reason": "React 비교 설명은 외부 라이브러리를 설치해 대조하지 않는다. AEUI의 setup 횟수와 상태 독립성을 직접 검증한다."
+        }
+      },
+      {
+        "heading": "왜 이게 가능할까? — Babel 컴파일러",
+        "contracts": [
+          "CMP-SETUP",
+          "CONFIG-BABEL"
+        ],
+        "review": {
+          "id": "REVIEW-02-02",
+          "result": "reviewed",
+          "reason": "변환 코드는 개념 설명이다. 생성 변수명과 전체 코드 문자열은 공개 계약으로 고정하지 않는다."
+        }
+      },
+      {
+        "heading": "Props 받기",
+        "contracts": [
+          "CMP-PROPS"
+        ]
+      },
+      {
+        "heading": "컴포넌트 조합",
+        "contracts": [
+          "CMP-PROPS"
+        ]
+      },
+      {
+        "heading": "컴포넌트 값 전달",
+        "contracts": [
+          "CMP-TYPE",
+          "CMP-CALL",
+          "CMP-PREPARE",
+          "CMP-CAPTURE"
+        ],
+        "review": {
+          "id": "REVIEW-02-05",
+          "result": "reviewed",
+          "reason": "자동 준비 제외 범위는 지원 보장이 아니다. 순환 모듈 평가 중 마운트는 AEUI-COMPILER-001로 추적하며 적합성 통과로 해결되었다고 표시하지 않는다."
+        }
+      },
+      {
+        "heading": "생명주기",
+        "contracts": [
+          "CMP-SETUP",
+          "CMP-FAIL",
+          "CLEAN"
+        ],
+        "review": {
+          "id": "REVIEW-02-06",
+          "result": "reviewed",
+          "reason": "전체 업데이트 rollback과 error boundary는 지원 약속이 아니므로 기대값에 넣지 않는다."
+        }
+      }
+    ]
+  },
+  {
+    "source": "docs/user-scenario/03-reactivity.md",
+    "sha256": "87570d3d79455bc11b04119e396a8de98a06a36a82ba8eed0b5c641522b983e6",
+    "sections": [
+      {
+        "heading": "변경 감지의 원리",
+        "contracts": [
+          "REACT-EVENT",
+          "REACT-POLL",
+          "REACT-DEEP"
+        ],
+        "review": {
+          "id": "REVIEW-03-01",
+          "result": "reviewed",
+          "reason": "약 1초는 foreground 60Hz 근사 환경에서 검증한다. 백그라운드 탭 throttling의 wall-clock 보장은 이 검증으로 주장하지 않는다."
+        }
+      },
+      {
+        "heading": "`watch` — 값 변화에 반응하기",
+        "contracts": [
+          "WATCH-ALWAYS",
+          "WATCH-DEPS",
+          "HOOK-PHASE"
+        ]
+      },
+      {
+        "heading": "deps는 언제 사용하나?",
+        "contracts": [
+          "WATCH-ALWAYS",
+          "WATCH-DEPS"
+        ],
+        "review": {
+          "id": "REVIEW-03-03",
+          "result": "reviewed",
+          "reason": "네트워크·알림 예시는 deps 선택 지침이다. 실제 서버 호출 대신 callback 횟수로 계약을 검증한다. deps watcher는 초기 요청을 실행하지 않는다."
+        }
+      },
+      {
+        "heading": "deps 사용 시 참고",
+        "contracts": [
+          "WATCH-DEPS",
+          "REACT-DEEP"
+        ]
+      },
+      {
+        "heading": "`clean` — 정리 작업 등록",
+        "contracts": [
+          "CLEAN",
+          "HOOK-PHASE"
+        ]
+      },
+      {
+        "heading": "비동기 작업과 수동 갱신",
+        "contracts": [
+          "MANUAL",
+          "REACT-POLL"
+        ]
+      },
+      {
+        "heading": "watch + clean 조합 예시",
+        "contracts": [
+          "CLEAN",
+          "REACT-DEEP"
+        ],
+        "review": {
+          "id": "REVIEW-03-07",
+          "result": "reviewed",
+          "reason": "autosave 예시는 watcher와 timer 정리의 조합이다. 실제 외부 서비스로 전송하지 않는다."
+        }
+      },
+      {
+        "heading": "이름 있는 dependency getter와 import alias",
+        "contracts": [
+          "WATCH-GETTER"
+        ]
+      }
+    ]
+  },
+  {
+    "source": "docs/user-scenario/04-jsx-and-rendering.md",
+    "sha256": "4939fca48b70637c30b61ccc476ac24cd51b87bd77654a946323f426546149a8",
+    "sections": [
+      {
+        "heading": "JSX 기본",
+        "contracts": [
+          "JSX-HIDDEN",
+          "JSX-STYLE",
+          "DOM-CONTROL"
+        ]
+      },
+      {
+        "heading": "Fragment — 감싸는 태그 없이 묶기",
+        "contracts": [
+          "JSX-FRAGMENT",
+          "JSX-AUTO"
+        ],
+        "review": {
+          "id": "REVIEW-04-02",
+          "result": "reviewed",
+          "reason": "일반 JSX 파서와 편집기의 인접 JSX 진단은 외부 도구별로 다르므로 지원 조합에 대한 주의로 검토한다."
+        }
+      },
+      {
+        "heading": "조건부 렌더링",
+        "contracts": [
+          "JSX-CONDITIONAL"
+        ]
+      },
+      {
+        "heading": "리스트 렌더링",
+        "contracts": [
+          "JSX-KEY",
+          "JSX-DUPLICATE"
+        ],
+        "review": {
+          "id": "REVIEW-04-04",
+          "result": "reviewed",
+          "reason": "index key 권고는 key identity 검증과 함께 검토한다. 고유하지 않은 key에 상태 보존을 약속하지 않는다."
+        }
+      },
+      {
+        "heading": "스타일 적용",
+        "contracts": [
+          "JSX-STYLE"
+        ]
+      },
+      {
+        "heading": "표시되지 않는 값",
+        "contracts": [
+          "JSX-HIDDEN"
+        ]
+      }
+    ]
+  },
+  {
+    "source": "docs/user-scenario/05-routing.md",
+    "sha256": "106bb26d6bc4491a8c72619d794bc48b38ad97687c5de795d57239f7e148c08f",
+    "sections": [
+      {
+        "heading": "기본 원리",
+        "contracts": [
+          "ROUTE-MATCH",
+          "CONFIG-ENTRY"
+        ]
+      },
+      {
+        "heading": "파일명 규칙",
+        "contracts": [
+          "ROUTE-FILES"
+        ]
+      },
+      {
+        "heading": "정적 라우트",
+        "contracts": [
+          "ROUTE-PRIORITY"
+        ]
+      },
+      {
+        "heading": "동적 라우트",
+        "contracts": [
+          "ROUTE-MATCH"
+        ]
+      },
+      {
+        "heading": "`route` prop",
+        "contracts": [
+          "ROUTE-MATCH"
+        ]
+      },
+      {
+        "heading": "Catch-All 라우트",
+        "contracts": [
+          "ROUTE-PRIORITY"
+        ]
+      },
+      {
+        "heading": "링크와 네비게이션",
+        "contracts": [
+          "ROUTE-NAV",
+          "ROUTE-EXCLUDE"
+        ]
+      },
+      {
+        "heading": "전역 레이아웃",
+        "contracts": [
+          "ROUTE-LAYOUT"
+        ]
+      },
+      {
+        "heading": "404 페이지",
+        "contracts": [
+          "ROUTE-LAYOUT",
+          "ROUTE-PRIORITY"
+        ]
+      },
+      {
+        "heading": "라우트 우선순위",
+        "contracts": [
+          "ROUTE-PRIORITY"
+        ]
+      },
+      {
+        "heading": "지원하는 파일 확장자",
+        "contracts": [
+          "ROUTE-FILES"
+        ]
+      }
+    ]
+  },
+  {
+    "source": "docs/user-scenario/06-event-handling.md",
+    "sha256": "c2bbc42d06d2c084c1eba053afadb033414f45f442983f23f663bb0a2c1b822d",
+    "sections": [
+      {
+        "heading": "이벤트 핸들링",
+        "contracts": [
+          "DOM-EVENT",
+          "DOM-FORM"
+        ]
+      },
+      {
+        "heading": "입력(input) 처리",
+        "contracts": [
+          "DOM-CONTROL",
+          "DOM-FORM"
+        ],
+        "review": {
+          "id": "REVIEW-06-02",
+          "result": "reviewed",
+          "reason": "onInput 권장과 onChange 비교는 입력 종류에 따른 차이가 있다. 자동 검증은 브라우저 이벤트 전달과 controlled 복구를 확인하며 모든 input 종류가 blur에만 change한다는 뜻으로 확장하지 않는다."
+        }
+      },
+      {
+        "heading": "Controlled Input",
+        "contracts": [
+          "DOM-CONTROL",
+          "DOM-FILE"
+        ]
+      },
+      {
+        "heading": "폼 조합 예시",
+        "contracts": [
+          "DOM-FORM"
+        ],
+        "review": {
+          "id": "REVIEW-06-04",
+          "result": "reviewed",
+          "reason": "연락처 폼의 필수 입력 검사는 앱 코드 예시다. 프레임워크가 자체 검증기를 제공한다는 계약이 아니다."
+        }
+      },
+      {
+        "heading": "이벤트와 화면 갱신",
+        "contracts": [
+          "REACT-EVENT"
+        ]
+      }
+    ]
+  },
+  {
+    "source": "docs/user-scenario/07-project-config.md",
+    "sha256": "b80a361f7af3ddb0c3a11802eb70fb8e12a2d2bf61d29a83cf2d69e27ae2f9b1",
+    "sections": [
+      {
+        "heading": "Vite 플러그인 기본 설정",
+        "contracts": [
+          "CONFIG-PACKAGE"
+        ],
+        "review": {
+          "id": "REVIEW-07-01",
+          "result": "reviewed",
+          "reason": "지원 버전 범위 전체의 OS·Node·Vite 조합을 한 실행으로 검증하지 않는다. 실제 실행 버전은 보고서에 기록한다."
+        }
+      },
+      {
+        "heading": "플러그인 옵션",
+        "contracts": [
+          "CONFIG-OPTIONS"
+        ]
+      },
+      {
+        "heading": "경로 별칭 (`@`)",
+        "contracts": [
+          "CONFIG-OPTIONS",
+          "START-CLI"
+        ]
+      },
+      {
+        "heading": "모드 자동 선택",
+        "contracts": [
+          "CONFIG-ENTRY"
+        ]
+      },
+      {
+        "heading": "HTML 진입점",
+        "contracts": [
+          "CONFIG-ENTRY"
+        ]
+      },
+      {
+        "heading": "npm 패키지 이름",
+        "contracts": [
+          "START-CLI",
+          "CONFIG-PACKAGE"
+        ]
+      },
+      {
+        "heading": "import 경로",
+        "contracts": [
+          "CONFIG-PACKAGE"
+        ]
+      },
+      {
+        "heading": "Babel 직접 설정 (Vite 없이)",
+        "contracts": [
+          "CONFIG-BABEL"
+        ]
+      },
+      {
+        "heading": "빌드",
+        "contracts": [
+          "CONFIG-BUILD"
+        ]
+      },
+      {
+        "heading": "관련 문서",
+        "contracts": [],
+        "review": {
+          "id": "REVIEW-07-10",
+          "result": "reviewed",
+          "reason": "문서 링크의 유효성을 별도로 검사한다. 새로운 runtime 동작은 없다."
+        }
+      }
+    ]
+  }
+]

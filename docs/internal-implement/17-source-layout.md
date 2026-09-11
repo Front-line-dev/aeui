@@ -20,6 +20,7 @@ src/
 ├── vnode-marker.js       → VNode 식별 Symbol
 ├── vnode-helpers.js      → key/Fragment 판별
 ├── component-lifecycle.js → setup, render, commit, cleanup
+├── component-type.js     → 함수 값별 setup 등록과 태그 검증
 ├── component-watchers.js → watcher 실행
 ├── hook-registry.js      → setup 중 watch/clean 등록
 ├── hooks.js              → public watch/clean (compile guard)
@@ -60,6 +61,7 @@ src/
 | `runtime-state.js` | `createRuntimeState`, `resetRuntimeState` |
 | `runtime-context.js` | `getRuntimeContext`, `withComponentContext` |
 | `node-factory.js` | `createRootNode`, `createNode` |
+| `component-type.js` | `registerComponent`, `resolveComponentSetup`, `assertElementType` |
 | `component-lifecycle.js` | `createComponentNode`, `setupComponentNode`, `runComponentRenderPhase`, `invokeComponentRenderFactory`, `renderComponentNode`, `commitRenderedNode`, `cleanupComponentNode` |
 | `component-watchers.js` | `runComponentWatchers` |
 | `hook-registry.js` | `registerWatch`, `registerCleanup` |
@@ -102,7 +104,9 @@ runtime.js의 module constant: `MAX_FRAME_DELAY = 60`
 ```
 index
 ├─ core
+│  ├─ component-type
 │  ├─ app-runtime
+│  │  ├─ component-type
 │  │  ├─ compiler-runtime ─ component-watchers / component-lifecycle
 │  │  ├─ dom-host
 │  │  ├─ node-factory ─ component-lifecycle / vnode-helpers
@@ -124,6 +128,8 @@ vite-plugin
 ```
 
 **핵심 규칙:** source 모듈은 `app-runtime` singleton을 역으로 import하지 않는다.
+
+`core.js`가 `app-runtime.js`의 팩토리를 조립하는 정방향 import는 허용한다. 그 밖의 하위 구현 모듈은 `app-runtime.js`, `core.js`, `index.js`를 역으로 import하지 않는다. `component-type.js`의 `componentSetups`와 `runtime-context.js`의 `runtimeContextStack`은 각 모듈의 private 상태다.
 
 ---
 
