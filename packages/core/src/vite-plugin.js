@@ -1,8 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { transformAsync } from '@babel/core';
-import jsxTransform from '@babel/plugin-transform-react-jsx';
-import aeuiTransform from './babel-plugin.js';
+import { fileURLToPath } from 'node:url';
 import { parse } from 'parse5';
 
 const VIRTUAL_ENTRY_ID = 'virtual:aeui-entry';
@@ -13,6 +11,7 @@ const ROUTE_GLOB_EXTENSIONS = 'js,jsx,ts,tsx,mjs,cjs';
 const DEFAULT_ROUTER_DIR = 'src/pages';
 const DEFAULT_ALIAS = '@';
 const DEFAULT_ALIAS_DIR = 'src';
+const CORE_ROOT = normalizePath(fileURLToPath(new URL('../', import.meta.url)));
 
 function normalizePath(filePath) {
   return String(filePath || '').replace(/\\/g, '/');
@@ -135,6 +134,8 @@ function shouldTransform(id) {
   const filePath = id.split('?')[0];
   if (!ROUTE_EXT_RE.test(filePath)) return false;
   if (filePath.includes('/node_modules/')) return false;
+  // Linked workspace packages resolve outside node_modules; never compile ourselves.
+  if (normalizePath(filePath).startsWith(CORE_ROOT)) return false;
   return true;
 }
 
@@ -154,6 +155,9 @@ function createParserPlugins(filePath) {
 
 export default function aeui(options = {}) {
   let root = process.cwd();
+  let development = false;
+  const compiler = options.compiler ?? 'swc';
+  if (!['swc', 'babel'].includes(compiler)) throw new TypeError('[AEUI] compiler must be "swc" or "babel".');
 
   return {
     name: 'aeui:vite',
@@ -165,6 +169,7 @@ export default function aeui(options = {}) {
 
     configResolved(config) {
       root = config.root;
+      development = config.command === 'serve';
     },
 
     transformIndexHtml: {
@@ -201,6 +206,15 @@ export default function aeui(options = {}) {
       if (!shouldTransform(id)) return null;
       const filePath = id.split('?')[0];
 
+      if (compiler === 'swc') {
+        const { default: transform } = await import('./swc-transform.js');
+        const result = transform(code, { filename: filePath, development });
+        return { code: result.code, map: result.map ? JSON.parse(result.map) : null };
+      }
+      const [{ transformAsync }, { default: jsxTransform }, { default: aeuiTransform }] = await Promise.all([
+        import('@babel/core'), import('@babel/plugin-transform-react-jsx'), import('./babel-plugin.js'),
+      ]);
+
       const result = await transformAsync(code, {
         babelrc: false,
         configFile: false,
@@ -211,8 +225,8 @@ export default function aeui(options = {}) {
         plugins: [
           aeuiTransform,
           [jsxTransform, {
-            pragma: 'AEUI.createElement',
-            pragmaFrag: 'AEUI.Fragment',
+            runtime: 'automatic',
+            importSource: 'aeui',
           }],
         ],
         sourceMaps: true,

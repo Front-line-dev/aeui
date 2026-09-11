@@ -1,6 +1,6 @@
 # 06. 이벤트와 입력
 
-AEUI에서 이벤트를 처리하고 폼 입력을 다루는 방법을 설명합니다.
+이벤트 핸들러는 사용자가 버튼을 누르거나 입력값을 바꿀 때 실행되는 함수입니다. JSX의 `onClick`, `onInput` 같은 속성에 지정합니다.
 
 ---
 
@@ -15,11 +15,12 @@ function ClickExample() {
   return (
     <div>
       <button onClick={() => count++}>클릭: {count}</button>
-      <button onMouseEnter={() => console.log('마우스 진입!')}>호버</button>
     </div>
   );
 }
 ```
+
+버튼을 누르면 `count`가 증가하고 다음 프레임에 버튼의 숫자가 바뀝니다.
 
 ### 주요 이벤트
 
@@ -90,7 +91,7 @@ function SearchBox() {
 }
 ```
 
-> **`onInput` vs `onChange`:** AEUI에서는 `onInput`을 권장합니다. `onChange`는 포커스를 잃을 때만 발생하는 반면, `onInput`은 값이 바뀔 때마다 즉시 발생합니다.
+텍스트를 편집하는 동안 상태를 갱신하려면 `onInput`을 사용합니다. `onChange`의 발생 시점은 입력 종류와 확정 동작에 따라 다릅니다. 텍스트 입력에서는 편집 후 포커스를 떠날 때, 체크박스에서는 선택 상태가 바뀔 때 발생합니다. [HTML 입력 이벤트 규칙](https://html.spec.whatwg.org/multipage/input.html#common-event-behaviors)을 따릅니다.
 
 ### 체크박스
 
@@ -170,7 +171,7 @@ function NumberInput() {
 }
 ```
 
-사용자가 직접 input에 타이핑해도, 다음 렌더에서 `value` prop의 값으로 돌아옵니다.
+예를 들어 `120`을 입력하면 핸들러가 상태를 `100`으로 제한하고, 다음 렌더에서 입력란에도 `100`이 표시됩니다. 입력 이벤트에서 상태를 바꾸지 않으면 입력란은 다음 렌더에서 상태에 저장된 값으로 돌아옵니다.
 
 > **참고:** `type="file"` input은 보안 상 프로그래밍으로 `value`를 설정할 수 없으므로, AEUI도 value를 강제하지 않습니다.
 
@@ -179,8 +180,6 @@ function NumberInput() {
 ## 폼 조합 예시
 
 ```jsx
-import { watch } from 'aeui';
-
 function ContactForm() {
   let name = '';
   let email = '';

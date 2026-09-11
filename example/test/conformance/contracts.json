@@ -13,7 +13,7 @@
     "tier": "default",
     "source": "docs/user-scenario/02-components.md",
     "section": "props는 항상 최신",
-    "quote": "컴파일러가 props 저장 객체를 만들고, 매 render마다 최신 값을 다시 읽습니다.",
+    "quote": "부모가 전달한 props가 바뀌면 자식은 `return`하는 JSX를 다시 계산합니다.",
     "purpose": "부모 변경을 자식 props와 구조 분해에 반영한다.",
     "forbids": "이전 props를 읽거나 변경 때 자식을 재마운트하지 않는다."
   },
@@ -31,16 +31,16 @@
     "tier": "default",
     "source": "docs/user-scenario/02-components.md",
     "section": "컴포넌트 값 전달",
-    "quote": "컴파일러는 원래 함수의 일반 호출을 유지하고 컴포넌트 전용 setup을 별도로 준비합니다.",
+    "quote": "일반 호출에는 독립적인 컴포넌트 상태나 생명주기가 생기지 않습니다.",
     "purpose": "일반 함수 호출과 컴포넌트 실행을 구분한다.",
     "forbids": "일반 호출을 render factory로 바꾸거나 콜백을 미리 실행하지 않는다."
   },
   "CMP-PREPARE": {
     "kind": "public",
     "tier": "default",
-    "source": "docs/user-scenario/02-components.md",
-    "section": "자동 준비 범위",
-    "quote": "수동으로 render 함수를 반환하는 기존 setup 함수도 사용할 수 있습니다.",
+    "source": "docs/tutorial/compiler-setup.md",
+    "section": "컴포넌트 자동 준비 범위",
+    "quote": "render 함수를 직접 반환하는 setup 함수도 사용할 수 있습니다.",
     "purpose": "지원하는 함수 형태와 수동 render를 실행한다.",
     "forbids": "미지원 타입을 조용히 렌더하거나 async 본문을 실행하지 않는다."
   },
@@ -319,14 +319,14 @@
     "tier": "extra",
     "source": "docs/user-scenario/07-project-config.md",
     "section": "import 경로",
-    "quote": "AEUI는 세 가지 import 경로를 제공합니다:",
-    "purpose": "설치한 패키지의 세 진입점을 ESM·CJS로 사용한다.",
+    "quote": "AEUI는 다음 import 경로를 제공합니다:",
+    "purpose": "설치한 패키지의 공개 진입점과 JSX runtime을 ESM·CJS로 사용한다.",
     "forbids": "workspace source 해석이나 누락된 export를 성공으로 간주하지 않는다."
   },
   "CONFIG-BABEL": {
     "kind": "public",
     "tier": "default",
-    "source": "docs/user-scenario/07-project-config.md",
+    "source": "docs/tutorial/compiler-setup.md",
     "section": "Babel 직접 설정 (Vite 없이)",
     "quote": "AEUI 플러그인이 먼저, JSX 변환 플러그인이 뒤에 와야 합니다.",
     "purpose": "문서의 Babel 조합으로 JSX를 변환하고 실행한다.",
@@ -475,5 +475,23 @@
     "quote": "상대 링크와 heading이 실제 존재",
     "purpose": "사용자와 기여자의 로컬 문서 링크가 유효한 대상에 도달하게 한다.",
     "forbids": "삭제한 문서나 존재하지 않는 heading으로 안내하지 않는다."
+  },
+  "JSX-RUNTIME": {
+    "kind": "public",
+    "tier": "default",
+    "source": "docs/tutorial/jsx-runtime.md",
+    "section": "automatic과 classic의 차이",
+    "quote": "두 방식 모두 AEUI의 VNode를 생성합니다.",
+    "purpose": "Babel·SWC의 automatic 및 개발용 JSX 변환이 AEUI의 상태·자식·key 계약을 따르는지 확인한다.",
+    "forbids": "runtime 또는 Fragment를 분리하거나 입력 props를 수정하고 key·자식·cleanup을 잃지 않는다."
+  },
+  "SWC-COMPILER": {
+    "kind": "public",
+    "tier": "default",
+    "source": "docs/tutorial/compiler-setup.md",
+    "section": "SWC로 변환하기",
+    "quote": "`aeui/swc`는 컴포넌트 변환과 JSX 변환을 함께 수행합니다.",
+    "purpose": "SWC 자체 컴포넌트 변환을 Babel과 같은 사용자 계약으로 검증한다.",
+    "forbids": "Babel을 호출하거나 상태·binding·일반 함수 호출·source map을 변형하지 않는다."
   }
 }

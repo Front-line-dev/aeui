@@ -19,6 +19,19 @@ npm run preview:landing
 
 정적 빌드 결과는 `landing/dist`입니다. 상대 경로로 빌드하므로 `/aeui/`, 다른 저장소 이름, 커스텀 도메인에서 같은 결과물을 사용할 수 있습니다. 코어 소스를 수정했다면 개발 서버를 재시작해 런타임도 다시 빌드하세요.
 
+## 웹 컴파일러를 사용하는 이유
+
+방문자는 페이지의 코드 편집기에서 JSX를 수정하고 바로 실행할 수 있습니다. 이 소스는 랜딩을 빌드할 때 아직 존재하지 않으므로 미리 JavaScript로 변환할 수 없습니다. 별도 컴파일 서버 없이 정적 페이지에서 이 기능을 제공하기 위해 브라우저용 Babel Standalone을 사용합니다.
+
+코드 전달과 실행은 다음 순서로 진행됩니다.
+
+1. 편집기가 변경된 JSX 문자열을 Web Worker에 보냅니다.
+2. Worker가 AEUI Babel 플러그인으로 setup/render·props·hook을 변환하고, JSX 변환과 반복문 제한을 적용합니다.
+3. 변환된 JavaScript를 실행용 iframe에 전달합니다.
+4. iframe의 AEUI runtime이 컴포넌트를 실행합니다. 이후 상태 변경은 runtime이 처리하며 코드를 다시 컴파일하지 않습니다.
+
+Babel Standalone은 코드 편집기의 의존성입니다. 일반 Vite 앱과 `example/letProps`, `example/shoppingCart`는 Node.js에서 SWC로 미리 컴파일하므로 브라우저에서 Babel을 로딩하지 않습니다. 컴파일 경로를 나눈 이유는 [내부 구현 문서](../docs/internal-implement/20-swc-compiler.md#앱-실행과-웹-코드-편집기의-차이)에 설명합니다.
+
 ## 내용과 예제 수정
 
 - `index.html`: 영어 기본 문구, 섹션, 읽기 전용 JSX 코드, 문서 링크, Simple Analytics 스크립트

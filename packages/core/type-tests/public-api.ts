@@ -1,5 +1,6 @@
 import aeuiTransform from 'aeui/babel-plugin';
 import aeui from 'aeui/vite';
+import swc from 'aeui/swc';
 import {
   AEUI,
   clean,
@@ -49,3 +50,8 @@ console.log(typeof aeuiTransform({ types: {} }));
 console.log(typeof aeui());
 console.log(typeof aeui({ alias: false }));
 console.log(typeof aeui({ alias: '~', aliasDir: 'src' }));
+console.log(swc('export default () => <p/>;', { filename: 'App.jsx' }).code);
+aeui({ compiler: 'swc' });
+aeui({ compiler: 'babel' });
+// @ts-expect-error compiler 선택지 검사
+aeui({ compiler: 'other' });

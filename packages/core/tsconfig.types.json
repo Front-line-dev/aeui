@@ -4,6 +4,8 @@
     "target": "ES2020",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "aeui",
     "lib": [
       "ES2020",
       "DOM",
@@ -14,6 +16,7 @@
   },
   "include": [
     "types/**/*.d.ts",
-    "type-tests/**/*.ts"
+    "type-tests/**/*.ts",
+    "type-tests/**/*.tsx"
   ]
 }

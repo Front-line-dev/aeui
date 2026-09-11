@@ -34,6 +34,8 @@ it('[INTERNAL-STRUCTURE.11] 하위 모듈은 조립 모듈을 역참조하지 �
       'ImportDeclaration|ExportNamedDeclaration|ExportAllDeclaration'(p) {
         const target = p.node.source?.value;
         if (!target?.startsWith('.') || ['index.js', 'core.js'].includes(file)) return;
+        // Public JSX adapters delegate to the assembled runtime; lower layers still cannot.
+        if (target === './core.js' && ['jsx-runtime.js', 'jsx-create-element.js'].includes(file)) return;
         expect(['app-runtime.js', 'core.js', 'index.js'], `${file} -> ${target}`).not.toContain(path.basename(target));
       },
       VariableDeclarator(p) {

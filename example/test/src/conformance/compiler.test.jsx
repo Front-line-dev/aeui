@@ -105,7 +105,7 @@ it.each([
   expect(container.querySelector('main > div')).toBeNull();
 });
 
-it('[CONFIG-BABEL.10] 문서의 Babel 조합이 일반 호출·문자열·비교식과 다른 모듈의 훅을 보존한다', () => {
+it('[CONFIG-BABEL.10] 문서의 classic Babel 조합이 일반 호출·문자열·비교식과 다른 모듈의 훅을 보존한다', () => {
   const sink = [];
   const container = app.mount(() => () => null);
   run(`

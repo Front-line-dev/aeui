@@ -54,10 +54,6 @@ component의 첫 parameter가 ArrayPattern 또는 ArrayPattern assignment인 문
 - 판별할 수 없는 component pattern의 dev warning
 - 명시적인 component annotation 또는 helper API
 
-### JSX import와 빌드 설정 간소화
-
-- `aeui/jsx-runtime` 제공 검토
-
 ### GitHub Pages 배포
 
 - base path와 SPA fallback 가이드

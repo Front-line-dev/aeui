@@ -12,4 +12,6 @@
 
 ### `AEUI-EXAMPLE-001`: Standalone 예제의 ESM 실행
 
-적합성 extra 구축 중 `letProps`와 `shoppingCart`의 `eval()`이 컴파일러가 삽입한 `import` 문을 실행하지 못하는 문제가 확인되었다. 공통 `standalone-runner.js`에서 훅을 명시적으로 import한 뒤 변환된 ESM을 Blob module로 실행하도록 수정했다. extra의 `REFERENCE-APPS.12`·`.13`이 실제 화면 갱신과 브라우저 오류 부재를 검증한다.
+적합성 extra 구축 당시 `letProps`와 `shoppingCart`의 `eval()`이 컴파일러가 삽입한 `import` 문을 실행하지 못하는 문제가 확인되었다. 당시에는 공통 실행기에서 훅을 명시적으로 import하고 변환된 ESM을 Blob module로 실행하도록 수정했다.
+
+현재 두 예제는 Vite/SWC 빌드로 전환했으며, Babel Standalone과 공통 실행기를 제거했다. extra의 `REFERENCE-APPS.12`·`.13`은 웹 컴파일러 없이 빌드 결과를 실행해 화면 갱신과 브라우저 오류 부재를 검증한다.

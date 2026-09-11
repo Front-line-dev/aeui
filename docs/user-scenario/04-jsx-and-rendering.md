@@ -1,12 +1,12 @@
 # 04. JSX와 렌더링
 
-AEUI는 **JSX**를 사용해 화면을 구성합니다. React의 JSX와 거의 동일하지만, 몇 가지 AEUI 고유의 특징이 있습니다.
+JSX는 화면 요소를 JavaScript 코드 안에서 태그 형태로 작성하는 문법입니다. 속성과 텍스트에 값을 넣고, 조건과 배열을 사용해 표시할 요소를 정합니다.
 
 ---
 
 ## JSX 기본
 
-JSX는 HTML처럼 보이는 JavaScript 확장 문법입니다:
+컴포넌트에서 JSX를 반환하면 해당 구조가 화면에 표시됩니다:
 
 ```jsx
 function Welcome() {
@@ -37,7 +37,7 @@ function Welcome() {
 
 ## Fragment — 감싸는 태그 없이 묶기
 
-여러 요소를 반환할 때 AEUI Babel/Vite 플러그인이 인접한 JSX 요소를 Fragment로 자동 묶습니다. 감싸는 태그를 직접 작성하지 않아도 됩니다:
+여러 요소를 반환할 때 AEUI Babel/SWC/Vite 변환기가 인접한 JSX 요소를 Fragment로 자동 묶습니다. 감싸는 태그를 직접 작성하지 않아도 됩니다:
 
 ```jsx
 function UserInfo() {
@@ -48,7 +48,7 @@ function UserInfo() {
 }
 ```
 
-Fragment는 실제 DOM 요소를 만들지 않고, 자식들을 그대로 부모에 삽입합니다. 기존처럼 `<>...</>`를 직접 작성해도 됩니다.
+Fragment는 실제 DOM 요소를 만들지 않고, 자식들을 그대로 부모에 삽입합니다. `<>...</>`를 직접 작성할 수도 있습니다.
 
 ### Fragment 자동 처리
 
@@ -71,7 +71,7 @@ items.map(item => <dt>{item.name}</dt><dd>{item.description}</dd>);
 <><strong>{name}</strong>님, {message}</>
 ```
 
-이미 부모 JSX 태그 안에 있는 자식, 쉼표로 구분한 배열 항목, 별도 문장의 JSX는 추가로 묶지 않습니다. 이 문법 확장은 AEUI Babel/Vite 플러그인이 적용되는 빌드에서 제공하며, 일반 JSX 파서만 사용하는 편집기·포매터·TypeScript 문법 검사는 인접 요소를 오류로 표시할 수 있습니다. 그런 도구와 함께 쓰는 파일에서는 명시적 `<>...</>`를 사용할 수 있습니다.
+이미 부모 JSX 태그 안에 있는 자식, 쉼표로 구분한 배열 항목, 별도 문장의 JSX는 추가로 묶지 않습니다. 이 문법 확장은 AEUI Babel/SWC/Vite 변환기가 적용되는 빌드에서 제공하며, 일반 JSX 파서만 사용하는 편집기·포매터·TypeScript 문법 검사는 인접 요소를 오류로 표시할 수 있습니다. 그런 도구와 함께 쓰는 파일에서는 명시적 `<>...</>`를 사용할 수 있습니다.
 
 ---
 

@@ -1,6 +1,7 @@
 import type { Plugin } from 'vite';
 
 export interface AeuiViteOptions {
+  compiler?: 'swc' | 'babel';
   alias?: string | false;
   aliasDir?: string;
   appEntry?: string;

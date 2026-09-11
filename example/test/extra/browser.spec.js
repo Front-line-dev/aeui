@@ -61,18 +61,28 @@ test('[REFERENCE-APPS.11] 깊은 비교 예제는 같은 값 재할당에 반응
   await expect(page.locator('body')).not.toContainText('FAIL:');
 });
 
-test('[REFERENCE-APPS.12] Babel Standalone props 예제는 부모·자식을 갱신하며 컴파일 오류를 남기지 않는다', async ({ page }) => {
-  await page.route('https://unpkg.com/@babel/standalone/babel.min.js', route => route.fulfill({ path: path.join(root, 'node_modules/@babel/standalone/babel.min.js'), contentType: 'application/javascript' }));
-  await page.goto(url(4) + '/example/letProps/');
+async function loadBuiltExample(page, offset) {
+  const requested = [];
+  page.on('request', request => requested.push(request.url()));
+  // Only the local static build is available; compiler CDN requests cannot pass.
+  await page.route('**/*', route => new URL(route.request().url()).origin === url(offset) ? route.continue() : route.abort());
+  await page.goto(url(offset));
+  await expect(page.locator('script[type="text/aeui-code"]')).toHaveCount(0);
+  expect(await page.evaluate(() => typeof window.Babel)).toBe('undefined');
+  expect(requested.every(request => new URL(request).origin === url(offset))).toBe(true);
+  expect(requested.some(request => /\/assets\/[^/]+\.js$/.test(new URL(request).pathname))).toBe(true);
+}
+
+test('[REFERENCE-APPS.12] 빌드한 props 예제는 웹 컴파일러 없이 부모·자식을 갱신한다', async ({ page }) => {
+  await loadBuiltExample(page, 4);
   await page.getByRole('button', { name: "Increment Parent's Let Variable" }).click();
   await expect(page.locator('#root')).toContainText('Local Count: 1');
   await expect(page.locator('strong')).toHaveText('1');
   await expect(page.locator('pre')).toHaveCount(0);
 });
 
-test('[REFERENCE-APPS.13] Babel Standalone 장바구니는 기존 항목을 유지하며 수량·합계를 갱신한다', async ({ page }) => {
-  await page.route('https://unpkg.com/@babel/standalone/babel.min.js', route => route.fulfill({ path: path.join(root, 'node_modules/@babel/standalone/babel.min.js'), contentType: 'application/javascript' }));
-  await page.goto(url(4) + '/example/shoppingCart/');
+test('[REFERENCE-APPS.13] 빌드한 장바구니는 웹 컴파일러 없이 항목을 유지하며 수량·합계를 갱신한다', async ({ page }) => {
+  await loadBuiltExample(page, 6);
   await expect(page.locator('li')).toHaveCount(3);
   const first = page.locator('li').first();
   await first.evaluate(node => { node.dataset.identity = 'retained'; });

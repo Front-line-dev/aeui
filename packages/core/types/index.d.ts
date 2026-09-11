@@ -52,6 +52,12 @@ export interface AeuiApp {
 
 export declare const AEUI: AeuiApp;
 
+export declare function createElement<P = Record<string, unknown>>(
+  tag: VNodeTag<P>,
+  props?: P | null,
+  ...children: Renderable[]
+): VNode<P>;
+
 export declare function watch(
   callback: () => void,
   deps?: readonly unknown[] | (() => readonly unknown[])

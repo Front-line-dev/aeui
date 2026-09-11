@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { afterEach, it, expect } from 'vitest';
 import plugin from 'aeui/vite';
 
@@ -51,4 +52,21 @@ it('[INTERNAL-COMPILER.11] 가짜 script 문자열은 진입점 주입을 막지
   expect(p.transformIndexHtml.handler(fake).tags).toHaveLength(1);
   const manual = '<script src="/src/main.js" type="module"></script>';
   expect(p.transformIndexHtml.handler(manual)).toBe(manual);
+});
+
+it('[INTERNAL-COMPILER.12] symlink로 연결한 AEUI 패키지는 다시 컴파일하지 않고 앱 JSX만 변환한다', async () => {
+  const p = plugin();
+  const require = createRequire(import.meta.url);
+  for (const entry of ['aeui', 'aeui/jsx-runtime', 'aeui/jsx-dev-runtime']) {
+    const file = fs.realpathSync(require.resolve(entry));
+    expect(await p.transform(fs.readFileSync(file, 'utf8'), file)).toBeNull();
+  }
+  const result = await p.transform('export function App() { return <p>app</p>; }', path.join(fixture(), 'App.jsx'));
+  expect(result.code).toContain('"aeui/jsx-runtime"');
+});
+
+it('[CONFIG-OPTIONS.12] Babel을 명시적으로 선택할 수 있고 잘못된 compiler를 조용히 대체하지 않는다', async () => {
+  expect(() => plugin({compiler:'unknown'})).toThrow(/compiler/);
+  const result = await plugin({compiler:'babel'}).transform('export function App(){return <p/>;}', path.join(fixture(),'App.jsx'));
+  expect(result.code).toContain('registerComponent');
 });

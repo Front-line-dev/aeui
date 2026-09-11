@@ -1,74 +1,42 @@
 # 02. 컴포넌트
 
-AEUI의 컴포넌트는 **함수**입니다. React와 비슷하게 보이지만, 근본적으로 다른 점이 하나 있습니다.
+AEUI의 컴포넌트는 화면에 표시할 내용을 반환하는 함수입니다. 함수 안에 상태를 두고 JSX로 표시하면, 상태를 바꿨을 때 화면이 갱신됩니다.
 
 ---
 
-## React와의 핵심 차이
+## 컴포넌트 작성하기
 
-같은 카운터를 React와 AEUI로 비교해 보세요:
-
-**React** — 버튼을 누를 때마다 함수 전체가 다시 실행됩니다:
+다음 카운터는 `count`를 버튼에 표시하고, 클릭할 때 값을 하나씩 늘립니다.
 
 ```jsx
-function Counter() {
-  // ← 매 렌더마다 이 줄부터 전부 재실행
-  const [count, setCount] = useState(0);
-  console.log('렌더!');  // 클릭할 때마다 출력
-
-  return <button onClick={() => setCount(count + 1)}>{count}</button>;
-}
-```
-
-**AEUI** — 함수 본문은 처음 한 번만 실행되고, `return` 부분만 반복됩니다:
-
-```jsx
-function Counter() {
-  // ← 처음 화면에 나타날 때 한 번만 실행
-  let count = 0;              // 일반 let 변수가 곧 상태
-  console.log('마운트!');      // 딱 한 번만 출력
-
-  return <button onClick={() => count++}>{count}</button>;
-  //                           ↑ setter 함수 없이 직접 변경
-  //     ↑ 이 부분만 화면 갱신 시마다 다시 실행
-}
-```
-
-핵심 차이를 정리하면:
-
-- **함수 실행**: React는 매 렌더마다 전체 재실행 / AEUI는 최초 1회만 실행
-- **상태**: React는 `useState` 훅 / AEUI는 일반 `let` 변수
-- **갱신**: React는 `setState` 호출 / AEUI는 자동 변경 감지
-
----
-
-## 왜 이게 가능할까? — Babel 컴파일러
-
-AEUI의 Babel 컴파일러가 빌드 시점에 `return`을 함수로 감쌉니다:
-
-```jsx
-// 여러분이 작성한 코드
 function Counter() {
   let count = 0;
-  return <button onClick={() => count++}>{count}</button>;
+  console.log('카운터 시작');
+
+  return <button onClick={() => count++}>클릭: {count}</button>;
 }
 ```
 
-```jsx
-// 컴포넌트 전용 setup의 개념
-function CounterSetup() {
-  let count = 0;
-  return () => <button onClick={() => count++}>{count}</button>;
-}
-```
+처음 화면에는 `클릭: 0`이 표시됩니다. 버튼을 두 번 누르면 `클릭: 2`가 됩니다. 함수 본문의 `카운터 시작` 로그는 이 컴포넌트가 마운트될 때 한 번 출력됩니다.
 
-컴포넌트 전용 setup에서 `return` 뒤에 `() =>`가 붙으면서 함수 본문(**setup** — 한 번)과 반환된 함수(**render** — 매번)로 나뉩니다. 이 변환은 자동이므로 신경 쓸 필요 없습니다.
+## setup과 render
 
-> **참고:** 위 카운터 예제에서 `let count = 0`으로 상태를 선언하고 `count++`로 직접 변경했습니다. AEUI가 이 변경을 어떻게 감지하는지는 [03. 반응성](03-reactivity.md)에서 설명합니다.
+상태를 유지하면서 화면을 갱신하도록 컴포넌트 실행을 두 단계로 나눕니다.
+
+| 단계 | 카운터에서 하는 일 | 실행 시점 |
+|---|---|---|
+| setup | `count`를 만들고 시작 로그 출력 | 컴포넌트가 마운트될 때 한 번 |
+| render | 현재 `count`를 읽어 버튼 내용 생성 | 첫 화면과 이후 화면 갱신 때 |
+
+버튼을 눌러도 `let count = 0`을 다시 실행하지 않으므로 증가한 값이 유지됩니다. 바뀐 `count`를 사용해 `return`하는 JSX를 다시 계산합니다.
+
+[03. 반응성](03-reactivity.md)에서 상태 변경이 반영되는 시점과 `watch`·`clean`을 이어서 다룹니다.
 
 ---
 
 ## Props 받기
+
+Props는 부모 컴포넌트가 자식에게 전달하는 입력입니다. JSX 속성으로 값을 넘기고, 자식은 함수의 첫 번째 인자로 받습니다.
 
 ### 기본 형태
 
@@ -110,30 +78,26 @@ function Button({ label, ...rest }) {
 
 ### props는 항상 최신
 
-setup은 한 번만 실행되는데, 구조 분해한 props는 어떻게 최신 값을 유지할까요?
+부모가 전달한 props가 바뀌면 자식은 `return`하는 JSX를 다시 계산합니다.
 
 ```jsx
-// 여러분이 작성한 코드
 function Display({ message }) {
   return <p>{message}</p>;
 }
-```
 
-```jsx
-// Babel 컴파일러가 변환한 코드 (개념)
-function Display(_initialProps) {
-  const _props = { ..._initialProps };      // props 저장 객체
-  let { message } = _initialProps;
+function MessageEditor() {
+  let message = '안녕하세요';
 
-  return (_newProps) => {
-    Object.assign(_props, _newProps);        // 매 render마다 최신 props로 갱신
-    ({ message } = _props);
-    return <p>{message}</p>;
-  };
+  return (
+    <div>
+      <input value={message} onInput={e => message = e.target.value} />
+      <Display message={message} />
+    </div>
+  );
 }
 ```
 
-컴파일러가 props 저장 객체를 만들고, 매 render마다 최신 값을 다시 읽습니다. 자동이므로 신경 쓸 필요 없습니다.
+입력란의 글자를 바꾸면 `Display`에 표시되는 글자도 바뀝니다. 자식을 다시 마운트하거나 별도 갱신 함수를 호출할 필요는 없습니다. setup에서 다른 지역 변수에 복사해 둔 값은 [값을 저장하는 위치](#setup에서-저장한-값과-render에서-읽는-값)에 따라 동작이 달라집니다.
 
 ---
 
@@ -204,19 +168,7 @@ function App() {
 - `const View = 'section'`이면 `<View />`는 HTML 요소입니다. `null`, 숫자, 일반 객체, 이미 생성한 VNode는 태그로 사용할 수 없습니다.
 - 콜백을 props로 전달해도 판별을 위해 호출하지 않습니다. 함수가 태그 자리에 도달할 때 컴포넌트로 실행합니다.
 
-컴파일러는 원래 함수의 일반 호출을 유지하고 컴포넌트 전용 setup을 별도로 준비합니다. 따라서 `badge({ text: '일반 호출' })`는 원래처럼 VNode를 반환합니다. 일반 호출에는 독립적인 컴포넌트 상태나 생명주기가 생기지 않으며, `watch`·`clean`의 setup 전용 규칙도 그대로 적용됩니다.
-
-### 자동 준비 범위
-
-AEUI Babel/Vite 플러그인이 처리하는 함수 선언·함수 표현식·화살표 함수가 대상입니다.
-
-- JSX 또는 AEUI VNode 생성 표현식을 반환하는 함수는 이름·export 여부와 관계없이 준비합니다. 함수를 반환하는 팩토리의 내부 함수도 포함합니다.
-- 같은 파일의 JSX 태그·AEUI 생성/초기화 호출·JSX props에서 함수 정의까지 추적되는 값도 준비합니다. 별칭, 재할당, 조건식과 단순 객체 속성을 추적합니다.
-- export된 함수의 `null`, 문자열·숫자 등의 리터럴, props 및 children 참조 반환도 준비합니다. JSX가 없는 파일도 플러그인의 처리 대상입니다.
-- import·re-export는 정의 파일에서 준비된 함수 값을 그대로 전달합니다. 사용하는 파일에서 외부 함수의 소스를 추측하거나 실행하지 않습니다.
-- 수동으로 render 함수를 반환하는 기존 setup 함수도 사용할 수 있습니다. 준비되지 않은 함수가 VNode 등을 바로 반환하면 컴파일이 필요하다는 오류를 기록합니다. async/generator 컴포넌트는 지원하지 않습니다.
-
-함수나 getter의 실행 결과를 빌드 중 알아내는 전역 분석은 수행하지 않습니다. JSX가 없고 위 사용 근거도 없는 외부 함수, `bind`·Proxy 등으로 새로 만든 함수, 객체/class 메서드는 자동 준비 범위 밖입니다. 해당 함수는 미리 AEUI로 빌드하거나 수동 setup/render 계약을 만족해야 합니다. 앱 시작은 모듈 평가가 끝난 뒤 수행해야 합니다. 순환 import 평가 중 등록 전에 마운트하는 경우는 [알려진 결함](../issue/known-defects.md)에서 추적합니다.
+`badge({ text: '일반 호출' })`처럼 일반 함수로 호출하면 VNode를 반환합니다. 일반 호출에는 독립적인 컴포넌트 상태나 생명주기가 생기지 않습니다. `watch`·`clean`은 컴포넌트의 setup에서 호출해야 합니다.
 
 ### setup에서 저장한 값과 render에서 읽는 값
 

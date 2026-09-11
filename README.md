@@ -47,7 +47,7 @@ npm의 물리적 패키지 이름은 `a-easy-ui`이고, 앱에서는 `aeui`라�
 
 ## 동작을 이해하기
 
-- **Setup은 마운트마다 1회 실행됩니다.** Babel 플러그인이 컴포넌트의 반환 부분을 렌더 함수로 바꿉니다. 이후에는 렌더 함수가 반복 실행됩니다.
+- **Setup은 마운트마다 1회 실행됩니다.** AEUI 컴파일러가 컴포넌트의 반환 부분을 렌더 함수로 바꿉니다. 이후에는 렌더 함수가 반복 실행됩니다.
 - **DOM 이벤트에서 바꾼 상태는 다음 프레임에 반영됩니다.** `count++`, `items.push()`, 객체 속성 수정처럼 일반 JavaScript를 사용합니다.
 - **타이머·네트워크 등 외부 비동기 변경은 polling으로 감지합니다.** 활성 화면에서 약 1초까지 기다릴 수 있으며 백그라운드 탭은 브라우저의 실행 제한을 받습니다.
 - **`watch(callback)`은 매 렌더마다, `watch(callback, [deps])`는 값이 바뀔 때 실행됩니다.** `clean(callback)`은 언마운트 정리를 등록합니다. 두 hook은 setup에서 호출합니다.
@@ -63,6 +63,7 @@ React와 JSX 문법은 비슷하지만 컴포넌트 실행 방식, 이벤트, ho
 
 - [시작하기](docs/user-scenario/01-getting-started.md)
 - [컴포넌트](docs/user-scenario/02-components.md) · [반응성](docs/user-scenario/03-reactivity.md) · [라우팅](docs/user-scenario/05-routing.md)
+- [튜토리얼 — JSX runtime, Babel·SWC, TypeScript 설정](docs/tutorial/README.md)
 - [전체 문서와 문서 우선순위](docs/README.md)
 - [기여하기](CONTRIBUTING.md) · [보안 문제 신고](SECURITY.md) · [릴리즈 절차](docs/releasing.md)
 
@@ -81,7 +82,7 @@ npm run build
 | `packages/create-aeui-app` | 프로젝트 생성 CLI와 템플릿 |
 | `example/test` | 단위·통합·회귀 테스트 |
 | `example/commerce-admin` | 종합 예제 |
-| `docs` | 사용자 계약, 내부 설계, 결함과 계획 |
+| `docs` | 개발 흐름과 사용자 계약, 튜토리얼, 내부 설계, 결함과 계획 |
 
 ## 라이선스
 

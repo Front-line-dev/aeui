@@ -1,0 +1,85 @@
+import { AEUI, watch } from 'aeui';
+
+const CartItem = ({ item, onIncrease, onDecrease }) => {
+  console.log(`[CartItem:${item.id}] Setup`);
+
+  // Watch for quantity changes
+  watch(() => {
+     console.log(`[CartItem:${item.id}] Quantity changed to: ${item.quantity}`);
+  }, [item.quantity]);
+
+  // Render
+  return (
+      <li style="margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; display: flex; align-items: center;">
+        <span style="margin-right: 10px;">
+          {item.name} ({item.price}원)
+        </span>
+        <button onClick={() => onDecrease(item.id)}>-</button>
+        <span style="margin: 0 10px; font-weight: bold;">{item.quantity}</span>
+        <button onClick={() => onIncrease(item.id)}>+</button>
+      </li>
+  );
+};
+
+const ShoppingCart = () => {
+  // State
+  const items = [
+    { id: 1, name: "사과", price: 1000, quantity: 1 },
+    { id: 2, name: "바나나", price: 2000, quantity: 2 },
+    { id: 3, name: "체리", price: 3000, quantity: 5 },
+  ];
+
+  // Actions (Mutations)
+  const increase = (id) => {
+    const item = items.find((i) => i.id === id);
+    if (item) item.quantity++;
+  };
+
+  const decrease = (id) => {
+    const item = items.find((i) => i.id === id);
+    if (item && item.quantity > 0) item.quantity--;
+  };
+
+  // Computed
+  const getTotal = () =>
+    items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  // Watch
+  watch(() => {
+    console.log(`[ShoppingCart] Total Price: ${getTotal()}원`);
+  }, [getTotal()]);
+
+  return (
+    <div style="padding: 20px; font-family: sans-serif;">
+      <h1>장바구니 (AEUI Framework)</h1>
+      <ul style="list-style: none; padding: 0;">
+        {items.map((item) => (
+          <CartItem
+            key={item.id}
+            item={item}
+            onIncrease={increase}
+            onDecrease={decrease}
+          />
+        ))}
+      </ul>
+      <hr />
+      <h3>총 합계: {getTotal()}원</h3>
+      {getTotal() >= 20000 && (
+        <p style="color: green; font-weight: bold;">
+          🎉 무료 배송 대상입니다!
+        </p>
+      )}
+    </div>
+  );
+};
+
+const App = () => {
+  return (
+    <div>
+      <ShoppingCart />
+    </div>
+  );
+};
+
+const root = document.getElementById("root");
+AEUI.init(App, root);

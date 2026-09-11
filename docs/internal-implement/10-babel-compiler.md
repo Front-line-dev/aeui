@@ -2,9 +2,18 @@
 
 ## 개요
 
-AEUI Babel 플러그인은 사용자가 작성한 컴포넌트 코드를 **AEUI 런타임이 이해할 수 있는 형태로 변환**하는 컴파일 타임 도구이다.
+AEUI Babel 플러그인은 컴포넌트 함수의 AST를 읽고, 원본 함수와 컴포넌트 실행용 setup을 연결하는 변환기다. 반환 표현식은 render 함수로 준비하고 props·hook 처리를 runtime bridge에 연결한다.
 
-AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은 이 Babel 플러그인이 컴포넌트를 setup/render 이중 구조로 바꿔주기 때문에 가능하다. 플러그인 없이는 AEUI 컴포넌트가 정상 동작하지 않는다.
+setup은 마운트 때 상태를 만들고, render는 그 상태를 읽어 화면을 갱신한다. 플러그인은 이 구조를 빌드 시점에 준비하며, 실행 중 변경 감지와 DOM 갱신은 runtime이 담당한다. 로컬 Vite의 기본 변환 경로는 [SWC 컴파일러](20-swc-compiler.md)다.
+
+### 처리 순서
+
+1. 소스를 파싱하고 인접 JSX를 Fragment로 묶는다.
+2. 함수의 반환값과 사용 위치, binding을 분석해 컴포넌트 후보를 찾는다.
+3. 원본 함수의 일반 호출을 유지하면서 setup·render와 props·hook 처리를 준비한다.
+4. 필요한 import와 runtime 등록을 넣고, 후속 JSX 변환기에 AST를 넘긴다.
+
+사용자 설정은 [Babel·SWC 튜토리얼](../tutorial/compiler-setup.md)에 있다. 아래에서는 각 단계가 만드는 코드와 binding 처리 규칙을 다룬다.
 
 ### 플러그인이 수행하는 5가지 변환
 
@@ -23,6 +32,10 @@ AEUI에서 `let count = 0; count++;`만으로 UI가 업데이트되는 동작은
 이 문서의 변환 예시에서 `_props`는 컴파일러가 만드는 props 저장 객체를 나타내는 설명용 이름이다. 실제 플러그인은 사용자 코드와 충돌하지 않는 식별자를 선택해야 하며, 생성되는 이름은 공개 API가 아니다.
 
 ### 전체 변환 흐름
+
+컴포넌트 변환 뒤에 JSX lowering을 적용한다. Babel 경로는 automatic JSX 변환으로 `aeui/jsx-runtime`의 `jsx`·`jsxs`·`Fragment`를 import한다. SWC 경로도 AEUI 변환 후의 JSX를 같은 runtime 호출로 바꾼다. 아래 `AEUI.createElement` 예시는 classic 방식의 개념 구조다.
+
+Vite의 Babel 경로는 `runtime: 'automatic'`, `importSource: 'aeui'`를 함께 지정한다. 첫 옵션은 JSX 호출과 import의 생성 방식을 선택하고, 두 번째 옵션은 해당 함수를 제공하는 패키지를 정한다. JSX 변환 플러그인은 이 설정만으로 setup/render 분리를 수행하지 않으므로 AEUI 플러그인을 먼저 적용한다. Vite 외부에서 설정을 구성하는 절차는 [Babel·SWC 튜토리얼](../tutorial/compiler-setup.md#babel-직접-설정-vite-없이)에 설명한다.
 
 ```javascript
 // 사용자 코드

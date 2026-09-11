@@ -14,7 +14,7 @@ AEUI는 크게 세 계층으로 구성된다:
 │   AEUI, watch, clean                    │
 ├─────────────────────────────────────────┤
 │            컴파일 계층                   │
-│   babel-plugin.js, vite-plugin.js       │
+│   Babel/SWC, vite-plugin.js       │
 ├─────────────────────────────────────────┤
 │             런타임 계층                  │
 │   core.js, app-runtime.js,             │
@@ -23,8 +23,8 @@ AEUI는 크게 세 계층으로 구성된다:
 └─────────────────────────────────────────┘
 ```
 
-- **앱 코드**: `AEUI`, `watch`, `clean` 세 가지만 사용
-- **컴파일 계층**: Babel 플러그인이 컴포넌트를 setup/render 구조로 변환
+- **앱 코드**: `AEUI`, `watch`, `clean` 사용. JSX 변환기는 automatic runtime과 fallback `createElement`를 자동 import
+- **컴파일 계층**: 선택한 Babel 또는 SWC 변환기가 컴포넌트를 setup/render 구조로 변환
 - **런타임 계층**: VDOM diffing, 스케줄러, 반응성 시스템 등 핵심 로직
 
 ---

@@ -4,6 +4,16 @@
 
 이 문서는 AEUI 문서의 **역할, 권위 순서, 읽기 순서**를 정의하는 루트 인덱스다.
 
+## 문서 역할
+
+| 위치 | 독자와 목적 |
+|---|---|
+| `user-scenario/` | 앱 개발자가 프로젝트 생성, 화면 작성, 상태 변경, 빌드로 이어지는 일반적인 개발 흐름과 동작 계약을 확인한다. |
+| `tutorial/` | 앱 개발자가 특정 기능이나 설정을 이해하고 적용한다. 배경, 선택 기준, 설정과 실행 예시를 제공한다. |
+| `internal-implement/` | 프레임워크 개발자가 변환 과정, 자료구조, 모듈 경계와 알고리즘을 확인한다. |
+
+튜토리얼과 내부 문서는 같은 주제를 다룰 수 있다. 튜토리얼은 사용자가 적용하는 방법을, 내부 문서는 그 동작을 구현하는 방법을 설명하고 서로 연결한다.
+
 ## 문서 권위
 
 문서 간 내용이 충돌하면 다음 우선순위를 따른다.
@@ -16,6 +26,8 @@
 
 구현이 `user-scenario`와 일치하지 않는 항목은 [`issue/known-defects.md`](issue/known-defects.md)에서 추적한다.
 
+`tutorial/`은 일반적인 개발 흐름을 보충하는 사용자 가이드다. 튜토리얼의 설정·예시도 검증하며, 공개 동작 설명이 `user-scenario`와 충돌하면 `user-scenario`를 따른다.
+
 ## user-scenario
 
 | # | 문서 | 한 줄 요약 |
@@ -26,7 +38,17 @@
 | 04 | [JSX와 렌더링](user-scenario/04-jsx-and-rendering.md) | JSX 문법, Fragment, 조건부 렌더링, 리스트와 key |
 | 05 | [라우팅](user-scenario/05-routing.md) | 파일 기반 라우팅, 동적 경로, 레이아웃 |
 | 06 | [이벤트와 입력](user-scenario/06-event-handling.md) | 이벤트 핸들링, controlled input, 폼 처리 |
-| 07 | [프로젝트 설정](user-scenario/07-project-config.md) | Vite 플러그인 옵션, 빌드 설정, npm 패키지 구조 |
+| 07 | [프로젝트 설정](user-scenario/07-project-config.md) | 앱의 Vite 설정 조정과 빌드 |
+
+## tutorial
+
+[튜토리얼 안내](tutorial/README.md)에서 필요한 가이드를 선택한다.
+
+| 문서 | 다루는 내용 |
+|---|---|
+| [JSX runtime 이해하기](tutorial/jsx-runtime.md) | JSX import, runtime 옵션의 이유, automatic·classic 방식 |
+| [Babel과 SWC 직접 설정하기](tutorial/compiler-setup.md) | Vite 외의 빌드 과정에 컴포넌트·JSX 변환 연결 |
+| [TypeScript JSX 설정하기](tutorial/typescript-jsx.md) | TSX 타입 설정과 컴포넌트 props 검사 |
 
 ## internal-implement
 
@@ -51,6 +73,7 @@
 | 17 | [소스 배치](internal-implement/17-source-layout.md) | 파일 경계, 모듈별 심볼 |
 | 18 | [적합성 검증](internal-implement/18-conformance.md) | 테스트 설계 원칙, 검증 범위 |
 | 19 | [컴포넌트 값 판별 검증](internal-implement/19-component-type-validation.md) | 값 기반 판별 적용, 회귀 검증과 지원 경계 |
+| 20 | [SWC 컴파일러](internal-implement/20-swc-compiler.md) | SWC AST 기반 컴포넌트 변환과 Babel 동등성 검증 |
 | — | [설계 결정](internal-implement/design-decisions.md) | 주요 설계 선택과 근거 |
 
 ## issue
@@ -63,9 +86,20 @@
 ## 권장 읽기 순서
 
 - **처음 사용:** `user-scenario/01` → 순서대로 읽기
+- **특정 기능·설정 적용:** `tutorial/README` → 필요한 가이드 → 관련 내부 문서
 - **프레임워크 수정:** 이 인덱스 → `internal-implement/01` → 관련 문서
 - **결함 수정:** `issue/known-defects.md` → 관련 내부 문서 → 코드
 - **기능 추가:** `issue/planned-features.md` → 관련 내부 문서 → 코드
+
+## 문서 작성 방식
+
+본문은 다루는 기능의 역할과 필요한 이유부터 설명한다. 짧은 예시로 동작을 보여준 뒤 설정과 선택 사항을 소개하고, 실행 후 확인할 결과를 적는다.
+
+- 사용자 시나리오는 개발자가 작성할 코드와 화면에서 관찰할 동작을 순서대로 설명한다.
+- 튜토리얼은 개념, 선택 기준, 설정, 결과 확인을 연결한다. 하나의 예시에는 하나의 핵심 동작을 담는다.
+- 내부 문서는 역할과 입력·출력, 처리 순서를 먼저 설명하고 자료구조·예외 규칙을 뒤에서 다룬다.
+- 현재 API와 동작을 직접 서술한다. 버전이 없는 과거 비교나 변경 보고 표현으로 스펙을 설명하지 않는다.
+- 예시의 코드와 설명을 함께 확인한다. 문서 이동이나 제목 변경 시 관련 링크와 검증 근거도 갱신한다.
 
 ## 공개와 기여
 

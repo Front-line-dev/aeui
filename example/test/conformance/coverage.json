@@ -1,7 +1,7 @@
 [
   {
     "source": "docs/user-scenario/01-getting-started.md",
-    "sha256": "f8fb34b6322e75115210de3a2c7a6fb47cd012144b40156856bee5be1c47d024",
+    "sha256": "44ac8194171f81c079d7414975ecf31120fb90eb7a6abe0cfb654cad1bba883c",
     "sections": [
       {
         "heading": "프로젝트 만들기",
@@ -44,21 +44,21 @@
   },
   {
     "source": "docs/user-scenario/02-components.md",
-    "sha256": "aa352f935df44a2ae52bdac5f192b147a0a0306051bd3810cb6c74fbe1257659",
+    "sha256": "d74d4756b02efb7981215677f0aa2e73fc9517420e51360e4f0f335d4fb59644",
     "sections": [
       {
-        "heading": "React와의 핵심 차이",
+        "heading": "컴포넌트 작성하기",
         "contracts": [
           "CMP-SETUP"
         ],
         "review": {
           "id": "REVIEW-02-01",
           "result": "reviewed",
-          "reason": "React 비교 설명은 외부 라이브러리를 설치해 대조하지 않는다. AEUI의 setup 횟수와 상태 독립성을 직접 검증한다."
+          "reason": "카운터의 setup 횟수와 상태 보존을 직접 검증한다. 예시의 콘솔 문구 자체는 고정된 API가 아니다."
         }
       },
       {
-        "heading": "왜 이게 가능할까? — Babel 컴파일러",
+        "heading": "setup과 render",
         "contracts": [
           "CMP-SETUP",
           "CONFIG-BABEL"
@@ -66,7 +66,7 @@
         "review": {
           "id": "REVIEW-02-02",
           "result": "reviewed",
-          "reason": "변환 코드는 개념 설명이다. 생성 변수명과 전체 코드 문자열은 공개 계약으로 고정하지 않는다."
+          "reason": "사용자가 관찰하는 초기화와 갱신 과정을 설명한다. 내부 생성 변수명과 전체 변환 문자열은 공개 계약으로 고정하지 않는다."
         }
       },
       {
@@ -86,13 +86,12 @@
         "contracts": [
           "CMP-TYPE",
           "CMP-CALL",
-          "CMP-PREPARE",
           "CMP-CAPTURE"
         ],
         "review": {
           "id": "REVIEW-02-05",
           "result": "reviewed",
-          "reason": "자동 준비 제외 범위는 지원 보장이 아니다. 순환 모듈 평가 중 마운트는 AEUI-COMPILER-001로 추적하며 적합성 통과로 해결되었다고 표시하지 않는다."
+          "reason": "함수 값의 전달·교체와 setup에서 저장한 값의 동작을 검토한다. 자동 준비 범위와 순환 모듈 평가의 제한은 컴파일러 튜토리얼에서 별도로 다룬다."
         }
       },
       {
@@ -112,7 +111,7 @@
   },
   {
     "source": "docs/user-scenario/03-reactivity.md",
-    "sha256": "87570d3d79455bc11b04119e396a8de98a06a36a82ba8eed0b5c641522b983e6",
+    "sha256": "5a0dd25bbb18348333d77c24a6ce58e663b41933396da94c63e33576b80be76b",
     "sections": [
       {
         "heading": "변경 감지의 원리",
@@ -190,7 +189,7 @@
   },
   {
     "source": "docs/user-scenario/04-jsx-and-rendering.md",
-    "sha256": "4939fca48b70637c30b61ccc476ac24cd51b87bd77654a946323f426546149a8",
+    "sha256": "d36fba660de473ef4e4f13536cda119c68dd49760e39e7d683f40f22d3cdded7",
     "sections": [
       {
         "heading": "JSX 기본",
@@ -321,7 +320,7 @@
   },
   {
     "source": "docs/user-scenario/06-event-handling.md",
-    "sha256": "c2bbc42d06d2c084c1eba053afadb033414f45f442983f23f663bb0a2c1b822d",
+    "sha256": "acd8687d84efaca36af393c32b03dd2179cd1503a4e469caabbbcd72c41f2fa1",
     "sections": [
       {
         "heading": "이벤트 핸들링",
@@ -370,7 +369,7 @@
   },
   {
     "source": "docs/user-scenario/07-project-config.md",
-    "sha256": "b80a361f7af3ddb0c3a11802eb70fb8e12a2d2bf61d29a83cf2d69e27ae2f9b1",
+    "sha256": "51fce7b16d453355cef9d0467caffe47bfec11ab4c75df5b09a62ad57407926b",
     "sections": [
       {
         "heading": "Vite 플러그인 기본 설정",
@@ -384,9 +383,21 @@
         }
       },
       {
-        "heading": "플러그인 옵션",
+        "heading": "HTML 진입점",
         "contracts": [
-          "CONFIG-OPTIONS"
+          "CONFIG-ENTRY"
+        ]
+      },
+      {
+        "heading": "모드 자동 선택",
+        "contracts": [
+          "CONFIG-ENTRY"
+        ]
+      },
+      {
+        "heading": "import 경로",
+        "contracts": [
+          "CONFIG-PACKAGE"
         ]
       },
       {
@@ -397,15 +408,15 @@
         ]
       },
       {
-        "heading": "모드 자동 선택",
+        "heading": "빌드",
         "contracts": [
-          "CONFIG-ENTRY"
+          "CONFIG-BUILD"
         ]
       },
       {
-        "heading": "HTML 진입점",
+        "heading": "플러그인 옵션",
         "contracts": [
-          "CONFIG-ENTRY"
+          "CONFIG-OPTIONS"
         ]
       },
       {
@@ -413,24 +424,6 @@
         "contracts": [
           "START-CLI",
           "CONFIG-PACKAGE"
-        ]
-      },
-      {
-        "heading": "import 경로",
-        "contracts": [
-          "CONFIG-PACKAGE"
-        ]
-      },
-      {
-        "heading": "Babel 직접 설정 (Vite 없이)",
-        "contracts": [
-          "CONFIG-BABEL"
-        ]
-      },
-      {
-        "heading": "빌드",
-        "contracts": [
-          "CONFIG-BUILD"
         ]
       },
       {

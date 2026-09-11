@@ -34,24 +34,37 @@ beforeAll(() => {
   install(consumer);
 });
 
-it('[CONFIG-PACKAGE.10] 실제 tarball의 ESM·CJS 세 진입점은 로딩되며 private subpath는 열리지 않는다', () => {
+it('[CONFIG-PACKAGE.10] 실제 tarball의 ESM·CJS 공개 진입점은 같은 runtime을 공유하고 private subpath는 열리지 않는다', () => {
   expect(fs.lstatSync(path.join(consumer, 'node_modules/aeui')).isSymbolicLink()).toBe(false);
   for (const format of ['module', 'commonjs']) {
     const script = format === 'module' ? `
       import assert from 'node:assert/strict';
       import * as api from 'aeui'; import babel from 'aeui/babel-plugin'; import vite from 'aeui/vite';
-      assert.deepEqual(Object.keys(api).sort(), ['AEUI','clean','watch']);
+      import * as jsx from 'aeui/jsx-runtime'; import * as dev from 'aeui/jsx-dev-runtime';
+      import swc from 'aeui/swc';
+      assert.deepEqual(Object.keys(api).sort(), ['AEUI','clean','createElement','watch']);
       assert.equal(typeof babel, 'function'); assert.equal(typeof vite, 'function');
       assert.equal(api.AEUI.createElement('p', null, 'ok').children[0], 'ok');
       await assert.rejects(import('aeui/src/index.js'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
     ` : `
       const assert = require('node:assert/strict'), api = require('aeui');
-      assert.deepEqual(Object.keys(api).sort(), ['AEUI','clean','watch']);
+      const jsx = require('aeui/jsx-runtime'), dev = require('aeui/jsx-dev-runtime');
+      const swc = require('aeui/swc');
+      assert.deepEqual(Object.keys(api).sort(), ['AEUI','clean','createElement','watch']);
       assert.equal(typeof require('aeui/babel-plugin'), 'function');
       assert.equal(typeof require('aeui/vite'), 'function');
       assert.throws(() => require('aeui/src/index.js'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
     `;
-    node(['--input-type=' + format, '-e', script]);
+    node(['--input-type=' + format, '-e', script + `
+      assert.equal(typeof swc, 'function');
+      assert.match(swc('export default () => <p/>;').code, /registerComponent/);
+      assert.deepEqual(Object.keys(jsx).sort(), ['Fragment', 'jsx', 'jsxs']);
+      assert.deepEqual(Object.keys(dev).sort(), ['Fragment', 'jsxDEV']);
+      assert.equal(jsx.Fragment, api.AEUI.Fragment); assert.equal(dev.Fragment, jsx.Fragment);
+      assert.deepEqual(jsx.jsxs(jsx.Fragment, { children: ['a', 'b'] }).children, ['a', 'b']);
+      assert.deepEqual(dev.jsxDEV('p', { children: 0 }, 1, false).children, [0]);
+      assert.deepEqual(api.createElement('p', { children: 'fallback' }).children, ['fallback']);
+    `]);
   }
   for (const artifact of packed) {
     expect(artifact.files.some(file => /(^|\/)\.DS_Store$/.test(file.path))).toBe(false);
@@ -66,12 +79,33 @@ it('[CONFIG-PACKAGE.10] 실제 tarball의 ESM·CJS 세 진입점은 로딩되며
   }
 });
 
+it('[INTERNAL-PACKAGE.13] SWC와 기본 Vite 변환은 Babel을 로딩하지 않고 실제 패키지에서 실행된다', () => {
+  fs.writeFileSync(path.join(consumer, 'no-babel.mjs'), `
+    export async function resolve(specifier, context, next) {
+      if (specifier.startsWith('@babel/') || specifier.includes('babel-plugin')) throw new Error('Babel loaded: ' + specifier);
+      return next(specifier, context);
+    }
+  `);
+  node(['--experimental-loader', './no-babel.mjs', '--input-type=module', '-e', `
+    import assert from 'node:assert/strict'; import swc from 'aeui/swc'; import vite from 'aeui/vite';
+    const source = 'export default function App(){let count=0;return <button onClick={()=>count++}>{count}</button>}';
+    const compiled = swc(source, {filename:'App.jsx'});
+    assert.match(compiled.code, /registerComponent/); assert.match(compiled.code, /runRenderPhase/);
+    const output = await vite().transform(source, process.cwd() + '/App.jsx');
+    assert.match(output.code, /registerComponent/); assert.match(output.code, /aeui\\/jsx-runtime/);
+  `]);
+});
+
 it('[INTERNAL-PACKAGE.10] 독립 strict NodeNext에서 공개 타입은 통과하고 잘못된 훅·태그 인자는 거부한다', () => {
   fs.writeFileSync(path.join(consumer, 'contract.ts'), `
     import { AEUI, watch, clean } from 'aeui';
     import babel from 'aeui/babel-plugin'; import vite from 'aeui/vite';
+    import swc from 'aeui/swc';
     const vnode = AEUI.createElement('button', { onClick: (e: Event) => e.preventDefault() }, 'ok');
     watch(() => {}, () => [vnode]); clean(() => {}); vite({ rootId: 'app', styles: false }); void babel;
+    swc('export default () => <p/>;', {filename:'App.jsx',development:true}); vite({compiler:'babel'});
+    // @ts-expect-error 지원하지 않는 compiler
+    vite({compiler:'unknown'});
     // @ts-expect-error callback은 함수여야 한다.
     watch(3);
     // @ts-expect-error cleanup도 함수여야 한다.
@@ -81,6 +115,38 @@ it('[INTERNAL-PACKAGE.10] 독립 strict NodeNext에서 공개 타입은 통과�
   `);
   write(path.join(consumer, 'tsconfig.json'), { compilerOptions: { strict: true, noEmit: true, module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2020', lib: ['ES2020', 'DOM', 'ESNext.Disposable'], skipLibCheck: false }, files: ['contract.ts'] });
   node(['node_modules/typescript/bin/tsc', '-p', 'tsconfig.json']);
+});
+
+it('[INTERNAL-PACKAGE.12] 독립 TypeScript automatic·개발용 JSX의 타입과 실제 ESM 출력을 사용할 수 있다', () => {
+  fs.writeFileSync(path.join(consumer, 'jsx-contract.tsx'), `
+    import { Fragment, jsx } from 'aeui/jsx-runtime';
+    import { jsxDEV } from 'aeui/jsx-dev-runtime';
+    function Item({ label }: { label: string }) { return <p>{label}</p>; }
+    const Empty = () => null;
+    export const view = <><Item key="id" label="typed" /><Empty /></>;
+    export const fallback = <p {...{ children: 'prop' }} key="last" />;
+    jsx(Fragment, { children: view }); jsxDEV('i', { children: 'dev' }, 0, false);
+    // @ts-expect-error component의 필수 prop 누락
+    const missing = <Item />;
+    // @ts-expect-error component prop 타입 오류
+    const incorrect = <Item label={42} />;
+    // @ts-expect-error 잘못된 태그
+    if (false) jsx(42, {});
+  `);
+  for (const jsx of ['react-jsx', 'react-jsxdev']) {
+    write(path.join(consumer, 'tsconfig-jsx.json'), { compilerOptions: {
+      strict: true, noEmitOnError: true, module: 'NodeNext', moduleResolution: 'NodeNext',
+      target: 'ES2020', lib: ['ES2020', 'DOM'], skipLibCheck: false,
+      jsx, jsxImportSource: 'aeui', outDir: 'compiled',
+    }, files: ['jsx-contract.tsx'] });
+    node(['node_modules/typescript/bin/tsc', '-p', 'tsconfig-jsx.json']);
+    node(['--input-type=module', '-e', `
+      import assert from 'node:assert/strict'; import { AEUI } from 'aeui';
+      import { view, fallback } from './compiled/jsx-contract.js';
+      assert.equal(view.tag, AEUI.Fragment); assert.equal(view.children.length, 2);
+      assert.deepEqual(fallback.children, ['prop']); assert.equal(fallback.props.key, 'last');
+    `]);
+  }
 });
 
 it('[START-CLI.10] 배포 CLI는 문서의 router 프로젝트를 생성하고 설치·빌드되며 수동 main을 요구하지 않는다', () => {

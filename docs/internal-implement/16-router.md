@@ -23,7 +23,7 @@
   - `index.html`에 내부 가상 엔트리 `"/@aeui-entry"`를 주입한다.
   - `src/pages/**/*.{js,jsx,ts,tsx,mjs,cjs}`가 있으면 route module map을 만들고 `AEUI.__runtime.initDirectoryRouter(...)`를 호출한다.
   - 라우트 디렉터리가 없으면 `src/App.jsx`를 기존 단일 앱처럼 자동 부팅한다.
-  - 지원 확장자의 모듈 변환은 AEUI Babel 플러그인과 classic JSX transform을 같은 순서로 적용한다.
+  - 지원 확장자의 모듈은 기본 SWC 변환기에서 컴포넌트 변환과 automatic JSX 변환을 수행한다. `compiler: 'babel'`이면 AEUI Babel 플러그인과 automatic JSX 변환을 적용한다.
 
 - **`packages/core/src/router.js`**
   - route module map을 route table로 변환한다.

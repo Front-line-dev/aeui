@@ -6,12 +6,12 @@ AEUI의 모든 UI는 **VNode(Virtual Node)** 객체로 표현된다.
 
 VNode란, 실제 DOM(브라우저가 화면에 그리는 HTML 요소)을 나타내는 **가벼운 자바스크립트 객체**이다. 실제 DOM을 직접 조작하는 대신, VNode 객체를 비교하여 변경된 부분만 DOM에 반영하는 것이 VDOM(Virtual DOM) 방식의 핵심이다.
 
-사용자가 JSX 코드를 작성하면, Babel 트랜스파일러가 이를 `AEUI.createVNode()` 함수 호출로 변환하고, 이 함수가 VNode 객체를 생성한다.
+사용자가 JSX 코드를 작성하면, Babel 또는 SWC가 이를 JSX runtime 함수 호출로 변환한다. automatic 경로의 `jsx`·`jsxs`·`jsxDEV`는 `AEUI.createElement()`로 연결되고, classic 경로는 설정한 생성 함수를 직접 호출한다. VNode 생성은 `core.js`의 `createVNode()`가 담당한다.
 
 ```
 JSX 코드
-  ↓ Babel 변환 (빌드 시)
-AEUI.createVNode() 호출
+  ↓ Babel 또는 SWC 변환 (빌드 시)
+JSX runtime / AEUI.createElement() 호출
   ↓ 런타임 실행
 VNode 객체 생성
   ↓ reconcile에서 이전 RuntimeNode과 비교
@@ -218,7 +218,35 @@ AEUI.createElement = AEUI.createVNode;
 
 `createElement`는 `createVNode`의 **alias(별칭)**이다. 동일한 함수를 가리킨다.
 
-Vite의 JSX 설정에서 `jsxFactory`를 `'AEUI.createElement'` 또는 `'AEUI.createVNode'` 어느 쪽으로 지정해도 동작하도록 하기 위해 존재한다. React에서 `React.createElement`를 사용하는 관례에 맞춘 것이다.
+classic JSX 변환에서 이 함수를 사용한다. Vite의 기본 automatic 변환은 `jsx-runtime.js`를 거쳐 같은 VNode 생성 함수를 호출한다. 단일 자식은 하나의 인자로, 다중 자식은 개별 인자로 전달하여 `createVNode`의 1단계 평탄화를 적용한다.
+
+root named export인 `createElement`는 automatic JSX의 key/spread fallback용이다. 별도 자식 인자가 없으면 `props.children`을 전달하고, 있으면 그 인자를 우선한다. `AEUI.createElement` alias는 별도 자식 인자를 사용한다.
+
+## Automatic JSX runtime 연결
+
+JSX runtime은 변환기가 생성한 호출을 `core.js`의 VNode 생성 함수에 연결한다. `jsx-runtime.js`는 props·자식·key를 정리하고, `jsx-dev-runtime.js`는 개발용 호출을 같은 경로로 전달한다.
+
+### 생성 함수와 Fragment
+
+`jsx`와 `jsxs`는 AEUI의 VNode를 생성하며, `Fragment`는 `AEUI.Fragment`다. `jsx`는 자식을 하나의 인자로, `jsxs`는 자식이 배열이면 개별 인자로 `AEUI.createElement`에 전달한다. 이 구분으로 `createVNode`의 1단계 평탄화가 적용되는 깊이를 맞춘다.
+
+### Props와 자식
+
+`createJsxVNode`는 props에서 `children`을 분리하고 나머지 속성을 새 객체로 만든다. JSX 태그 안의 자식은 변환기가 `children` 값으로 넣으며, 명시적인 JSX 자식이 있으면 `children` prop보다 우선한다. 입력 props와 자식 배열은 수정하지 않는다.
+
+### Key와 spread
+
+속성 객체에 own `key`가 없고 별도 key 인자가 `undefined`가 아니면 그 key를 추가한다. key를 문자열로 변환하지 않는다. 뒤쪽 spread에서 들어온 own `key`는 `null`·`undefined`도 포함하여 별도 key 인자보다 우선한다.
+
+spread 뒤에 명시적 key가 있는 JSX는 변환기가 root named export `createElement` 호출로 처리한다. 이 함수는 별도 자식 인자가 없으면 `props.children`을 전달한다. `AEUI.createElement` alias와의 입력 차이는 위 절에 설명한다.
+
+### 개발용 호출
+
+`jsxDEV`는 정적 다중 자식 여부에 따라 `jsx` 또는 `jsxs`를 호출한다. source/self 위치 정보는 DOM props로 전달하지 않는다. 두 runtime의 `Fragment`는 같은 함수를 가리킨다.
+
+### 컴파일러 설정과 연결
+
+`runtime: 'automatic'`은 이 함수 호출과 import를 생성하는 방식이고, `importSource: 'aeui'`는 import할 패키지를 지정한다. setup/render 준비는 Babel·SWC의 AEUI 컴포넌트 변환기가 먼저 수행한다. 사용자 설정과 변환 전후 예시는 [JSX runtime 튜토리얼](../tutorial/jsx-runtime.md)을 참고한다.
 
 ---
 
@@ -232,10 +260,10 @@ Fragment는 **래핑 DOM 요소 없이** 여러 자식을 반환할 수 있게 �
 
 ### 왜 필요한가
 
-JSX에서 컴포넌트는 하나의 루트 요소만 반환할 수 있다. 여러 형제 요소를 반환하려면 `<div>`로 감싸야 하는데, DOM에 불필요한 래핑 요소가 추가된다.
+여러 형제 요소를 하나의 반환값으로 묶을 때 Fragment를 사용하면 추가 DOM 요소가 생기지 않는다. 명시적 `<>...</>`와 AEUI의 인접 JSX 자동 처리는 모두 Fragment VNode를 만들고 같은 자식 그룹 처리로 연결된다.
 
 ```jsx
-// ❌ 불필요한 <div> 래핑
+// div로 묶으면 DOM 요소도 하나 추가된다.
 function List() {
   return (
     <div>        {/* ← 이 div는 의미 없음 */}
@@ -289,7 +317,7 @@ function isFragmentVNode(AEUI, vnode) {
 
 ### 주의사항: Babel 플러그인과의 관계
 
-Fragment는 함수이지만, Babel 플러그인이 이를 일반 컴포넌트로 인식하여 `return () => children` 형태로 변환하면 안 된다. 이를 방지하기 위해 `vite.config.js`에서 `jsxFragmentFactory`를 별도로 설정하여, Babel이 Fragment를 일반 함수 호출이 아닌 Fragment 전용 처리를 하도록 해야 한다.
+JSX Fragment 변환은 runtime의 `Fragment`를 VNode의 tag로 사용한다. reconciler는 이 tag를 일반 함수 컴포넌트와 구분하여 자식 그룹으로 처리한다. `aeui/vite`가 JSX 변환과 Fragment 경로를 설정하므로 앱에서 `jsxFragmentFactory`를 별도로 지정할 필요는 없다.
 
 ---
 

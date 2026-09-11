@@ -21,6 +21,21 @@
       "types": "./types/vite.d.ts",
       "import": "./dist/vite-plugin.js",
       "require": "./dist/vite-plugin.cjs"
+    },
+    "./jsx-runtime": {
+      "types": "./types/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js",
+      "require": "./dist/jsx-runtime.cjs"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./types/jsx-dev-runtime.d.ts",
+      "import": "./dist/jsx-dev-runtime.js",
+      "require": "./dist/jsx-dev-runtime.cjs"
+    },
+    "./swc": {
+      "types": "./types/swc.d.ts",
+      "import": "./dist/swc-transform.js",
+      "require": "./dist/swc-transform.cjs"
     }
   },
   "typesVersions": {
@@ -33,6 +48,15 @@
       ],
       "*": [
         "types/index.d.ts"
+      ],
+      "jsx-runtime": [
+        "types/jsx-runtime.d.ts"
+      ],
+      "jsx-dev-runtime": [
+        "types/jsx-dev-runtime.d.ts"
+      ],
+      "swc": [
+        "types/swc.d.ts"
       ]
     }
   },
@@ -50,6 +74,18 @@
     "dist/vite-plugin.cjs.map",
     "dist/vite-plugin.js",
     "dist/vite-plugin.js.map",
+    "dist/jsx-runtime.js",
+    "dist/jsx-runtime.js.map",
+    "dist/jsx-runtime.cjs",
+    "dist/jsx-runtime.cjs.map",
+    "dist/jsx-dev-runtime.js",
+    "dist/jsx-dev-runtime.js.map",
+    "dist/jsx-dev-runtime.cjs",
+    "dist/jsx-dev-runtime.cjs.map",
+    "dist/swc-transform.js",
+    "dist/swc-transform.js.map",
+    "dist/swc-transform.cjs",
+    "dist/swc-transform.cjs.map",
     "src",
     "types"
   ],
@@ -67,13 +103,16 @@
   "license": "ISC",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
+    "@types/node": "^22.0.0",
     "rollup": "^4.63.1",
-    "typescript": "^5.9.3",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@babel/core": "^7.29.7",
     "@babel/plugin-transform-react-jsx": "^7.29.7",
+    "@jridgewell/remapping": "^2.3.5",
+    "@swc/core": "^1.16.2",
+    "magic-string": "^0.30.21",
     "parse5": "^8.0.1"
   },
   "repository": {

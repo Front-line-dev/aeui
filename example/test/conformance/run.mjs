@@ -15,12 +15,16 @@ const results = [];
 let cases;
 let failure;
 const reportPath = path.join(output, `${tier}-vitest.json`);
+const compilerReports = tier === 'default' ? ['swc', 'babel'].map(compiler => ({
+  compiler, path: path.join(output, `${tier}-${compiler}-vitest.json`),
+})) : [{ compiler: 'swc', path: reportPath }];
 const browserReportPath = path.join(output, 'extra-browser.json');
 fs.rmSync(reportPath, { force: true });
+for (const report of compilerReports) fs.rmSync(report.path, { force: true });
 fs.rmSync(path.join(output, `${tier}-summary.json`), { force: true });
 if (tier === 'extra') fs.rmSync(browserReportPath, { force: true });
 
-async function step(label, args, cwd = root) {
+async function step(label, args, cwd = root, env = {}) {
   const begin = Date.now();
   const log = fs.openSync(logPath, 'a');
   fs.writeSync(log, `\n${label}\n`);
@@ -29,7 +33,7 @@ async function step(label, args, cwd = root) {
     const code = await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, args, {
         cwd, stdio: ['ignore', log, log],
-        env: { ...process.env, FORCE_COLOR: '0', AEUI_CONFORMANCE: tier },
+        env: { ...process.env, FORCE_COLOR: '0', AEUI_CONFORMANCE: tier, ...env },
       });
       child.on('error', reject);
       child.on('exit', (code, signal) => resolve(signal ? 1 : code));
@@ -42,10 +46,12 @@ async function step(label, args, cwd = root) {
 try {
   cases = check();
   await step('코어 빌드', [path.join(root, 'node_modules/rollup/dist/bin/rollup'), '-c'], path.join(root, 'packages/core'));
-  await step(tier === 'default' ? '기본 적합성' : 'extra 패키지 소비', [
-    'node_modules/vitest/vitest.mjs', 'run', '--root', 'example/test', '--config', `vite.${tier === 'extra' ? 'extra.' : ''}config.js`,
-    '--reporter=json', `--outputFile=${reportPath}`,
-  ]);
+  for (const report of compilerReports) {
+    await step(tier === 'default' ? `기본 적합성 (${report.compiler})` : 'extra 패키지 소비', [
+      'node_modules/vitest/vitest.mjs', 'run', '--root', 'example/test', '--config', `vite.${tier === 'extra' ? 'extra.' : ''}config.js`,
+      '--reporter=json', `--outputFile=${report.path}`,
+    ], root, { AEUI_TEST_COMPILER: report.compiler });
+  }
   if (tier === 'extra') {
     await step('extra 브라우저', ['node_modules/@playwright/test/cli.js', 'test', '-c', 'example/test/playwright.config.js']);
   }
@@ -55,8 +61,8 @@ try {
   if (fs.existsSync(logPath)) console.error(fs.readFileSync(logPath, 'utf8').split('\n').slice(-25).join('\n').slice(-3500));
   process.exitCode = 1;
 } finally {
-  const report = fs.existsSync(reportPath) ? JSON.parse(fs.readFileSync(reportPath, 'utf8')) : null;
-  const assertions = report?.testResults.flatMap(file => file.assertionResults) || [];
+  const assertions = compilerReports.flatMap(report => fs.existsSync(report.path)
+    ? JSON.parse(fs.readFileSync(report.path, 'utf8')).testResults.flatMap(file => file.assertionResults) : []);
   const browserReport = tier === 'extra' && fs.existsSync(browserReportPath) ? JSON.parse(fs.readFileSync(browserReportPath, 'utf8')) : null;
   function browserTests(suite) {
     return [
